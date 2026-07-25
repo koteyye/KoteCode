@@ -127,10 +127,19 @@ export async function verifyConfig(raw: unknown): Promise<{ ok: true; config: Bo
   if (expires <= now) return { ok: false, error: { _tag: "Expired", expiresAt: config.expires_at, now } }
 
   // Verify the detached signature over the canonical unsigned message.
+  // The signature must be valid hex decoding to 64 bytes; anything else is a
+  // bad signature (not a crash). Wrap verifyAsync so a malformed signature or
+  // an internal library throw is reported as BadSignature.
   const msg = new TextEncoder().encode(signingMessage(config))
-  const sig = Buffer.from(config.signature, "hex")
   const pub = Buffer.from(KOTE_BOOTSTRAP_PUBLIC_KEY_HEX, "hex")
-  const valid = await verifyAsync(sig, msg, pub)
+  let valid = false
+  try {
+    const sig = Buffer.from(config.signature, "hex")
+    if (sig.length !== 64) throw new Error("signature must decode to 64 bytes")
+    valid = await verifyAsync(sig, msg, pub)
+  } catch {
+    valid = false
+  }
   if (!valid) return { ok: false, error: { _tag: "BadSignature" } }
 
   return { ok: true, config }
