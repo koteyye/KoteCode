@@ -75,4 +75,34 @@ export const Flag = {
   get OPENCODE_CLIENT() {
     return process.env["OPENCODE_CLIENT"] ?? "cli"
   },
+
+  // ── KoteCode brand variables (additive layer over OPENCODE_*) ──────────────
+  // These are evaluated at access time (like OPENCODE_CONFIG_DIR) so tests and
+  // CLI can set them at runtime. OPENCODE_* equivalents remain honored for the
+  // compatibility layer — KoteCode values take precedence when both are set.
+  // See docs/CONFIGURATION.md.
+  get KOTECODE_CONFIG() {
+    return process.env["KOTECODE_CONFIG"]
+  },
+  get KOTECODE_CONFIG_DIR() {
+    return process.env["KOTECODE_CONFIG_DIR"]
+  },
+  get KOTECODE_DATA_DIR() {
+    return process.env["KOTECODE_DATA_DIR"]
+  },
+  get KOTECODE_CACHE_DIR() {
+    return process.env["KOTECODE_CACHE_DIR"]
+  },
+  get KOTECODE_BOOTSTRAP_URL() {
+    return process.env["KOTECODE_BOOTSTRAP_URL"]
+  },
+  get KOTECODE_GATEWAY_URL() {
+    return process.env["KOTECODE_GATEWAY_URL"]
+  },
+  get KOTECODE_GATEWAY_API_KEY() {
+    return process.env["KOTECODE_GATEWAY_API_KEY"]
+  },
+  get KOTECODE_DISABLE_UPDATE_CHECK() {
+    return truthy("KOTECODE_DISABLE_UPDATE_CHECK")
+  },
 }

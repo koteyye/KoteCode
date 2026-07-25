@@ -61,9 +61,11 @@ export interface Interface {
 export function make(input: Partial<Interface> = {}): Interface {
   return {
     home: Path.home,
-    data: Path.data,
-    cache: Path.cache,
-    config: Flag.OPENCODE_CONFIG_DIR ?? Path.config,
+    // KoteCode overrides take precedence over OpenCode's, then the kotencode default.
+    // All three layers coexist (compatibility): OPENCODE_* still honored for the base.
+    data: Flag.KOTECODE_DATA_DIR ?? Path.data,
+    cache: Flag.KOTECODE_CACHE_DIR ?? Path.cache,
+    config: Flag.KOTECODE_CONFIG_DIR ?? Flag.OPENCODE_CONFIG_DIR ?? Path.config,
     state: Path.state,
     tmp: Path.tmp,
     bin: Path.bin,
