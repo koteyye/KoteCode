@@ -31,6 +31,8 @@ import { ModelV2 } from "@opencode-ai/core/model"
 import { ModelStatus } from "./model-status"
 import { RuntimeFlags } from "@/effect/runtime-flags"
 import { ProviderError } from "./error"
+import { resolveGateway } from "@opencode-ai/core/kote/bootstrap"
+import { Flag } from "@opencode-ai/core/flag/flag"
 
 const OPENAI_HEADER_TIMEOUT_DEFAULT = 300_000
 
@@ -957,6 +959,48 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
       return {
         autoload: input.source === "config",
         options,
+      }
+    }),
+    "kote-gateway": Effect.fnUntraced(function* (input: Info) {
+      // Resolve the Kote Gateway endpoint from the signed bootstrap configuration
+      // (or KOTECODE_GATEWAY_URL override). See packages/core/src/kote/bootstrap.ts.
+      // The resolved base_url becomes the provider's baseURL with highest precedence
+      // in resolveSDK — no separate HTTP client is created (spec ТЗ §9.5).
+      const resolved = yield* Effect.promise(() => resolveGateway())
+
+      // If the user already supplied a baseURL in config, honor it (local override).
+      if (input.options?.baseURL && resolved.source !== "environment") {
+        return {
+          autoload: input.source === "config",
+          options: {
+            baseURL: input.options.baseURL,
+            apiKey: Flag.KOTECODE_GATEWAY_API_KEY ?? input.options?.apiKey,
+            headers: { "X-Title": "kotencode" },
+          },
+        }
+      }
+
+      // Bootstrap unresolved and no override. Do not autoload; surface a clear error
+      // if the user actually tries to use the provider.
+      if (!("baseUrl" in resolved)) {
+        const failure = resolved
+        return {
+          autoload: false,
+          async getModel() {
+            throw new Error(
+              `Kote Gateway is unavailable: ${failure.reason}${failure.hint ? " — " + failure.hint : ""}`,
+            )
+          },
+        }
+      }
+
+      return {
+        autoload: input.source === "config",
+        options: {
+          baseURL: resolved.baseUrl,
+          apiKey: Flag.KOTECODE_GATEWAY_API_KEY ?? input.options?.apiKey,
+          headers: { "X-Title": "kotencode" },
+        },
       }
     }),
   }
