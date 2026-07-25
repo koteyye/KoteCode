@@ -1,5 +1,13 @@
 #!/usr/bin/env node
 
+// KoteCode launcher shim (Node). Resolves and execs the platform-specific
+// compiled binary produced by packages/opencode/script/build.ts.
+//
+// Binary name / sub-package prefix is "kotencode" (matches pkg.name in
+// packages/opencode/package.json, which build.ts uses to derive sub-package
+// names like kotencode-darwin-arm64). The OPENCODE_BIN_PATH env is honored as
+// a fallback alias for compatibility with the OpenCode base.
+
 const childProcess = require("child_process")
 const fs = require("fs")
 const path = require("path")
@@ -43,13 +51,14 @@ function run(target) {
   })
 }
 
-const envPath = process.env.OPENCODE_BIN_PATH
+// KOTECODE_BIN_PATH takes precedence; OPENCODE_BIN_PATH is honored as a
+// compatibility alias for users/scripts coming from the OpenCode base.
+const envPath = process.env.KOTECODE_BIN_PATH || process.env.OPENCODE_BIN_PATH
 
 const scriptPath = fs.realpathSync(__filename)
 const scriptDir = path.dirname(scriptPath)
 
-//
-const cached = path.join(scriptDir, ".opencode")
+const cached = path.join(scriptDir, ".kotencode")
 
 const platformMap = {
   darwin: "darwin",
@@ -70,8 +79,8 @@ let arch = archMap[os.arch()]
 if (!arch) {
   arch = os.arch()
 }
-const base = "opencode-" + platform + "-" + arch
-const binary = platform === "windows" ? "opencode.exe" : "opencode"
+const base = "kotencode-" + platform + "-" + arch
+const binary = platform === "windows" ? "kotencode.exe" : "kotencode"
 
 function supportsAvx2() {
   if (arch !== "x64") return false
@@ -189,7 +198,7 @@ function findBinary(startDir) {
 const resolved = envPath || (fs.existsSync(cached) ? cached : findBinary(scriptDir))
 if (!resolved) {
   console.error(
-    "It seems that your package manager failed to install the right version of the opencode CLI for your platform. You can try manually installing " +
+    "It seems that your package manager failed to install the right version of the kotencode CLI for your platform. You can try manually installing " +
       names.map((n) => `\"${n}\"`).join(" or ") +
       " package",
   )

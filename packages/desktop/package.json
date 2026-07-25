@@ -4,10 +4,10 @@
   "version": "1.18.5",
   "type": "module",
   "license": "MIT",
-  "homepage": "https://opencode.ai",
+  "homepage": "https://github.com/koteyye/KoteCode",
   "author": {
-    "name": "OpenCode",
-    "email": "hello@opencode.ai"
+    "name": "KoteCode",
+    "email": "hello@kotencode.ai"
   },
   "scripts": {
     "typecheck": "tsgo -b",

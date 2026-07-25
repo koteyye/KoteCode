@@ -15,7 +15,9 @@ import { httpClient } from "./effect/app-node-platform"
 export const CatalogModelStatus = Schema.Literals(["alpha", "beta", "deprecated"])
 export type CatalogModelStatus = typeof CatalogModelStatus.Type
 
-const USER_AGENT = `opencode/${InstallationChannel}/${InstallationVersion}/${Flag.OPENCODE_CLIENT}`
+// KoteCode brand: the models.dev catalog request is attributed to KoteCode.
+// Internal Installation* values still reflect the OpenCode base (compatibility layer).
+const USER_AGENT = `kotencode/${InstallationChannel}/${InstallationVersion}/${Flag.OPENCODE_CLIENT}`
 
 const CostTier = Schema.Struct({
   input: Schema.Finite,

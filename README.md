@@ -1,129 +1,162 @@
-<p align="center">
-  <a href="https://opencode.ai">
-    <picture>
-      <source srcset="packages/console/app/src/asset/logo-ornate-dark.svg" media="(prefers-color-scheme: dark)">
-      <source srcset="packages/console/app/src/asset/logo-ornate-light.svg" media="(prefers-color-scheme: light)">
-      <img src="packages/console/app/src/asset/logo-ornate-light.svg" alt="OpenCode logo">
-    </picture>
-  </a>
-</p>
-<p align="center">The open source AI coding agent.</p>
-<p align="center">
-  <a href="https://opencode.ai/discord"><img alt="Discord" src="https://img.shields.io/discord/1391832426048651334?style=flat-square&label=discord" /></a>
-  <a href="https://www.npmjs.com/package/opencode-ai"><img alt="npm" src="https://img.shields.io/npm/v/opencode-ai?style=flat-square" /></a>
-  <a href="https://github.com/anomalyco/opencode/actions/workflows/publish.yml"><img alt="Build status" src="https://img.shields.io/github/actions/workflow/status/anomalyco/opencode/publish.yml?style=flat-square&branch=dev" /></a>
-</p>
+```
+█  █ █▀▀█ █▀▀█ █▀▀█  █▀▀▀ █▀▀█ █▀▀█ █▀▀█
+█▀█  █  █  ██  █▀▀▀  █    █  █ █  █ █▀▀▀
+█ ▀█ ▀▀▀▀  ▀▀  ▀▀▀▀  ▀▀▀▀ ▀▀▀▀ ▀▀▀▀ ▀▀▀▀
+```
 
-<p align="center">
-  <a href="README.md">English</a> |
-  <a href="README.zh.md">简体中文</a> |
-  <a href="README.zht.md">繁體中文</a> |
-  <a href="README.ko.md">한국어</a> |
-  <a href="README.de.md">Deutsch</a> |
-  <a href="README.es.md">Español</a> |
-  <a href="README.fr.md">Français</a> |
-  <a href="README.it.md">Italiano</a> |
-  <a href="README.da.md">Dansk</a> |
-  <a href="README.ja.md">日本語</a> |
-  <a href="README.pl.md">Polski</a> |
-  <a href="README.ru.md">Русский</a> |
-  <a href="README.bs.md">Bosanski</a> |
-  <a href="README.ar.md">العربية</a> |
-  <a href="README.no.md">Norsk</a> |
-  <a href="README.br.md">Português (Brasil)</a> |
-  <a href="README.th.md">ไทย</a> |
-  <a href="README.tr.md">Türkçe</a> |
-  <a href="README.uk.md">Українська</a> |
-  <a href="README.bn.md">বাংলা</a> |
-  <a href="README.gr.md">Ελληνικά</a> |
-  <a href="README.vi.md">Tiếng Việt</a>
-</p>
+# KoteCode
 
-[![OpenCode Terminal UI](packages/web/src/assets/lander/screenshot.png)](https://opencode.ai)
+**KoteCode — AI coding agent based on OpenCode.**
+
+KoteCode is an independent fork of [OpenCode](https://github.com/anomalyco/opencode). It is
+**not** affiliated with, endorsed by, or an official product of the OpenCode team. It is a
+separate project that builds on OpenCode's MIT-licensed source code.
+
+> **Status:** `0.1.0-alpha.1` — internal testing only. Based on OpenCode `1.18.5`.
 
 ---
 
-### Installation
+## What is KoteCode?
+
+KoteCode is an AI coding agent you run from the terminal (TUI) or as a desktop app. It keeps
+all of OpenCode's core capabilities — multi-provider chat, tool calling, sessions, the `build`
+and `plan` agents — and adds:
+
+- The **Kote Gateway** as a first-class provider, whose endpoint is resolved at runtime from a
+  **signed bootstrap configuration** (no hardcoded gateway URL).
+- KoteCode-specific config directories and `KOTECODE_*` environment variables.
+- A `kotencode` CLI command and KoteCode branding.
+
+See [`docs/FORK_AUDIT.md`](./docs/FORK_AUDIT.md) for the full audit of what changed.
+
+## ⚠️ Cost & data warning
+
+Running KoteCode sends your prompts, code, and file contents to the AI provider you select.
+
+- **API costs:** Most providers bill per token. Review your provider's pricing. KoteCode
+  itself is free; the model usage is not.
+- **Data:** Whatever you ask KoteCode to read or write is transmitted to the selected
+  provider's endpoint. Understand your provider's data policy before sending sensitive code.
+
+## Connection modes
+
+KoteCode supports three ways to reach a model, and you always know which one is in use:
+
+| Mode | What it is | Endpoint |
+|---|---|---|
+| **Kote Gateway** | KoteCode's own gateway | Resolved at runtime from a **signed bootstrap config** (see below) |
+| **Direct OpenRouter** | Your own OpenRouter account | `openrouter.ai` (your key) |
+| **Other providers** | Anthropic, OpenAI, Google, Bedrock, Azure, … | Each provider's own endpoint |
+
+The Kote Gateway is presented explicitly as a provider — it is **not** a hidden substitution
+for OpenRouter or any other provider. KoteCode never silently switches you between modes.
+
+### How the Kote Gateway endpoint is resolved
+
+The real Kote Gateway address is **not** hardcoded in KoteCode. At startup KoteCode:
+
+1. Fetches a small, **Ed25519-signed** bootstrap configuration (over HTTPS, with a size cap
+   and timeout — no redirects to unknown domains, no code execution from the config).
+2. Verifies the signature against a public key baked into the binary.
+3. Checks `config_version`, `issued_at`, and `expires_at`.
+4. Uses the signed `gateway.base_url` as the provider's `baseURL`.
+
+This lets the gateway address change **without rebuilding KoteCode**. See
+[`docs/BOOTSTRAP.md`](./docs/BOOTSTRAP.md) for the format and signing process.
+
+**Override for local development / diagnostics:** you can force a specific gateway address
+without touching the bootstrap flow:
 
 ```bash
-# YOLO
-curl -fsSL https://opencode.ai/install | bash
-
-# Package managers
-npm i -g opencode-ai@latest        # or bun/pnpm/yarn
-scoop install opencode             # Windows
-choco install opencode             # Windows
-brew install anomalyco/tap/opencode # macOS and Linux (recommended, always up to date)
-brew install opencode              # macOS and Linux (official brew formula, updated less)
-sudo pacman -S opencode            # Arch Linux (Stable)
-paru -S opencode-bin               # Arch Linux (Latest from AUR)
-mise use -g opencode               # Any OS
-nix run nixpkgs#opencode           # or github:anomalyco/opencode for latest dev branch
+KOTECODE_GATEWAY_URL=https://your-test-endpoint.example/api/v1 kotencode
 ```
 
-> [!TIP]
-> Remove versions older than 0.1.x before installing.
+`KOTECODE_GATEWAY_URL` takes priority over the bootstrap configuration. The source of the
+currently active configuration (environment / remote bootstrap / cached bootstrap) is visible
+in diagnostics.
 
-### Desktop App (BETA)
+## Installation
 
-OpenCode is also available as a desktop application. Download directly from the [releases page](https://github.com/anomalyco/opencode/releases) or [opencode.ai/download](https://opencode.ai/download).
-
-| Platform              | Download                           |
-| --------------------- | ---------------------------------- |
-| macOS (Apple Silicon) | `opencode-desktop-mac-arm64.dmg`   |
-| macOS (Intel)         | `opencode-desktop-mac-x64.dmg`     |
-| Windows               | `opencode-desktop-windows-x64.exe` |
-| Linux                 | `.deb`, `.rpm`, or `.AppImage`     |
+> Alpha builds are produced by the draft release workflow. See [`docs/BUILD.md`](./docs/BUILD.md)
+> for building from source.
 
 ```bash
-# macOS (Homebrew)
-brew install --cask opencode-desktop
-# Windows (Scoop)
-scoop bucket add extras; scoop install extras/opencode-desktop
+# From a GitHub release (once published)
+curl -fsSL https://github.com/koteyye/KoteCode/raw/main/install | bash
 ```
 
-#### Installation Directory
-
-The install script respects the following priority order for the installation path:
-
-1. `$OPENCODE_INSTALL_DIR` - Custom installation directory
-2. `$XDG_BIN_DIR` - XDG Base Directory Specification compliant path
-3. `$HOME/bin` - Standard user binary directory (if it exists or can be created)
-4. `$HOME/.opencode/bin` - Default fallback
+Or build from source (requires [Bun](https://bun.sh) ≥ 1.3):
 
 ```bash
-# Examples
-OPENCODE_INSTALL_DIR=/usr/local/bin curl -fsSL https://opencode.ai/install | bash
-XDG_BIN_DIR=$HOME/.local/bin curl -fsSL https://opencode.ai/install | bash
+git clone https://github.com/koteyye/KoteCode.git
+cd KoteCode
+bun install
+./packages/opencode/script/build.ts --single     # produces dist/kotecode-*/bin/kotecode
 ```
 
-### Agents
+## Minimal configuration
 
-OpenCode includes two built-in agents you can switch between with the `Tab` key.
+KoteCode reads config from its own directories (separate from OpenCode's):
 
-- **build** - Default, full-access agent for development work
-- **plan** - Read-only agent for analysis and code exploration
-  - Denies file edits by default
-  - Asks permission before running bash commands
-  - Ideal for exploring unfamiliar codebases or planning changes
+| OS | Config dir |
+|---|---|
+| Linux | `~/.config/kotecode` |
+| macOS | `~/Library/Application Support/kotecode` |
+| Windows | `%APPDATA%\kotencode` |
 
-Also included is a **general** subagent for complex searches and multistep tasks.
-This is used internally and can be invoked using `@general` in messages.
+Create `~/.config/kotecode/kotecode.jsonc` (or use env vars):
 
-Learn more about [agents](https://opencode.ai/docs/agents).
+```jsonc
+{
+  // Use the Kote Gateway (endpoint resolved from signed bootstrap)
+  "provider": {
+    "kote-gateway": { "models": { /* your model ids */ } }
+  }
+}
+```
 
-### Documentation
+API keys: set `KOTECODE_GATEWAY_API_KEY` (Kote Gateway) or the provider's own env var. Keys
+are never written to logs or error messages. See [`docs/CONFIGURATION.md`](./docs/CONFIGURATION.md).
 
-For more info on how to configure OpenCode, [**head over to our docs**](https://opencode.ai/docs).
+### Migrating from an existing OpenCode install
 
-### Contributing
+KoteCode does **not** touch your OpenCode configuration automatically. To import non-secret
+settings on demand:
 
-If you're interested in contributing to OpenCode, please read our [contributing docs](./CONTRIBUTING.md) before submitting a pull request.
+```bash
+kotencode migrate-from-opencode            # copies non-secret settings only
+kotencode migrate-from-opencode --with-secrets   # also imports keys (explicit opt-in)
+```
 
-### Building on OpenCode
+Your original OpenCode files are left untouched.
 
-If you are working on a project that's related to OpenCode and is using "opencode" as part of its name, for example "opencode-dashboard" or "opencode-mobile", please add a note to your README to clarify that it is not built by the OpenCode team and is not affiliated with us in any way.
+## Environment variables
 
----
+KoteCode adds `KOTECODE_*` variables on top of OpenCode's `OPENCODE_*` (both still work):
 
-**Join our community** [Discord](https://discord.gg/opencode) | [X.com](https://x.com/opencode)
+| Variable | Purpose |
+|---|---|
+| `KOTECODE_CONFIG` | Path to a config file |
+| `KOTECODE_CONFIG_DIR` | Override the config directory |
+| `KOTECODE_DATA_DIR` | Override the data directory |
+| `KOTECODE_CACHE_DIR` | Override the cache directory |
+| `KOTECODE_BOOTSTRAP_URL` | Override the bootstrap config URL (dev/testing) |
+| `KOTECODE_GATEWAY_URL` | Force the gateway address (priority over bootstrap) |
+| `KOTECODE_GATEWAY_API_KEY` | Provide the gateway key via env (not written to config) |
+| `KOTECODE_DISABLE_UPDATE_CHECK` | Disable the update check |
+
+Full reference: [`docs/CONFIGURATION.md`](./docs/CONFIGURATION.md).
+
+## Documentation
+
+- [`docs/FORK_AUDIT.md`](./docs/FORK_AUDIT.md) — audit of the OpenCode base
+- [`docs/UPSTREAM.md`](./docs/UPSTREAM.md) — syncing from upstream OpenCode
+- [`docs/BOOTSTRAP.md`](./docs/BOOTSTRAP.md) — signed bootstrap config format & signing
+- [`docs/NETWORK.md`](./docs/NETWORK.md) — every network call KoteCode makes
+- [`docs/CONFIGURATION.md`](./docs/CONFIGURATION.md) — directories, env vars, modes
+- [`docs/BUILD.md`](./docs/BUILD.md) — building from source
+
+## License
+
+MIT — see [`LICENSE`](./LICENSE). KoteCode is based on OpenCode (© 2025 opencode, MIT); see
+[`THIRD_PARTY_NOTICES.md`](./THIRD_PARTY_NOTICES.md) for attribution.

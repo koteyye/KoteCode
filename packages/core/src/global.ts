@@ -7,7 +7,9 @@ import { Flock } from "./util/flock"
 import { Flag } from "./flag/flag"
 import { makeGlobalNode } from "./effect/app-node"
 
-const app = "opencode"
+// KoteCode brand: public XDG app name. Internal package names (@opencode-ai/*) and
+// OPENCODE_* env vars are intentionally kept (compatibility layer) — see docs/UPSTREAM.md.
+const app = "kotencode"
 const data = path.join(xdgData!, app)
 const cache = path.join(xdgCache!, app)
 const config = path.join(xdgConfig!, app)

@@ -9,7 +9,7 @@ import { UpgradeCommand } from "./cli/cmd/upgrade"
 import { UninstallCommand } from "./cli/cmd/uninstall"
 import { ModelsCommand } from "./cli/cmd/models"
 import { UI } from "./cli/ui"
-import { InstallationVersion } from "@opencode-ai/core/installation/version"
+import { InstallationVersion, versionString } from "@opencode-ai/core/installation/version"
 import { FormatError } from "./cli/error"
 import { ServeCommand } from "./cli/cmd/serve"
 import { DebugCommand } from "./cli/cmd/debug"
@@ -34,7 +34,7 @@ const args = hideBin(process.argv)
 
 function show(out: string) {
   const text = out.trimStart()
-  if (!text.startsWith("opencode ")) {
+  if (!text.startsWith("kotencode ")) {
     process.stderr.write(UI.logo() + EOL + EOL)
     process.stderr.write(text + EOL)
     return
@@ -44,7 +44,7 @@ function show(out: string) {
 
 const cli = yargs(args)
   .parserConfiguration({ "populate--": true })
-  .scriptName("opencode")
+  .scriptName("kotencode")
   .wrap(100)
   .help("help", "show help")
   .alias("help", "h")
@@ -116,6 +116,13 @@ const cli = yargs(args)
   .strict()
 
 try {
+  // KoteCode: print the composed version (KoteCode + upstream) for --version/-v.
+  // yargs' built-in .version() only takes a single string; emitting the two-line form
+  // here keeps `kotencode --version` spec-compliant (ТЗ §12).
+  if (args.includes("-v") || args.includes("--version")) {
+    process.stderr.write(versionString() + EOL)
+    process.exit(0)
+  }
   if (args.includes("-h") || args.includes("--help")) {
     await cli.parse(args, (err: Error | undefined, _argv: unknown, out: string) => {
       if (err) throw err

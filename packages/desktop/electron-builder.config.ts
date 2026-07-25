@@ -33,13 +33,13 @@ const channel = (() => {
 })()
 
 const APP_IDS = {
-  dev: "ai.opencode.desktop.dev",
-  beta: "ai.opencode.desktop.beta",
-  prod: "ai.opencode.desktop",
+  dev: "ai.kotecode.desktop.dev",
+  beta: "ai.kotecode.desktop.beta",
+  prod: "ai.kotecode.desktop",
 } as const
 
 const getBase = (appId: string): Configuration => ({
-  artifactName: "opencode-desktop-${os}-${arch}.${ext}",
+  artifactName: "kotencode-desktop-${os}-${arch}.${ext}",
   directories: {
     output: "dist",
     buildResources: "resources",
@@ -74,8 +74,8 @@ const getBase = (appId: string): Configuration => ({
     sign: true,
   },
   protocols: {
-    name: "OpenCode",
-    schemes: ["opencode"],
+    name: "KoteCode",
+    schemes: ["kotencode"],
   },
   win: {
     icon: `resources/icons/icon.ico`,
@@ -115,29 +115,29 @@ function getConfig() {
       return {
         ...base,
         appId,
-        productName: "OpenCode Dev",
-        rpm: { packageName: "opencode-dev" },
+        productName: "KoteCode Dev",
+        rpm: { packageName: "kotencode-dev" },
       }
     }
     case "beta": {
       return {
         ...base,
         appId,
-        productName: "OpenCode Beta",
-        protocols: { name: "OpenCode Beta", schemes: ["opencode"] },
-        publish: { provider: "github", owner: "anomalyco", repo: "opencode-beta", channel: "latest" },
-        rpm: { packageName: "opencode-beta" },
+        productName: "KoteCode Beta",
+        protocols: { name: "KoteCode Beta", schemes: ["kotencode"] },
+        publish: { provider: "github", owner: "koteyye", repo: "KoteCode", channel: "beta" },
+        rpm: { packageName: "kotencode-beta" },
       }
     }
     case "prod": {
       return {
         ...base,
         appId,
-        productName: "OpenCode",
-        protocols: { name: "OpenCode", schemes: ["opencode"] },
-        publish: { provider: "github", owner: "anomalyco", repo: "opencode", channel: "latest" },
+        productName: "KoteCode",
+        protocols: { name: "KoteCode", schemes: ["kotencode"] },
+        publish: { provider: "github", owner: "koteyye", repo: "KoteCode", channel: "latest" },
         deb: { fpm: [legacyDesktopEntryFpm] },
-        rpm: { packageName: "opencode", fpm: [legacyDesktopEntryFpm] },
+        rpm: { packageName: "kotencode", fpm: [legacyDesktopEntryFpm] },
       }
     }
   }
