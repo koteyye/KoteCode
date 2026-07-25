@@ -32,3 +32,16 @@ UPCOMING_CHANGELOG.md
 logs/
 *.bun-build
 tsconfig.tsbuildinfo
+
+# KoteCode: secrets must never enter the repo, build, or release artifacts.
+# The bootstrap signing private key lives OUTSIDE the repo (see docs/BOOTSTRAP.md).
+KoteCode-secret/
+*.key
+*.pem
+bootstrap-private*
+bootstrap.signed.private.json
+
+# Agent/tooling working dirs (not part of the project)
+.zcode/
+.serena/
+.omo/
