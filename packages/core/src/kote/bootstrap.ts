@@ -46,6 +46,27 @@ export interface BootstrapConfig {
   signature: string
 }
 
+function requireIsoDate(value: unknown, field: string): string {
+  if (typeof value !== "string") throw new Error(`bootstrap: ${field} not an ISO date`)
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime()) || date.toISOString() !== value) {
+    throw new Error(`bootstrap: ${field} not an ISO date`)
+  }
+  return value
+}
+
+function requireGatewayUrl(value: unknown, field: string): string {
+  if (typeof value !== "string" || value.trim() === "") throw new Error(`bootstrap: ${field} missing`)
+  let url: URL
+  try {
+    url = new URL(value)
+  } catch {
+    throw new Error(`bootstrap: ${field} must be a valid URL`)
+  }
+  if (url.protocol !== "https:") throw new Error(`bootstrap: ${field} must use HTTPS`)
+  return value
+}
+
 /** Parse + structurally validate a raw object into a BootstrapConfig (throws on malformed). */
 export function parseConfig(raw: unknown): BootstrapConfig {
   if (typeof raw !== "object" || raw === null) throw new Error("bootstrap: not an object")
@@ -55,19 +76,21 @@ export function parseConfig(raw: unknown): BootstrapConfig {
   const issued_at = obj["issued_at"]
   const expires_at = obj["expires_at"]
   const signature = obj["signature"]
-  if (typeof config_version !== "number" || !Number.isFinite(config_version)) throw new Error("bootstrap: config_version missing")
+  if (typeof config_version !== "number" || !Number.isFinite(config_version))
+    throw new Error("bootstrap: config_version missing")
   if (typeof gateway !== "object" || gateway === null) throw new Error("bootstrap: gateway missing")
   const g = gateway as Record<string, unknown>
-  if (typeof g["base_url"] !== "string" || g["base_url"].trim() === "") throw new Error("bootstrap: gateway.base_url missing")
-  if (g["models_url"] !== undefined && typeof g["models_url"] !== "string") throw new Error("bootstrap: gateway.models_url must be a string")
-  if (typeof issued_at !== "string" || Number.isNaN(Date.parse(issued_at))) throw new Error("bootstrap: issued_at not an ISO date")
-  if (typeof expires_at !== "string" || Number.isNaN(Date.parse(expires_at))) throw new Error("bootstrap: expires_at not an ISO date")
+  const baseUrl = requireGatewayUrl(g["base_url"], "gateway.base_url")
+  const modelsUrl = g["models_url"] === undefined ? undefined : requireGatewayUrl(g["models_url"], "gateway.models_url")
+  const issuedAt = requireIsoDate(issued_at, "issued_at")
+  const expiresAt = requireIsoDate(expires_at, "expires_at")
+  if (new Date(expiresAt) <= new Date(issuedAt)) throw new Error("bootstrap: expires_at must be after issued_at")
   if (typeof signature !== "string" || signature.trim() === "") throw new Error("bootstrap: signature missing")
   return {
     config_version,
-    gateway: { base_url: g["base_url"], ...(typeof g["models_url"] === "string" ? { models_url: g["models_url"] } : {}) },
-    issued_at,
-    expires_at,
+    gateway: { base_url: baseUrl, ...(modelsUrl ? { models_url: modelsUrl } : {}) },
+    issued_at: issuedAt,
+    expires_at: expiresAt,
     signature,
   }
 }
@@ -107,8 +130,17 @@ export type VerifyError =
   | { _tag: "Expired"; expiresAt: string; now: Date }
   | { _tag: "Malformed"; message: string }
 
+export interface VerifyConfigOptions {
+  now?: Date
+  publicKeyHex?: string
+  allowExpired?: boolean
+}
+
 /** Validate structure, version, time window, and signature. Returns the config on success. */
-export async function verifyConfig(raw: unknown): Promise<{ ok: true; config: BootstrapConfig } | { ok: false; error: VerifyError }> {
+export async function verifyConfig(
+  raw: unknown,
+  options: VerifyConfigOptions = {},
+): Promise<{ ok: true; config: BootstrapConfig } | { ok: false; error: VerifyError }> {
   let config: BootstrapConfig
   try {
     config = parseConfig(raw)
@@ -120,22 +152,25 @@ export async function verifyConfig(raw: unknown): Promise<{ ok: true; config: Bo
     return { ok: false, error: { _tag: "UnknownConfigVersion", got: config.config_version } }
   }
 
-  const now = new Date()
+  const now = options.now ?? new Date()
   const issued = new Date(config.issued_at)
   const expires = new Date(config.expires_at)
   if (issued > now) return { ok: false, error: { _tag: "NotYetValid", issuedAt: config.issued_at, now } }
-  if (expires <= now) return { ok: false, error: { _tag: "Expired", expiresAt: config.expires_at, now } }
+  if (!options.allowExpired && expires <= now) {
+    return { ok: false, error: { _tag: "Expired", expiresAt: config.expires_at, now } }
+  }
 
   // Verify the detached signature over the canonical unsigned message.
   // The signature must be valid hex decoding to 64 bytes; anything else is a
   // bad signature (not a crash). Wrap verifyAsync so a malformed signature or
   // an internal library throw is reported as BadSignature.
   const msg = new TextEncoder().encode(signingMessage(config))
-  const pub = Buffer.from(KOTE_BOOTSTRAP_PUBLIC_KEY_HEX, "hex")
+  const pub = Buffer.from(options.publicKeyHex ?? KOTE_BOOTSTRAP_PUBLIC_KEY_HEX, "hex")
   let valid = false
   try {
+    if (!/^[0-9a-f]{128}$/i.test(config.signature)) throw new Error("invalid Ed25519 signature")
     const sig = Buffer.from(config.signature, "hex")
-    if (sig.length !== 64) throw new Error("signature must decode to 64 bytes")
+    if (sig.length !== 64 || pub.length !== 32) throw new Error("invalid Ed25519 key material")
     valid = await verifyAsync(sig, msg, pub)
   } catch {
     valid = false
@@ -166,13 +201,17 @@ export function cachePath(): string {
 }
 
 /** Read the cached config. Corrupt/unreadable cache never throws — returns null. */
-export async function readCache(): Promise<BootstrapConfig | null> {
+export async function readCache(
+  file = cachePath(),
+  options: Pick<VerifyConfigOptions, "now" | "publicKeyHex"> = {},
+): Promise<BootstrapConfig | null> {
   try {
-    const raw = await fs.readFile(cachePath(), "utf8")
+    const raw = await fs.readFile(file, "utf8")
     const parsed = JSON.parse(raw)
-    // The cache stores verified configs, but we re-validate (cheap, and defends
-    // against a cache file edited after it was written).
-    const result = await verifyConfig(parsed)
+    // Expiry is evaluated by isCacheUsable so the documented emergency grace
+    // period remains reachable. Structure, signature and issued_at are still
+    // revalidated here to defend against an edited cache file.
+    const result = await verifyConfig(parsed, { ...options, allowExpired: true })
     return result.ok ? result.config : null
   } catch {
     return null
@@ -180,12 +219,15 @@ export async function readCache(): Promise<BootstrapConfig | null> {
 }
 
 /** Persist a verified config as last-known-good. Never throws. */
-export async function writeCache(config: BootstrapConfig): Promise<void> {
+export async function writeCache(config: BootstrapConfig, file = cachePath()): Promise<void> {
+  const temporary = `${file}.tmp-${process.pid}`
   try {
-    await fs.mkdir(path.dirname(cachePath()), { recursive: true })
-    await fs.writeFile(cachePath(), JSON.stringify(config, null, 2), "utf8")
+    await fs.mkdir(path.dirname(file), { recursive: true })
+    await fs.writeFile(temporary, JSON.stringify(config, null, 2), "utf8")
+    await fs.rename(temporary, file)
   } catch {
     // Swallow: cache write failure must not crash the app.
+    await fs.rm(temporary, { force: true }).catch(() => {})
   }
 }
 
@@ -216,7 +258,9 @@ const DEFAULT_BOOTSTRAP_URL = "https://bootstrap.kotencode.ai/bootstrap.json"
  *     (no off-domain redirect chains)
  *   - no eval / no code execution
  */
-export async function fetchRemote(url: string = Flag.KOTECODE_BOOTSTRAP_URL ?? DEFAULT_BOOTSTRAP_URL): Promise<unknown> {
+export async function fetchRemote(
+  url: string = Flag.KOTECODE_BOOTSTRAP_URL ?? DEFAULT_BOOTSTRAP_URL,
+): Promise<unknown> {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), KOTE_BOOTSTRAP_TIMEOUT_MS)
   try {
@@ -275,23 +319,41 @@ export interface ResolveFailure {
   hint?: string
 }
 
-export async function resolveGateway(): Promise<ResolvedGateway | ResolveFailure> {
+export interface ResolveGatewayOptions {
+  fetch?: () => Promise<unknown>
+  cacheFile?: string
+  now?: Date
+  publicKeyHex?: string
+}
+
+export async function resolveGateway(options: ResolveGatewayOptions = {}): Promise<ResolvedGateway | ResolveFailure> {
   // 1. Explicit env override.
   const envUrl = Flag.KOTECODE_GATEWAY_URL
   if (envUrl) {
+    let baseUrl: string
+    try {
+      baseUrl = requireGatewayUrl(envUrl, "KOTECODE_GATEWAY_URL")
+    } catch (error) {
+      return {
+        source: "none",
+        reason: error instanceof Error ? error.message : "KOTECODE_GATEWAY_URL is invalid.",
+        hint: "Set KOTECODE_GATEWAY_URL to a valid HTTPS gateway URL.",
+      }
+    }
     return {
-      baseUrl: envUrl,
+      baseUrl,
       modelsUrl: undefined,
       source: "environment",
     }
   }
 
   // 2. Remote bootstrap.
+  let remoteReason = "remote bootstrap is unreachable"
   try {
-    const raw = await fetchRemote()
-    const result = await verifyConfig(raw)
+    const raw = await (options.fetch ?? fetchRemote)()
+    const result = await verifyConfig(raw, { now: options.now, publicKeyHex: options.publicKeyHex })
     if (result.ok) {
-      await writeCache(result.config) // persist last-known-good
+      await writeCache(result.config, options.cacheFile) // persist last-known-good
       return {
         baseUrl: result.config.gateway.base_url,
         modelsUrl: result.config.gateway.models_url,
@@ -299,14 +361,15 @@ export async function resolveGateway(): Promise<ResolvedGateway | ResolveFailure
         config: result.config,
       }
     }
+    remoteReason = `remote bootstrap was rejected (${result.error._tag})`
     // Invalid new config does NOT overwrite the cache. Fall through to cache.
   } catch {
     // Remote unreachable or malformed — fall through to cache.
   }
 
   // 3. Last-known-good cache.
-  const cached = await readCache()
-  if (cached && isCacheUsable(cached)) {
+  const cached = await readCache(options.cacheFile, { now: options.now, publicKeyHex: options.publicKeyHex })
+  if (cached && isCacheUsable(cached, options.now)) {
     return {
       baseUrl: cached.gateway.base_url,
       modelsUrl: cached.gateway.models_url,
@@ -318,7 +381,7 @@ export async function resolveGateway(): Promise<ResolvedGateway | ResolveFailure
   // 4. Nothing available.
   return {
     source: "none",
-    reason: "Kote Gateway endpoint could not be resolved.",
+    reason: `Kote Gateway endpoint could not be resolved: ${remoteReason}, and no usable cached bootstrap exists.`,
     hint:
       "Set KOTECODE_GATEWAY_URL to point at a gateway directly, " +
       "or ensure the bootstrap service is reachable and the local cache is valid.",

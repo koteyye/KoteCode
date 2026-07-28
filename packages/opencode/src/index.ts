@@ -122,7 +122,7 @@ try {
   // yargs' built-in .version() only takes a single string; emitting the two-line form
   // here keeps `kotencode --version` spec-compliant (ТЗ §12).
   if (args.includes("-v") || args.includes("--version")) {
-    process.stderr.write(versionString() + EOL)
+    process.stdout.write(versionString() + EOL)
     process.exit(0)
   }
   if (args.includes("-h") || args.includes("--help")) {

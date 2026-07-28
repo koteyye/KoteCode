@@ -6,7 +6,7 @@ import { InstallationVersion } from "@opencode-ai/core/installation/version"
 
 export const UpgradeCommand = {
   command: "upgrade [target]",
-  describe: "upgrade opencode to the latest or a specific version",
+  describe: "KoteCode alpha updates are currently disabled",
   builder: (yargs: Argv) => {
     return yargs
       .positional("target", {
@@ -25,6 +25,11 @@ export const UpgradeCommand = {
     UI.println(UI.logo("  "))
     UI.empty()
     prompts.intro("Upgrade")
+    if (!Installation.UpdatesEnabled) {
+      prompts.log.warn(Installation.UpdatesDisabledMessage)
+      prompts.outro("No changes made")
+      return
+    }
     const detectedMethod = await Installation.method()
     const method = (args.method as Installation.Method) ?? detectedMethod
     if (method === "unknown") {

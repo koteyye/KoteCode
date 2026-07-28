@@ -45,3 +45,4 @@ bootstrap.signed.private.json
 .zcode/
 .serena/
 .omo/
+.test-xdg-*/

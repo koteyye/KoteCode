@@ -10,9 +10,9 @@ import { makeGlobalNode } from "./effect/app-node"
 // KoteCode brand: public XDG app name. Internal package names (@opencode-ai/*) and
 // OPENCODE_* env vars are intentionally kept (compatibility layer) — see docs/UPSTREAM.md.
 const app = "kotencode"
-const data = path.join(xdgData!, app)
-const cache = path.join(xdgCache!, app)
-const config = path.join(xdgConfig!, app)
+const data = Flag.KOTECODE_DATA_DIR ?? path.join(xdgData!, app)
+const cache = Flag.KOTECODE_CACHE_DIR ?? path.join(xdgCache!, app)
+const config = Flag.KOTECODE_CONFIG_DIR ?? Flag.OPENCODE_CONFIG_DIR ?? path.join(xdgConfig!, app)
 const state = path.join(xdgState!, app)
 const tmp = path.join(os.tmpdir(), app)
 
@@ -61,11 +61,9 @@ export interface Interface {
 export function make(input: Partial<Interface> = {}): Interface {
   return {
     home: Path.home,
-    // KoteCode overrides take precedence over OpenCode's, then the kotencode default.
-    // All three layers coexist (compatibility): OPENCODE_* still honored for the base.
-    data: Flag.KOTECODE_DATA_DIR ?? Path.data,
-    cache: Flag.KOTECODE_CACHE_DIR ?? Path.cache,
-    config: Flag.KOTECODE_CONFIG_DIR ?? Flag.OPENCODE_CONFIG_DIR ?? Path.config,
+    data: Path.data,
+    cache: Path.cache,
+    config: Path.config,
     state: Path.state,
     tmp: Path.tmp,
     bin: Path.bin,

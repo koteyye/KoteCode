@@ -4,28 +4,33 @@ import { Global } from "@opencode-ai/core/global"
 import fs from "fs/promises"
 import path from "path"
 import { exists as existsAsync } from "@/util/filesystem"
+import { ConfigParse } from "@/config/parse"
 
-// Keys/values that are considered secrets and are NOT copied unless --with-secrets is given.
-// Matches the keys OpenCode itself treats as credentials in provider options / auth.
-const SECRET_KEY_PATTERNS = [/key/i, /token/i, /secret/i, /password/i, /credential/i, /apikey/i]
-
-function isSecretKey(key: string): boolean {
-  return SECRET_KEY_PATTERNS.some((re) => re.test(key))
+export function isSecretKey(key: string): boolean {
+  const compact = key.replace(/[^a-zA-Z0-9]/g, "").toLowerCase()
+  return (
+    compact === "key" ||
+    compact.includes("apikey") ||
+    compact.endsWith("token") ||
+    compact.includes("secret") ||
+    compact.endsWith("privatekey") ||
+    compact.endsWith("accesskey") ||
+    compact.endsWith("signingkey") ||
+    compact.endsWith("password") ||
+    compact.endsWith("credential") ||
+    compact.endsWith("credentials")
+  )
 }
 
-/** Strip secret-looking values from an arbitrary config object (deep). */
-function stripSecrets<T>(value: T): T {
-  if (Array.isArray(value)) return value.map((v) => stripSecrets(v)) as unknown as T
+export function stripSecrets(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map((item) => stripSecrets(item))
   if (value && typeof value === "object") {
     const out: Record<string, unknown> = {}
-    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
-      if (isSecretKey(k) && (typeof v === "string" || typeof v === "number")) {
-        out[k] = "<redacted: re-enter after migration>"
-      } else {
-        out[k] = stripSecrets(v)
-      }
+    for (const [k, v] of Object.entries(value)) {
+      if (isSecretKey(k) && (typeof v === "string" || typeof v === "number")) continue
+      out[k] = stripSecrets(v)
     }
-    return out as T
+    return out
   }
   return value
 }
@@ -95,7 +100,9 @@ export const MigrateCommand = {
     })()
 
     if (!(await existsAsync(opencodeConfigDir))) {
-      UI.println(`${UI.Style.TEXT_WARNING}No OpenCode configuration found at ${opencodeConfigDir}${UI.Style.TEXT_NORMAL}`)
+      UI.println(
+        `${UI.Style.TEXT_WARNING}No OpenCode configuration found at ${opencodeConfigDir}${UI.Style.TEXT_NORMAL}`,
+      )
       UI.println(`${UI.Style.TEXT_DIM}Nothing to migrate.${UI.Style.TEXT_NORMAL}`)
       return
     }
@@ -111,17 +118,16 @@ export const MigrateCommand = {
     }
 
     if (!sourceFile) {
-      UI.println(`${UI.Style.TEXT_WARNING}OpenCode directory found, but no config file inside it.${UI.Style.TEXT_NORMAL}`)
+      UI.println(
+        `${UI.Style.TEXT_WARNING}OpenCode directory found, but no config file inside it.${UI.Style.TEXT_NORMAL}`,
+      )
       UI.println(`${UI.Style.TEXT_DIM}Looked for: config.json, opencode.json, opencode.jsonc${UI.Style.TEXT_NORMAL}`)
       return
     }
 
-    const raw = await fs.readFile(sourceFile, "utf8")
     let parsed: unknown
     try {
-      // opencode.jsonc may contain comments; strip single-line // comments for a best-effort parse.
-      const cleaned = raw.replace(/^\s*\/\/.*$/gm, "").replace(/\/\*[\s\S]*?\*\//g, "")
-      parsed = JSON.parse(cleaned)
+      parsed = ConfigParse.jsonc(await fs.readFile(sourceFile, "utf8"), sourceFile)
     } catch (e) {
       UI.error(`Failed to parse OpenCode config at ${sourceFile}: ${(e as Error).message}`)
       process.exitCode = 1
@@ -130,6 +136,13 @@ export const MigrateCommand = {
 
     const secretCount = countSecrets(parsed)
     const output = args.withSecrets ? parsed : stripSecrets(parsed)
+    const opencodeDataDir = path.join(path.dirname(Global.Path.data), "opencode")
+    const sourceAuthFile = path.join(opencodeDataDir, "auth.json")
+    const destAuthFile = path.join(Global.Path.data, "auth.json")
+    const copyAuth =
+      args.withSecrets &&
+      path.resolve(sourceAuthFile) !== path.resolve(destAuthFile) &&
+      (await existsAsync(sourceAuthFile))
 
     // Resolve the destination KoteCode config file.
     let destFile = path.join(koteConfigDir, "kotencode.jsonc")
@@ -144,26 +157,60 @@ export const MigrateCommand = {
         }
       }
     }
+    if (copyAuth && !args.force && (await existsAsync(destAuthFile))) {
+      UI.println(`${UI.Style.TEXT_WARNING}KoteCode auth already exists at ${destAuthFile}${UI.Style.TEXT_NORMAL}`)
+      UI.println(`${UI.Style.TEXT_DIM}Use --force to overwrite it.${UI.Style.TEXT_NORMAL}`)
+      return
+    }
+    if (copyAuth) {
+      try {
+        const auth = JSON.parse(await fs.readFile(sourceAuthFile, "utf8"))
+        if (!auth || typeof auth !== "object" || Array.isArray(auth)) throw new Error("auth store is not an object")
+      } catch (e) {
+        UI.error(`Failed to parse OpenCode auth at ${sourceAuthFile}: ${(e as Error).message}`)
+        process.exitCode = 1
+        return
+      }
+    }
 
-    const action = args.dryRun ? "Would write" : "Wrote"
-    UI.println(`${UI.Style.TEXT_SUCCESS}${action} KoteCode config to ${destFile}${UI.Style.TEXT_NORMAL}`)
-    UI.println(`${UI.Style.TEXT_DIM}Source: ${sourceFile} (left untouched)${UI.Style.TEXT_NORMAL}`)
     if (secretCount > 0 && !args.withSecrets) {
       UI.println(
-        `${UI.Style.TEXT_WARNING}Redacted ${secretCount} secret value(s); re-enter API keys after migration.${UI.Style.TEXT_NORMAL}`,
+        `${UI.Style.TEXT_WARNING}Skipped ${secretCount} secret value(s); re-enter API keys after migration.${UI.Style.TEXT_NORMAL}`,
       )
       UI.println(`${UI.Style.TEXT_DIM}Pass --with-secrets to copy them too.${UI.Style.TEXT_NORMAL}`)
     } else if (secretCount > 0 && args.withSecrets) {
-      UI.println(`${UI.Style.TEXT_WARNING}Copied ${secretCount} secret value(s) as requested.${UI.Style.TEXT_NORMAL}`)
+      UI.println(
+        `${UI.Style.TEXT_WARNING}Including ${secretCount} secret value(s) as requested.${UI.Style.TEXT_NORMAL}`,
+      )
     }
 
     if (args.dryRun) {
-      UI.println(`${UI.Style.TEXT_DIM}--- preview (redacted secrets shown as <redacted>) ---${UI.Style.TEXT_NORMAL}`)
-      process.stderr.write(JSON.stringify(output, null, 2) + "\n")
+      UI.println(`${UI.Style.TEXT_SUCCESS}Would write KoteCode config to ${destFile}${UI.Style.TEXT_NORMAL}`)
+      UI.println(`${UI.Style.TEXT_DIM}Source: ${sourceFile} (left untouched)${UI.Style.TEXT_NORMAL}`)
+      if (copyAuth) {
+        UI.println(`${UI.Style.TEXT_SUCCESS}Would copy OpenCode auth to ${destAuthFile}${UI.Style.TEXT_NORMAL}`)
+      }
+      UI.println(`${UI.Style.TEXT_DIM}--- preview (secret fields omitted) ---${UI.Style.TEXT_NORMAL}`)
+      process.stderr.write(JSON.stringify(stripSecrets(parsed), null, 2) + "\n")
       return
     }
 
     await fs.mkdir(koteConfigDir, { recursive: true })
     await fs.writeFile(destFile, JSON.stringify(output, null, 2) + "\n", "utf8")
+    if (copyAuth) {
+      await fs.mkdir(Global.Path.data, { recursive: true })
+      await fs.copyFile(sourceAuthFile, destAuthFile)
+    }
+
+    UI.println(`${UI.Style.TEXT_SUCCESS}Wrote KoteCode config to ${destFile}${UI.Style.TEXT_NORMAL}`)
+    UI.println(`${UI.Style.TEXT_DIM}Source: ${sourceFile} (left untouched)${UI.Style.TEXT_NORMAL}`)
+    if (copyAuth) {
+      UI.println(
+        `${UI.Style.TEXT_WARNING}Copied OpenCode auth credentials as explicitly requested.${UI.Style.TEXT_NORMAL}`,
+      )
+      UI.println(`${UI.Style.TEXT_DIM}Source: ${sourceAuthFile} (left untouched)${UI.Style.TEXT_NORMAL}`)
+    } else if (args.withSecrets) {
+      UI.println(`${UI.Style.TEXT_DIM}No OpenCode auth store found at ${sourceAuthFile}.${UI.Style.TEXT_NORMAL}`)
+    }
   },
 }

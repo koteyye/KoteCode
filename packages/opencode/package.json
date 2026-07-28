@@ -16,7 +16,7 @@
     "dev:temporary": "bun run --conditions=browser ./src/temporary.ts"
   },
   "bin": {
-    "kotencode": "./bin/kotecode"
+    "kotencode": "./bin/kotencode"
   },
   "exports": {
     "./*": "./src/*.ts"

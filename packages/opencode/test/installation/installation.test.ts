@@ -6,7 +6,7 @@ import { Effect, Layer, Stream } from "effect"
 import { HttpClient, HttpClientRequest, HttpClientResponse } from "effect/unstable/http"
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process"
 import { Installation } from "../../src/installation"
-import { InstallationChannel } from "@opencode-ai/core/installation/version"
+import { InstallationChannel, InstallationVersion } from "@opencode-ai/core/installation/version"
 import { CrossSpawnSpawner } from "@opencode-ai/core/cross-spawn-spawner"
 import { testEffect } from "../lib/effect"
 
@@ -67,7 +67,54 @@ function testLayer(
 }
 
 describe("installation", () => {
-  describe("latest", () => {
+  describe("KoteCode alpha safety lock", () => {
+    const latestHttpCalls: string[] = []
+    const latestProcessCalls: string[] = []
+    testEffect(
+      testLayer(
+        (request) => {
+          latestHttpCalls.push(request.url)
+          return jsonResponse({ tag_name: "v9.9.9" })
+        },
+        (cmd, args) => {
+          latestProcessCalls.push([cmd, ...args].join(" "))
+          return ""
+        },
+      ),
+    ).effect("returns the installed version without checking upstream", () =>
+      Effect.gen(function* () {
+        expect(Installation.UpdatesEnabled).toBe(false)
+        expect(yield* Installation.use.latest()).toBe(InstallationVersion)
+        expect(latestHttpCalls).toEqual([])
+        expect(latestProcessCalls).toEqual([])
+      }),
+    )
+
+    const upgradeHttpCalls: string[] = []
+    const upgradeProcessCalls: string[] = []
+    testEffect(
+      testLayer(
+        (request) => {
+          upgradeHttpCalls.push(request.url)
+          return new Response("upstream installer")
+        },
+        (cmd, args) => {
+          upgradeProcessCalls.push([cmd, ...args].join(" "))
+          return ""
+        },
+      ),
+    ).effect("rejects upgrades before fetching or launching an installer", () =>
+      Effect.gen(function* () {
+        const error = yield* Effect.flip(Installation.use.upgrade("curl", "9.9.9"))
+        expect(error).toBeInstanceOf(Installation.UpgradeFailedError)
+        expect(error.stderr).toBe(Installation.UpdatesDisabledMessage)
+        expect(upgradeHttpCalls).toEqual([])
+        expect(upgradeProcessCalls).toEqual([])
+      }),
+    )
+  })
+
+  describe.skipIf(!Installation.UpdatesEnabled)("latest", () => {
     testEffect(testLayer(() => jsonResponse({ tag_name: "v1.2.3" }))).effect(
       "reads release version from GitHub releases",
       () =>
@@ -181,7 +228,7 @@ describe("installation", () => {
     )
   })
 
-  describe("upgrade", () => {
+  describe.skipIf(!Installation.UpdatesEnabled)("upgrade", () => {
     testEffect(
       testLayer(
         () => jsonResponse({}),

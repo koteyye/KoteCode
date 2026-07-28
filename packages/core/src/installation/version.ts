@@ -11,6 +11,7 @@
 declare global {
   const OPENCODE_VERSION: string
   const OPENCODE_CHANNEL: string
+  const KOTECODE_VERSION: string
 }
 
 // OpenCode base version, injected at compile time by packages/opencode/script/build.ts.
@@ -21,7 +22,7 @@ export const InstallationLocal = InstallationChannel === "local"
 
 // KoteCode's own version. Bump here for each KoteCode release.
 // First release: 0.1.0-alpha.1 (see docs and UPSTREAM_STATE.md).
-export const KoteCodeVersion = "0.1.0-alpha.1"
+export const KoteCodeVersion = typeof KOTECODE_VERSION === "string" ? KOTECODE_VERSION : "0.1.0-alpha.1"
 
 // Upstream OpenCode version this KoteCode was forked from (see UPSTREAM_STATE.md).
 export const UpstreamBaseVersion = "1.18.5"

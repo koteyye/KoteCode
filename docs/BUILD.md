@@ -70,13 +70,13 @@ cd packages/opencode && bun test src/kote
 `--single` builds only the target matching the current OS/arch. Output:
 
 ```
-packages/opencode/dist/kotecode-<os>-<arch>/bin/kotecode
+packages/opencode/dist/kotencode-<os>-<arch>/bin/kotencode
 ```
 
 Run it:
 
 ```bash
-./packages/opencode/dist/kotecode-<os>-<arch>/bin/kotecode --version
+./packages/opencode/dist/kotencode-<os>-<arch>/bin/kotencode --version
 ```
 
 `--version` prints both the KoteCode version and the OpenCode base, e.g.:

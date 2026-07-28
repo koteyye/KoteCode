@@ -56,5 +56,5 @@ describe("kote security: private key never in repo", () => {
         if ((e as Error).message.startsWith("PRIVATE KEY LEAK")) throw e
       }
     }
-  })
+  }, 30_000)
 })

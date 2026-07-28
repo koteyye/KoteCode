@@ -20,6 +20,9 @@ export type Method = "curl" | "npm" | "yarn" | "pnpm" | "bun" | "brew" | "scoop"
 export type ReleaseType = "patch" | "minor" | "major"
 
 export const Event = InstallationEvent
+export const UpdatesEnabled = false
+export const UpdatesDisabledMessage =
+  "KoteCode alpha updates are disabled. Install a newer build from https://github.com/koteyye/KoteCode/releases."
 
 export function getReleaseType(current: string, latest: string): ReleaseType {
   const currMajor = semver.major(current)
@@ -206,6 +209,7 @@ const layer: Layer.Layer<Service, never, HttpClient.HttpClient | AppProcess.Serv
         return "unknown" as Method
       }),
       latest: Effect.fn("Installation.latest")(function* (installMethod?: Method) {
+        if (!UpdatesEnabled) return InstallationVersion
         const detectedMethod = installMethod || (yield* result.method())
 
         if (detectedMethod === "brew") {
@@ -263,6 +267,7 @@ const layer: Layer.Layer<Service, never, HttpClient.HttpClient | AppProcess.Serv
         return data.tag_name.replace(/^v/, "")
       }, Effect.orDie),
       upgrade: Effect.fn("Installation.upgrade")(function* (m: Method, target: string) {
+        if (!UpdatesEnabled) return yield* new UpgradeFailedError({ stderr: UpdatesDisabledMessage })
         let upgradeResult: { code: number; stdout: string; stderr: string } | undefined
         switch (m) {
           case "curl":

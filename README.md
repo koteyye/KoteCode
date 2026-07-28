@@ -91,7 +91,7 @@ Or build from source (requires [Bun](https://bun.sh) ≥ 1.3):
 git clone https://github.com/koteyye/KoteCode.git
 cd KoteCode
 bun install
-./packages/opencode/script/build.ts --single     # produces dist/kotecode-*/bin/kotecode
+bun run packages/opencode/script/build.ts --single # produces dist/kotencode-*/bin/kotencode
 ```
 
 ## Minimal configuration
@@ -100,11 +100,11 @@ KoteCode reads config from its own directories (separate from OpenCode's):
 
 | OS | Config dir |
 |---|---|
-| Linux | `~/.config/kotecode` |
-| macOS | `~/Library/Application Support/kotecode` |
+| Linux | `~/.config/kotencode` |
+| macOS | `~/Library/Application Support/kotencode` |
 | Windows | `%APPDATA%\kotencode` |
 
-Create `~/.config/kotecode/kotecode.jsonc` (or use env vars):
+Create `~/.config/kotencode/kotencode.jsonc` (or use env vars):
 
 ```jsonc
 {
@@ -143,7 +143,7 @@ KoteCode adds `KOTECODE_*` variables on top of OpenCode's `OPENCODE_*` (both sti
 | `KOTECODE_BOOTSTRAP_URL` | Override the bootstrap config URL (dev/testing) |
 | `KOTECODE_GATEWAY_URL` | Force the gateway address (priority over bootstrap) |
 | `KOTECODE_GATEWAY_API_KEY` | Provide the gateway key via env (not written to config) |
-| `KOTECODE_DISABLE_UPDATE_CHECK` | Disable the update check |
+| `KOTECODE_DISABLE_UPDATE_CHECK` | Reserved update-check kill switch; alpha updates are already disabled |
 
 Full reference: [`docs/CONFIGURATION.md`](./docs/CONFIGURATION.md).
 

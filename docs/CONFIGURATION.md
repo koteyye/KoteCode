@@ -10,10 +10,10 @@ A new KoteCode install uses its own directories (separate from OpenCode's):
 
 | Directory | Linux | macOS | Windows |
 |---|---|---|---|
-| config | `~/.config/kotecode` | `~/Library/Application Support/kotecode` | `%APPDATA%\kotencode` |
-| data | `~/.local/share/kotecode` | `~/Library/Application Support/kotecode` | `%LOCALAPPDATA%\kotencode` |
-| cache | `~/.cache/kotecode` | `~/Library/Caches/kotecode` | `%LOCALAPPDATA%\kotencode\cache` |
-| state | `~/.local/state/kotecode` | `~/Library/Application Support/kotecode` | `%LOCALAPPDATA%\kotencode\state` |
+| config | `~/.config/kotencode` | `~/Library/Application Support/kotencode` | `%APPDATA%\kotencode` |
+| data | `~/.local/share/kotencode` | `~/Library/Application Support/kotencode` | `%LOCALAPPDATA%\kotencode` |
+| cache | `~/.cache/kotencode` | `~/Library/Caches/kotencode` | `%LOCALAPPDATA%\kotencode\cache` |
+| state | `~/.local/state/kotencode` | `~/Library/Application Support/kotencode` | `%LOCALAPPDATA%\kotencode\state` |
 | log | `<data>/log` | `<data>/log` | `<data>\log` |
 
 ### Overriding directories
@@ -30,12 +30,13 @@ over the OpenCode equivalent, which takes precedence over the platform default):
 
 ## Config files
 
-KoteCode reads (merge order, first wins): `config.json`, `kotencode.json`,
-`kotencode.jsonc`, `opencode.json`, `opencode.jsonc` from the config directory. The
-default write target is `kotencode.jsonc`.
+KoteCode loads `config.json`, `opencode.json`, `opencode.jsonc`, `kotencode.json`,
+and `kotencode.jsonc` from the config directory. Later files override earlier files,
+so the KoteCode-branded files have priority. The default write target is
+`kotencode.jsonc`.
 
 Project-local config is discovered by walking up from the current directory looking
-for a `.kotencode/` (or `.opencode/`) folder and JSON/JSONC files inside it.
+for the upstream-compatible `.opencode/` folder and JSON/JSONC files inside it.
 
 Set the config file path explicitly:
 
@@ -71,8 +72,13 @@ KOTECODE_CONFIG=/path/to/my-config.jsonc kotencode
 | `KOTECODE_BOOTSTRAP_URL` | Override the bootstrap config URL (dev/testing) |
 | `KOTECODE_GATEWAY_URL` | Force the gateway address — **priority over bootstrap** |
 | `KOTECODE_GATEWAY_API_KEY` | Provide the gateway key via env (not written to config) |
-| `KOTECODE_DISABLE_UPDATE_CHECK` | Disable the update check |
+| `KOTECODE_DISABLE_UPDATE_CHECK` | Reserved update-check kill switch; alpha updates are already disabled |
 | `KOTECODE_BIN_PATH` | Point the launcher at a specific binary (also honors `OPENCODE_BIN_PATH`) |
+
+KoteCode alpha does not perform automatic update checks and rejects manual/API
+upgrade requests. Install a newer alpha explicitly from the KoteCode GitHub Releases
+page. The dormant upstream updater must not be enabled until every source and install
+method has been replaced with KoteCode-owned release infrastructure.
 
 ### OpenCode compatibility (`OPENCODE_*`)
 

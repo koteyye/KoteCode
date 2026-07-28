@@ -313,7 +313,7 @@ it.effect("creates global jsonc config with schema when no global configs exist"
     Effect.gen(function* () {
       yield* Config.use.get().pipe(provideInstanceEffect(dir))
 
-      const content = yield* FSUtil.use.readFileString(path.join(dir, "opencode.jsonc"))
+      const content = yield* FSUtil.use.readFileString(path.join(dir, "kotencode.jsonc"))
       expect(content).toContain('"$schema": "https://opencode.ai/config.json"')
     }).pipe(Effect.provide(testInstanceStoreLayer), Effect.provide(LayerNode.compile(CrossSpawnSpawner.node))),
   ),
@@ -329,11 +329,39 @@ it.effect("does not create global config when OPENCODE_CONFIG_DIR is set", () =>
         Effect.gen(function* () {
           yield* Config.use.get().pipe(provideInstanceEffect(dir))
 
-          expect(yield* FSUtil.use.existsSafe(path.join(dir, "opencode.jsonc"))).toBe(false)
+          expect(yield* FSUtil.use.existsSafe(path.join(dir, "kotencode.jsonc"))).toBe(false)
         }).pipe(Effect.provide(testInstanceStoreLayer), Effect.provide(LayerNode.compile(CrossSpawnSpawner.node))),
       ),
     )
   }),
+)
+
+it.effect("loads the branded kotencode.jsonc global config", () =>
+  withGlobalConfig({ config: { model: "kote/model" }, name: "kotencode.jsonc" }, ({ dir }) =>
+    Effect.gen(function* () {
+      const config = yield* Config.use.get().pipe(provideInstanceEffect(dir))
+      expect(config.model).toBe("kote/model")
+    }).pipe(Effect.provide(testInstanceStoreLayer), Effect.provide(LayerNode.compile(CrossSpawnSpawner.node))),
+  ),
+)
+
+it.effect("KOTECODE_CONFIG overrides OPENCODE_CONFIG", () =>
+  Effect.gen(function* () {
+    const directory = yield* tmpdirScoped()
+    const opencodeConfig = path.join(directory, "opencode-custom.json")
+    const koteConfig = path.join(directory, "kote-custom.json")
+    yield* Effect.all([
+      writeConfigEffect(directory, schemaConfig({ model: "opencode/model" }), path.basename(opencodeConfig)),
+      writeConfigEffect(directory, schemaConfig({ model: "kote/model" }), path.basename(koteConfig)),
+    ])
+    yield* withProcessEnvs(
+      { OPENCODE_CONFIG: opencodeConfig, KOTECODE_CONFIG: koteConfig },
+      Effect.gen(function* () {
+        const config = yield* Config.use.get().pipe(provideInstanceEffect(directory))
+        expect(config.model).toBe("kote/model")
+      }),
+    )
+  }).pipe(Effect.provide(testInstanceStoreLayer), Effect.provide(LayerNode.compile(CrossSpawnSpawner.node))),
 )
 
 it.instance(

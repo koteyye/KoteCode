@@ -106,7 +106,7 @@ endpoint came from.
 ## Cache and emergency operation
 
 The last successfully verified config is stored at `<cache>/kote/bootstrap.json`
-(`~/.cache/kotecode/kote/bootstrap.json` on Linux). When the remote bootstrap is
+(`~/.cache/kotencode/kote/bootstrap.json` on Linux). When the remote bootstrap is
 unreachable, the cache is used.
 
 An **expired** cached config may still be used for a limited **grace period** after

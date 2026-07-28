@@ -137,8 +137,8 @@ export class Service extends Context.Service<Service, Interface>()("@opencode/Co
 export const use = serviceUse(Service)
 
 function globalConfigFile() {
-  const candidates = ["opencode.jsonc", "opencode.json", "config.json"].map((file) =>
-    path.join(Global.Path.config, file),
+  const candidates = ["kotencode.jsonc", "kotencode.json", "opencode.jsonc", "opencode.json", "config.json"].map(
+    (file) => path.join(Global.Path.config, file),
   )
   for (const file of candidates) {
     if (existsSync(file)) return file
@@ -247,7 +247,13 @@ const layer = Layer.effect(
       let result: Info = {}
       // Seed the default global config with the schema for editor completion, but avoid writing when the user
       // explicitly routes config through env-provided paths or content.
-      if (!Flag.OPENCODE_CONFIG && !Flag.OPENCODE_CONFIG_DIR && !Flag.OPENCODE_CONFIG_CONTENT) {
+      if (
+        !Flag.KOTECODE_CONFIG &&
+        !Flag.KOTECODE_CONFIG_DIR &&
+        !Flag.OPENCODE_CONFIG &&
+        !Flag.OPENCODE_CONFIG_DIR &&
+        !Flag.OPENCODE_CONFIG_CONTENT
+      ) {
         const file = globalConfigFile()
         if (!existsSync(file)) {
           yield* fs
@@ -258,6 +264,8 @@ const layer = Layer.effect(
       result = mergeConfig(result, yield* loadFile(path.join(Global.Path.config, "config.json"), env))
       result = mergeConfig(result, yield* loadFile(path.join(Global.Path.config, "opencode.json"), env))
       result = mergeConfig(result, yield* loadFile(path.join(Global.Path.config, "opencode.jsonc"), env))
+      result = mergeConfig(result, yield* loadFile(path.join(Global.Path.config, "kotencode.json"), env))
+      result = mergeConfig(result, yield* loadFile(path.join(Global.Path.config, "kotencode.jsonc"), env))
 
       const legacy = path.join(Global.Path.config, "config")
       if (existsSync(legacy)) {
@@ -402,6 +410,10 @@ const layer = Layer.effect(
           yield* merge(Flag.OPENCODE_CONFIG, yield* loadFile(Flag.OPENCODE_CONFIG, authEnv))
           yield* Effect.logDebug("loaded custom config", { path: Flag.OPENCODE_CONFIG })
         }
+        if (Flag.KOTECODE_CONFIG) {
+          yield* merge(Flag.KOTECODE_CONFIG, yield* loadFile(Flag.KOTECODE_CONFIG, authEnv))
+          yield* Effect.logDebug("loaded KoteCode config", { path: Flag.KOTECODE_CONFIG })
+        }
 
         if (!Flag.OPENCODE_DISABLE_PROJECT_CONFIG) {
           for (const file of yield* ConfigPaths.files("opencode", ctx.directory, ctx.worktree).pipe(Effect.orDie)) {
@@ -418,12 +430,15 @@ const layer = Layer.effect(
         if (Flag.OPENCODE_CONFIG_DIR) {
           yield* Effect.logDebug("loading config from OPENCODE_CONFIG_DIR", { path: Flag.OPENCODE_CONFIG_DIR })
         }
+        if (Flag.KOTECODE_CONFIG_DIR) {
+          yield* Effect.logDebug("loading config from KOTECODE_CONFIG_DIR", { path: Flag.KOTECODE_CONFIG_DIR })
+        }
 
         const deps: Fiber.Fiber<void>[] = []
 
         for (const dir of directories) {
-          if (dir.endsWith(".opencode") || dir === Flag.OPENCODE_CONFIG_DIR) {
-            for (const file of ["opencode.json", "opencode.jsonc"]) {
+          if (dir.endsWith(".opencode") || dir === Flag.OPENCODE_CONFIG_DIR || dir === Flag.KOTECODE_CONFIG_DIR) {
+            for (const file of ["opencode.json", "opencode.jsonc", "kotencode.json", "kotencode.jsonc"]) {
               const source = path.join(dir, file)
               yield* Effect.logDebug(`loading config from ${source}`)
               yield* merge(source, yield* loadFile(source, authEnv))

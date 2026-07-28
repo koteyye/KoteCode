@@ -76,7 +76,7 @@ and expected. The merge procedure is "take upstream logic, keep KoteCode brand."
 - `packages/core/src/models-dev.ts` — `kotencode` User-Agent
 - `packages/opencode/src/provider/provider.ts` — KoteCode provider attribution headers + the `kote-gateway` case
 - `packages/opencode/package.json` — `name: "kotencode"`, `bin`, `version`
-- `packages/opencode/bin/opencode` — launcher `kotencode-*` names (may be renamed to `bin/kotecode`)
+- `packages/opencode/bin/kotencode` — launcher and `kotencode-*` package names
 - `packages/opencode/script/build.ts` — outfile `kotencode`, KoteCode User-Agent in `execArgv`
 - `package.json` (root) — name/description/repository
 - `packages/desktop/package.json`, `packages/desktop/electron-builder.config.ts` — desktop identity

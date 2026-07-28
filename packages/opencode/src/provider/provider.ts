@@ -35,6 +35,7 @@ import { resolveGateway } from "@opencode-ai/core/kote/bootstrap"
 import { Flag } from "@opencode-ai/core/flag/flag"
 
 const OPENAI_HEADER_TIMEOUT_DEFAULT = 300_000
+const KOTE_MODELS_MAX_BYTES = 1024 * 1024
 
 function wrapSSE(res: Response, ms: number, ctl: AbortController) {
   if (typeof ms !== "number" || ms <= 0) return res
@@ -151,6 +152,79 @@ type CustomDep = {
   config: () => Effect.Effect<ConfigV1.Info>
   env: () => Effect.Effect<Record<string, string | undefined>>
   get: (key: string) => Effect.Effect<string | undefined>
+}
+
+async function discoverKoteGatewayModels(input: {
+  baseUrl: string
+  modelsUrl: string
+  apiKey?: string
+}): Promise<Record<string, Model>> {
+  const response = await fetch(input.modelsUrl, {
+    redirect: "error",
+    signal: AbortSignal.timeout(10_000),
+    headers: {
+      accept: "application/json",
+      ...(input.apiKey ? { authorization: `Bearer ${input.apiKey}` } : {}),
+    },
+  })
+  if (!response.ok) throw new Error(`Kote Gateway models request failed with HTTP ${response.status}`)
+  const contentLength = Number(response.headers.get("content-length") ?? 0)
+  if (contentLength > KOTE_MODELS_MAX_BYTES) throw new Error("Kote Gateway models response is too large")
+
+  const reader = response.body?.getReader()
+  if (!reader) throw new Error("Kote Gateway models response has no body")
+  const chunks: Uint8Array[] = []
+  let total = 0
+  for (;;) {
+    const part = await reader.read()
+    if (part.done) break
+    total += part.value.byteLength
+    if (total > KOTE_MODELS_MAX_BYTES) throw new Error("Kote Gateway models response is too large")
+    chunks.push(part.value)
+  }
+
+  const raw = JSON.parse(new TextDecoder().decode(Buffer.concat(chunks)))
+  const items = isRecord(raw) && Array.isArray(raw.data) ? raw.data : Array.isArray(raw) ? raw : []
+  return Object.fromEntries(
+    items.flatMap((item) => {
+      if (!isRecord(item) || typeof item.id !== "string" || item.id.trim() === "") return []
+      const id = item.id.trim()
+      const context =
+        typeof item.context_window === "number" && Number.isFinite(item.context_window) ? item.context_window : 0
+      const output =
+        typeof item.max_output_tokens === "number" && Number.isFinite(item.max_output_tokens)
+          ? item.max_output_tokens
+          : 0
+      const model: Model = {
+        id: ModelV2.ID.make(id),
+        providerID: ProviderV2.ID.make("kote-gateway"),
+        name: typeof item.name === "string" && item.name.trim() ? item.name : id,
+        family: typeof item.family === "string" ? item.family : "",
+        api: {
+          id,
+          url: input.baseUrl,
+          npm: "@ai-sdk/openai-compatible",
+        },
+        status: "active",
+        headers: {},
+        options: {},
+        cost: { input: 0, output: 0, cache: { read: 0, write: 0 } },
+        limit: { context, output },
+        capabilities: {
+          temperature: true,
+          reasoning: false,
+          attachment: false,
+          toolcall: true,
+          input: { text: true, audio: false, image: false, video: false, pdf: false },
+          output: { text: true, audio: false, image: false, video: false, pdf: false },
+          interleaved: false,
+        },
+        release_date: "",
+        variants: {},
+      }
+      return [[id, model] as const]
+    }),
+  )
 }
 
 function selectAzureLanguageModel(sdk: any, modelID: string, useChat: boolean) {
@@ -962,45 +1036,40 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
       }
     }),
     "kote-gateway": Effect.fnUntraced(function* (input: Info) {
-      // Resolve the Kote Gateway endpoint from the signed bootstrap configuration
-      // (or KOTECODE_GATEWAY_URL override). See packages/core/src/kote/bootstrap.ts.
-      // The resolved base_url becomes the provider's baseURL with highest precedence
-      // in resolveSDK — no separate HTTP client is created (spec ТЗ §9.5).
       const resolved = yield* Effect.promise(() => resolveGateway())
 
-      // If the user already supplied a baseURL in config, honor it (local override).
-      if (input.options?.baseURL && resolved.source !== "environment") {
-        return {
-          autoload: input.source === "config",
-          options: {
-            baseURL: input.options.baseURL,
-            apiKey: Flag.KOTECODE_GATEWAY_API_KEY ?? input.options?.apiKey,
-            headers: { "X-Title": "kotencode" },
-          },
-        }
-      }
-
-      // Bootstrap unresolved and no override. Do not autoload; surface a clear error
-      // if the user actually tries to use the provider.
       if (!("baseUrl" in resolved)) {
         const failure = resolved
         return {
-          autoload: false,
+          autoload: input.source === "config",
           async getModel() {
-            throw new Error(
-              `Kote Gateway is unavailable: ${failure.reason}${failure.hint ? " — " + failure.hint : ""}`,
-            )
+            throw new Error(`Kote Gateway is unavailable: ${failure.reason}${failure.hint ? " — " + failure.hint : ""}`)
           },
         }
       }
 
+      const auth = yield* dep.auth(input.id)
+      const configApiKey = typeof input.options?.apiKey === "string" ? input.options.apiKey : undefined
+      const apiKey =
+        Flag.KOTECODE_GATEWAY_API_KEY ??
+        configApiKey ??
+        (auth?.type === "api" ? auth.key : auth?.type === "oauth" ? auth.access : undefined)
       return {
         autoload: input.source === "config",
         options: {
           baseURL: resolved.baseUrl,
-          apiKey: Flag.KOTECODE_GATEWAY_API_KEY ?? input.options?.apiKey,
           headers: { "X-Title": "kotencode" },
         },
+        ...(resolved.modelsUrl
+          ? {
+              discoverModels: () =>
+                discoverKoteGatewayModels({
+                  baseUrl: resolved.baseUrl,
+                  modelsUrl: resolved.modelsUrl!,
+                  apiKey,
+                }),
+            }
+          : {}),
       }
     }),
   }
@@ -1629,21 +1698,26 @@ const layer = Layer.effect(
           const partial: Partial<Info> = { source: "config" }
           if (provider.env) partial.env = provider.env
           if (provider.name) partial.name = provider.name
-          if (provider.options) partial.options = provider.options
+          if (provider.options) {
+            const options = { ...provider.options }
+            if (providerID === "kote-gateway") delete options.baseURL
+            partial.options = options
+          }
           mergeProvider(providerID, partial)
         }
 
-        const gitlab = ProviderV2.ID.make("gitlab")
-        if (discoveryLoaders[gitlab] && providers[gitlab] && isProviderAllowed(gitlab)) {
+        for (const [id, discover] of Object.entries(discoveryLoaders)) {
+          const providerID = ProviderV2.ID.make(id)
+          if (!providers[providerID] || !isProviderAllowed(providerID)) continue
           yield* Effect.promise(async () => {
             try {
-              const discovered = await discoveryLoaders[gitlab]()
+              const discovered = await discover()
               for (const [modelID, model] of Object.entries(discovered)) {
-                if (!providers[gitlab].models[modelID]) {
-                  providers[gitlab].models[modelID] = model
+                if (!providers[providerID].models[modelID]) {
+                  providers[providerID].models[modelID] = model
                 }
               }
-            } catch (e) {}
+            } catch {}
           })
         }
 
@@ -1713,6 +1787,9 @@ const layer = Layer.effect(
       try {
         const provider = s.providers[model.providerID]
         const options = { ...provider.options }
+        if (model.providerID === "kote-gateway" && Flag.KOTECODE_GATEWAY_API_KEY) {
+          options.apiKey = Flag.KOTECODE_GATEWAY_API_KEY
+        }
 
         if (
           model.providerID === "google-vertex" &&

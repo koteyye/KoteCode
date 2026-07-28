@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-APP=kotecode
+APP=kotencode
 
 MUTED='\033[0;2m'
 RED='\033[0;31m'
@@ -22,7 +22,7 @@ Options:
 Examples:
     curl -fsSL https://github.com/koteyye/KoteCode/raw/main/install | bash
     curl -fsSL https://github.com/koteyye/KoteCode/raw/main/install | bash -s -- --version 0.1.0-alpha.1
-    ./install --binary /path/to/kotecode
+    ./install --binary /path/to/kotencode
 EOF
 }
 
@@ -101,7 +101,7 @@ else
 
     combo="$os-$arch"
     case "$combo" in
-      linux-x64|linux-arm64|darwin-x64|darwin-arm64|windows-x64)
+      linux-x64|darwin-arm64|windows-x64)
         ;;
       *)
         echo -e "${RED}Unsupported OS/Arch: $os/$arch${NC}"
@@ -157,13 +157,16 @@ else
       fi
     fi
 
-    target="$os-$arch"
-    if [ "$needs_baseline" = "true" ]; then
-      target="$target-baseline"
-    fi
     if [ "$is_musl" = "true" ]; then
-      target="$target-musl"
+      echo -e "${RED}This alpha does not publish a Linux musl artifact yet.${NC}"
+      exit 1
     fi
+    if [ "$needs_baseline" = "true" ]; then
+      echo -e "${RED}This alpha does not publish a non-AVX2 x64 artifact yet.${NC}"
+      exit 1
+    fi
+
+    target="$os-$arch"
 
     filename="$APP-$target$archive_ext"
 
@@ -223,7 +226,11 @@ check_version() {
         kotencode_path=$(which kotencode)
 
         ## Check the installed version
-        installed_version=$(kotencode --version 2>/dev/null || echo "")
+        installed_output=$(kotencode --version 2>/dev/null || echo "")
+        installed_version=$(printf '%s\n' "$installed_output" | sed -n 's/^KoteCode //p' | head -1)
+        if [ -z "$installed_version" ]; then
+            installed_version=$(printf '%s\n' "$installed_output" | head -1)
+        fi
 
         if [[ "$installed_version" != "$specific_version" ]]; then
             print_message info "${MUTED}Installed version: ${NC}$installed_version."
@@ -340,15 +347,25 @@ download_and_install() {
         unzip -q "$tmp_dir/$filename" -d "$tmp_dir"
     fi
 
-    mv "$tmp_dir/kotecode" "$INSTALL_DIR"
-    chmod 755 "${INSTALL_DIR}/kotencode"
+    local source_binary="$tmp_dir/kotencode"
+    local installed_binary="$INSTALL_DIR/kotencode"
+    if [ "$os" = "windows" ]; then
+        source_binary="$tmp_dir/kotencode.exe"
+        installed_binary="$INSTALL_DIR/kotencode.exe"
+    fi
+    mv "$source_binary" "$installed_binary"
+    chmod 755 "$installed_binary"
     rm -rf "$tmp_dir"
 }
 
 install_from_binary() {
     print_message info "\n${MUTED}Installing ${NC}kotencode ${MUTED}from: ${NC}$binary_path"
-    cp "$binary_path" "${INSTALL_DIR}/kotencode"
-    chmod 755 "${INSTALL_DIR}/kotencode"
+    local installed_binary="$INSTALL_DIR/kotencode"
+    if [[ "$binary_path" == *.exe ]]; then
+        installed_binary="$INSTALL_DIR/kotencode.exe"
+    fi
+    cp "$binary_path" "$installed_binary"
+    chmod 755 "$installed_binary"
 }
 
 if [ -n "$binary_path" ]; then

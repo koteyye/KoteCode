@@ -14,6 +14,7 @@ process.chdir(dir)
 const generated = await import("./generate.ts")
 
 import { Script } from "@opencode-ai/script"
+import { KoteCodeVersion as DefaultKoteCodeVersion } from "@opencode-ai/core/installation/version"
 import pkg from "../package.json"
 
 const singleFlag = process.argv.includes("--single")
@@ -22,6 +23,7 @@ const skipInstall = process.argv.includes("--skip-install")
 const sourcemapsFlag = process.argv.includes("--sourcemaps")
 const plugin = createSolidTransformPlugin()
 const skipEmbedWebUi = process.argv.includes("--skip-embed-web-ui")
+const koteCodeVersion = process.env.KOTECODE_VERSION ?? DefaultKoteCodeVersion
 
 const createEmbeddedWebUIBundle = async () => {
   console.log(`Building Web UI to embed in the binary`)
@@ -175,8 +177,8 @@ for (const item of targets) {
       autoloadTsconfig: true,
       autoloadPackageJson: true,
       target: name.replace(pkg.name, "bun") as any,
-      outfile: `dist/${name}/bin/kotecode`,
-      execArgv: [`--user-agent=kotecode/${Script.version}`, "--use-system-ca", "--"],
+      outfile: `dist/${name}/bin/kotencode`,
+      execArgv: [`--user-agent=kotencode/${koteCodeVersion}`, "--use-system-ca", "--"],
       windows: {},
     },
     files: {
@@ -192,6 +194,7 @@ for (const item of targets) {
     define: {
       FFF_LIBC: JSON.stringify(item.abi === "musl" ? "musl" : "gnu"),
       OPENCODE_VERSION: `'${Script.version}'`,
+      KOTECODE_VERSION: JSON.stringify(koteCodeVersion),
       OPENCODE_MODELS_DEV: generated.modelsData,
       OTUI_TREE_SITTER_WORKER_PATH: bunfsRoot + treeSitterWorkerPath,
       OPENCODE_WORKER_PATH: workerPath,
@@ -203,7 +206,7 @@ for (const item of targets) {
 
   // Smoke test: only run if binary is for current platform
   if (item.os === process.platform && item.arch === process.arch && !item.abi) {
-    const binaryPath = `dist/${name}/bin/kotecode`
+    const binaryPath = `dist/${name}/bin/kotencode`
     console.log(`Running smoke test: ${binaryPath} --version`)
     try {
       const versionOutput = await $`${binaryPath} --version`.text()
