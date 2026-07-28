@@ -4,16 +4,12 @@ import { fileURLToPath } from "node:url"
 import { promisify } from "node:util"
 
 import type { Configuration } from "electron-builder"
+import { APP_IDS, APP_NAMES } from "./src/main/constants"
 
 const execFileAsync = promisify(execFile)
 const packageDir = path.dirname(fileURLToPath(import.meta.url))
 const rootDir = path.resolve(packageDir, "../..")
 const signScript = path.join(rootDir, "script", "sign-windows.ps1")
-// The Electron 42 packaging update briefly installed Linux launchers/icons under
-// "opencode-desktop". Keep that hidden desktop entry around so existing GNOME/KDE
-// pins still resolve after the canonical app id changes back to ai.opencode.desktop.
-const legacyDesktopEntry = path.join(packageDir, "resources", "linux", "opencode-desktop.desktop")
-const legacyDesktopEntryFpm = `${legacyDesktopEntry}=/usr/share/applications/opencode-desktop.desktop`
 
 async function signWindows(configuration: { path: string }) {
   if (process.platform !== "win32") return
@@ -32,12 +28,6 @@ const channel = (() => {
   return "dev"
 })()
 
-const APP_IDS = {
-  dev: "ai.kotecode.desktop.dev",
-  beta: "ai.kotecode.desktop.beta",
-  prod: "ai.kotecode.desktop",
-} as const
-
 const getBase = (appId: string): Configuration => ({
   artifactName: "kotencode-desktop-${os}-${arch}.${ext}",
   directories: {
@@ -45,8 +35,8 @@ const getBase = (appId: string): Configuration => ({
     buildResources: "resources",
   },
   // Linux launchers are .desktop files, so this is the desktop file name,
-  // not just the app id. For prod, app id "ai.opencode.desktop" becomes
-  // "ai.opencode.desktop.desktop".
+  // not just the app id. For prod, app id "ai.kotecode.desktop" becomes
+  // "ai.kotecode.desktop.desktop".
   // https://developer.gnome.org/documentation/guidelines/maintainer/integrating.html
   // https://www.electron.build/docs/linux/
   extraMetadata: {
@@ -115,7 +105,7 @@ function getConfig() {
       return {
         ...base,
         appId,
-        productName: "KoteCode Dev",
+        productName: APP_NAMES.dev,
         rpm: { packageName: "kotencode-dev" },
       }
     }
@@ -123,7 +113,7 @@ function getConfig() {
       return {
         ...base,
         appId,
-        productName: "KoteCode Beta",
+        productName: APP_NAMES.beta,
         protocols: { name: "KoteCode Beta", schemes: ["kotencode"] },
         publish: { provider: "github", owner: "koteyye", repo: "KoteCode", channel: "beta" },
         rpm: { packageName: "kotencode-beta" },
@@ -133,11 +123,10 @@ function getConfig() {
       return {
         ...base,
         appId,
-        productName: "KoteCode",
+        productName: APP_NAMES.prod,
         protocols: { name: "KoteCode", schemes: ["kotencode"] },
         publish: { provider: "github", owner: "koteyye", repo: "KoteCode", channel: "latest" },
-        deb: { fpm: [legacyDesktopEntryFpm] },
-        rpm: { packageName: "kotencode", fpm: [legacyDesktopEntryFpm] },
+        rpm: { packageName: "kotencode" },
       }
     }
   }

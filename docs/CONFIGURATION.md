@@ -8,25 +8,25 @@ on top; when both are set, KoteCode's take precedence.
 
 A new KoteCode install uses its own directories (separate from OpenCode's):
 
-| Directory | Linux | macOS | Windows |
-|---|---|---|---|
-| config | `~/.config/kotencode` | `~/Library/Application Support/kotencode` | `%APPDATA%\kotencode` |
-| data | `~/.local/share/kotencode` | `~/Library/Application Support/kotencode` | `%LOCALAPPDATA%\kotencode` |
-| cache | `~/.cache/kotencode` | `~/Library/Caches/kotencode` | `%LOCALAPPDATA%\kotencode\cache` |
-| state | `~/.local/state/kotencode` | `~/Library/Application Support/kotencode` | `%LOCALAPPDATA%\kotencode\state` |
-| log | `<data>/log` | `<data>/log` | `<data>\log` |
+| Directory | Linux                      | macOS                                     | Windows                          |
+| --------- | -------------------------- | ----------------------------------------- | -------------------------------- |
+| config    | `~/.config/kotencode`      | `~/Library/Application Support/kotencode` | `%APPDATA%\kotencode`            |
+| data      | `~/.local/share/kotencode` | `~/Library/Application Support/kotencode` | `%LOCALAPPDATA%\kotencode`       |
+| cache     | `~/.cache/kotencode`       | `~/Library/Caches/kotencode`              | `%LOCALAPPDATA%\kotencode\cache` |
+| state     | `~/.local/state/kotencode` | `~/Library/Application Support/kotencode` | `%LOCALAPPDATA%\kotencode\state` |
+| log       | `<data>/log`               | `<data>/log`                              | `<data>\log`                     |
 
 ### Overriding directories
 
 Each directory can be overridden by environment variable (KoteCode takes precedence
 over the OpenCode equivalent, which takes precedence over the platform default):
 
-| Override env | What it sets |
-|---|---|
-| `KOTECODE_CONFIG_DIR` | config directory |
-| `KOTECODE_DATA_DIR` | data directory |
-| `KOTECODE_CACHE_DIR` | cache directory |
-| (`OPENCODE_CONFIG_DIR` is still honored as a fallback) | |
+| Override env                                           | What it sets     |
+| ------------------------------------------------------ | ---------------- |
+| `KOTECODE_CONFIG_DIR`                                  | config directory |
+| `KOTECODE_DATA_DIR`                                    | data directory   |
+| `KOTECODE_CACHE_DIR`                                   | cache directory  |
+| (`OPENCODE_CONFIG_DIR` is still honored as a fallback) |                  |
 
 ## Config files
 
@@ -52,10 +52,10 @@ KOTECODE_CONFIG=/path/to/my-config.jsonc kotencode
   "provider": {
     "kote-gateway": {
       "models": {
-        "my-model": { "name": "My Model" }
-      }
-    }
-  }
+        "my-model": { "name": "My Model" },
+      },
+    },
+  },
 }
 ```
 
@@ -63,17 +63,17 @@ KOTECODE_CONFIG=/path/to/my-config.jsonc kotencode
 
 ### KoteCode (`KOTECODE_*`)
 
-| Variable | Purpose |
-|---|---|
-| `KOTECODE_CONFIG` | Path to a config file (merged as local scope) |
-| `KOTECODE_CONFIG_DIR` | Override the config directory |
-| `KOTECODE_DATA_DIR` | Override the data directory |
-| `KOTECODE_CACHE_DIR` | Override the cache directory |
-| `KOTECODE_BOOTSTRAP_URL` | Override the bootstrap config URL (dev/testing) |
-| `KOTECODE_GATEWAY_URL` | Force the gateway address — **priority over bootstrap** |
-| `KOTECODE_GATEWAY_API_KEY` | Provide the gateway key via env (not written to config) |
-| `KOTECODE_DISABLE_UPDATE_CHECK` | Reserved update-check kill switch; alpha updates are already disabled |
-| `KOTECODE_BIN_PATH` | Point the launcher at a specific binary (also honors `OPENCODE_BIN_PATH`) |
+| Variable                        | Purpose                                                                   |
+| ------------------------------- | ------------------------------------------------------------------------- |
+| `KOTECODE_CONFIG`               | Path to a config file (merged as local scope)                             |
+| `KOTECODE_CONFIG_DIR`           | Override the config directory                                             |
+| `KOTECODE_DATA_DIR`             | Override the data directory                                               |
+| `KOTECODE_CACHE_DIR`            | Override the cache directory                                              |
+| `KOTECODE_BOOTSTRAP_URL`        | Override the bootstrap config URL (dev/testing)                           |
+| `KOTECODE_GATEWAY_URL`          | Force the gateway address — **priority over bootstrap**                   |
+| `KOTECODE_GATEWAY_API_KEY`      | Provide the gateway key via env (not written to config)                   |
+| `KOTECODE_DISABLE_UPDATE_CHECK` | Reserved update-check kill switch; alpha updates are already disabled     |
+| `KOTECODE_BIN_PATH`             | Point the launcher at a specific binary (also honors `OPENCODE_BIN_PATH`) |
 
 KoteCode alpha does not perform automatic update checks and rejects manual/API
 upgrade requests. Install a newer alpha explicitly from the KoteCode GitHub Releases
@@ -89,11 +89,11 @@ remove or rename any of them.
 
 ## Connection modes
 
-| Mode | Provider id | Endpoint | When to use |
-|---|---|---|---|
-| **Kote Gateway** | `kote-gateway` | Resolved at runtime from the signed bootstrap (or `KOTECODE_GATEWAY_URL`) | Use KoteCode's gateway |
-| **Direct OpenRouter** | `openrouter` | `openrouter.ai` (your key) | Your own OpenRouter account |
-| **Other providers** | `anthropic`, `openai`, `google`, `azure`, `amazon-bedrock`, … | Each provider's own endpoint | Direct to a model vendor |
+| Mode                  | Provider id                                                   | Endpoint                                                                  | When to use                 |
+| --------------------- | ------------------------------------------------------------- | ------------------------------------------------------------------------- | --------------------------- |
+| **Kote Gateway**      | `kote-gateway`                                                | Resolved at runtime from the signed bootstrap (or `KOTECODE_GATEWAY_URL`) | Use KoteCode's gateway      |
+| **Direct OpenRouter** | `openrouter`                                                  | `openrouter.ai` (your key)                                                | Your own OpenRouter account |
+| **Other providers**   | `anthropic`, `openai`, `google`, `azure`, `amazon-bedrock`, … | Each provider's own endpoint                                              | Direct to a model vendor    |
 
 You always know which endpoint is in use — the Kote Gateway is never a hidden
 substitution for OpenRouter or any other provider. See [`NETWORK.md`](./NETWORK.md)
@@ -126,6 +126,24 @@ kotencode migrate-from-opencode --force            # overwrite an existing KoteC
 Your original OpenCode files are **never modified or deleted**. Secret-looking values
 (`key`, `token`, `secret`, `password`, `credential`, `apikey`) are redacted unless you
 pass `--with-secrets`.
+
+## Desktop isolation
+
+The KoteCode desktop app uses its own application identifiers and user-data roots:
+
+| Channel    | Application ID             |
+| ---------- | -------------------------- |
+| dev        | `ai.kotecode.desktop.dev`  |
+| beta       | `ai.kotecode.desktop.beta` |
+| production | `ai.kotecode.desktop`      |
+
+It does not automatically import the OpenCode desktop store. Internal compatibility
+keys may retain `opencode` names inside the isolated KoteCode directory so upstream
+merges and data formats remain compatible.
+
+WSL integration is disabled for the alpha. The inherited implementation installs and
+launches an upstream OpenCode binary inside WSL; it will remain unavailable until
+KoteCode publishes and verifies its own Linux sidecar.
 
 ## Secrets handling
 

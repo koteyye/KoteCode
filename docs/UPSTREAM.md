@@ -68,6 +68,7 @@ These are the **only** files that will routinely conflict on merge. A conflict h
 and expected. The merge procedure is "take upstream logic, keep KoteCode brand."
 
 **Branding (single-constant touchpoints):**
+
 - `packages/core/src/global.ts` — app dir name `kotencode`, `KOTECODE_CONFIG_DIR` override
 - `packages/opencode/src/index.ts` — `scriptName("kotencode")`, `--help` prefix, version display
 - `packages/tui/src/logo.ts` — KoteCode ASCII logo glyphs
@@ -79,11 +80,15 @@ and expected. The merge procedure is "take upstream logic, keep KoteCode brand."
 - `packages/opencode/bin/kotencode` — launcher and `kotencode-*` package names
 - `packages/opencode/script/build.ts` — outfile `kotencode`, KoteCode User-Agent in `execArgv`
 - `package.json` (root) — name/description/repository
-- `packages/desktop/package.json`, `packages/desktop/electron-builder.config.ts` — desktop identity
+- `packages/desktop/package.json`, `packages/desktop/electron-builder.config.ts`,
+  `packages/desktop/src/main/{constants,index,logging,server,windows}.ts`, and
+  `packages/desktop/src/main/wsl/{ipc,runtime}.ts` — desktop identity, isolated
+  runtime data, and alpha WSL safety lock
 - `install` — KoteCode installer
 - `README.md` — KoteCode README
 
 **KoteCode additions (new files upstream does not have — no conflict, but keep them):**
+
 - `packages/core/src/kote/` — bootstrap resolver, signature verification, last-known-good cache
 - `packages/core/src/flag/flag.ts` — `KOTECODE_*` entries (additive; should not conflict unless upstream rewrites the file)
 - `packages/opencode/src/cli/cmd/migrate.ts` — `kotencode migrate-from-opencode`

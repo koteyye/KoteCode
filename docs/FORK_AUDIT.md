@@ -26,6 +26,7 @@ Fork base: OpenCode `1.18.5` — see [`../UPSTREAM_STATE.md`](../UPSTREAM_STATE.
 ## 2. Entry points
 
 ### CLI / TUI
+
 - **CLI entrypoint:** `packages/opencode/src/index.ts` — yargs-based, registers ~24 commands,
   handles `-h`/`--help` (custom `show()` prepends the ASCII logo), `--version` (uses
   `InstallationVersion`), and forces `process.exit()` in `finally`.
@@ -37,6 +38,7 @@ Fork base: OpenCode `1.18.5` — see [`../UPSTREAM_STATE.md`](../UPSTREAM_STATE.
   `plug`, `upgrade`, `uninstall`, `stats`, `web`, `db`, `account`, `acp`, …) + `debug/`, `run/`.
 
 ### Desktop
+
 - `packages/desktop/` — Electron app (`@opencode-ai/desktop`), config in
   `electron-builder.config.ts` (channel-driven `appId`/`productName`/URL scheme).
 
@@ -65,37 +67,38 @@ Client+Core+Server. Client never depends on Core/Server.
 This is the **complete** list of places the brand string appears to end users. Most are a
 single constant (see [`UPSTREAM.md`](./UPSTREAM.md) "expected-diff files").
 
-| Surface | File | Change for KoteCode |
-|---|---|---|
-| XDG app dir name | `packages/core/src/global.ts` — `const app = "opencode"` | → `"kotencode"` |
-| Config-dir override | `packages/core/src/global.ts` `make()` | honor `KOTECODE_CONFIG_DIR` |
-| CLI `scriptName` / `--help` prefix | `packages/opencode/src/index.ts` | `scriptName("kotencode")` |
-| ASCII logo (TTY) | `packages/tui/src/logo.ts` | new "KOTECODE" glyphs |
-| ASCII wordmark (non-TTY) | `packages/opencode/src/cli/ui.ts` `wordmark` | new glyph array |
-| `--version` string | via `OPENCODE_VERSION` define → `installation/version.ts` | show KoteCode + upstream |
-| Binary outfile name | `packages/opencode/script/build.ts` (`outfile …/bin/opencode`) | → `kotencode` |
-| npm package name (drives sub-package names) | `packages/opencode/package.json` `name` | → `"kotencode"` |
-| Launcher expected names | `packages/opencode/bin/opencode` | `kotencode-…`, `kotencode(.exe)`, `.kotencode` |
-| User-Agent (models.dev) | `packages/core/src/models-dev.ts` `USER_AGENT` | `kotencode/…` |
-| Provider attribution headers | `packages/opencode/src/provider/provider.ts` (openrouter/llmgateway/nvidia/vercel/zenmux/cerebras/kilo) | `kotencode` brand headers |
-| Root package identity | `package.json` (`name`, `description`, `repository.url`) | KoteCode identity |
-| Desktop identity | `packages/desktop/{package.json, electron-builder.config.ts}` | KoteCode app IDs/name/author |
-| Install script | `install` (`APP=opencode`, "OpenCode Installer", release URLs, ASCII art) | KoteCode installer |
-| README | `README.md` (+ 20 translations) | KoteCode README |
+| Surface                                     | File                                                                                                                                   | Change for KoteCode                                                |
+| ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| XDG app dir name                            | `packages/core/src/global.ts` — `const app = "opencode"`                                                                               | → `"kotencode"`                                                    |
+| Config-dir override                         | `packages/core/src/global.ts` `make()`                                                                                                 | honor `KOTECODE_CONFIG_DIR`                                        |
+| CLI `scriptName` / `--help` prefix          | `packages/opencode/src/index.ts`                                                                                                       | `scriptName("kotencode")`                                          |
+| ASCII logo (TTY)                            | `packages/tui/src/logo.ts`                                                                                                             | new "KOTECODE" glyphs                                              |
+| ASCII wordmark (non-TTY)                    | `packages/opencode/src/cli/ui.ts` `wordmark`                                                                                           | new glyph array                                                    |
+| `--version` string                          | via `OPENCODE_VERSION` define → `installation/version.ts`                                                                              | show KoteCode + upstream                                           |
+| Binary outfile name                         | `packages/opencode/script/build.ts` (`outfile …/bin/opencode`)                                                                         | → `kotencode`                                                      |
+| npm package name (drives sub-package names) | `packages/opencode/package.json` `name`                                                                                                | → `"kotencode"`                                                    |
+| Launcher expected names                     | `packages/opencode/bin/opencode`                                                                                                       | `kotencode-…`, `kotencode(.exe)`, `.kotencode`                     |
+| User-Agent (models.dev)                     | `packages/core/src/models-dev.ts` `USER_AGENT`                                                                                         | `kotencode/…`                                                      |
+| Provider attribution headers                | `packages/opencode/src/provider/provider.ts` (openrouter/llmgateway/nvidia/vercel/zenmux/cerebras/kilo)                                | `kotencode` brand headers                                          |
+| Root package identity                       | `package.json` (`name`, `description`, `repository.url`)                                                                               | KoteCode identity                                                  |
+| Desktop identity                            | `packages/desktop/{package.json, electron-builder.config.ts}`, `packages/desktop/src/main/{constants,index,logging,server,windows}.ts` | KoteCode app IDs/name/author and isolated runtime data             |
+| Desktop WSL bridge                          | `packages/desktop/src/main/wsl/`                                                                                                       | Disabled for alpha; inherited code installs/runs upstream OpenCode |
+| Install script                              | `install` (`APP=opencode`, "OpenCode Installer", release URLs, ASCII art)                                                              | KoteCode installer                                                 |
+| README                                      | `README.md` (+ 20 translations)                                                                                                        | KoteCode README                                                    |
 
 ## 5. Configuration / data / cache / state / log directories
 
 Defined in `packages/core/src/global.ts` via `xdg-basedir` (app name `"opencode"`):
 
-| Directory | Linux/macOS | Windows |
-|---|---|---|
-| config | `$XDG_CONFIG_HOME/opencode` (`~/.config/opencode`) | `%APPDATA%\opencode` |
-| data | `$XDG_DATA_HOME/opencode` (`~/.local/share/opencode`) | `%LOCALAPPDATA%\opencode` |
-| cache | `$XDG_CACHE_HOME/opencode` (`~/.cache/opencode`) | `%LOCALAPPDATA%\opencode\cache` |
-| state | `$XDG_STATE_HOME/opencode` (`~/.local/state/opencode`) | `%LOCALAPPDATA%\opencode\state` |
-| log | `data/log` | `data/log` |
-| bin | `cache/bin` | `cache/bin` |
-| tmp | `os.tmpdir()/opencode` | `os.tmpdir()/opencode` |
+| Directory | Linux/macOS                                            | Windows                         |
+| --------- | ------------------------------------------------------ | ------------------------------- |
+| config    | `$XDG_CONFIG_HOME/opencode` (`~/.config/opencode`)     | `%APPDATA%\opencode`            |
+| data      | `$XDG_DATA_HOME/opencode` (`~/.local/share/opencode`)  | `%LOCALAPPDATA%\opencode`       |
+| cache     | `$XDG_CACHE_HOME/opencode` (`~/.cache/opencode`)       | `%LOCALAPPDATA%\opencode\cache` |
+| state     | `$XDG_STATE_HOME/opencode` (`~/.local/state/opencode`) | `%LOCALAPPDATA%\opencode\state` |
+| log       | `data/log`                                             | `data/log`                      |
+| bin       | `cache/bin`                                            | `cache/bin`                     |
+| tmp       | `os.tmpdir()/opencode`                                 | `os.tmpdir()/opencode`          |
 
 Config dir is overridable at runtime via `Flag.OPENCODE_CONFIG_DIR ?? Path.config`.
 All dirs are `mkdir -p`'d at module import.

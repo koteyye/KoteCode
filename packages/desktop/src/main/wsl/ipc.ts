@@ -3,12 +3,18 @@ import type { IpcMainInvokeEvent } from "electron"
 import type { WslServersController } from "./servers"
 import { requireWslIpcString, requireWslIpcStrings } from "./policy"
 import type { WslServersState } from "../../preload/types"
+import { WSL_DISABLED_MESSAGE, WSL_ENABLED } from "../constants"
 
-export function registerWslIpcHandlers(controller: WslServersController) {
-  if (process.platform !== "win32") {
-    registerUnavailableWslIpcHandlers()
+export function registerWslIpcHandlers(controller?: WslServersController) {
+  if (!WSL_ENABLED) {
+    registerUnavailableWslIpcHandlers(WSL_DISABLED_MESSAGE)
     return
   }
+  if (process.platform !== "win32") {
+    registerUnavailableWslIpcHandlers("WSL is only available on Windows")
+    return
+  }
+  if (!controller) throw new Error("WSL controller is required when WSL integration is enabled")
 
   const subscriptions = new Map<number, () => void>()
   const unsubscribe = (id: number) => {
@@ -66,15 +72,15 @@ export function registerWslIpcHandlers(controller: WslServersController) {
   )
 }
 
-function registerUnavailableWslIpcHandlers() {
+function registerUnavailableWslIpcHandlers(message: string) {
   const unavailable = () => {
-    throw new Error("WSL is only available on Windows")
+    throw new Error(message)
   }
   const state = (): WslServersState => ({
     runtime: {
       available: false,
       version: null,
-      error: "WSL is only available on Windows",
+      error: message,
     },
     installed: [],
     online: [],

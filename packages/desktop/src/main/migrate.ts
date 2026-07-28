@@ -8,6 +8,9 @@ import { getStore } from "./store"
 
 const TAURI_MIGRATED_KEY = "tauriMigrated"
 
+// Dormant upstream migration support. KoteCode must not call migrate() automatically:
+// its desktop data remains isolated unless an explicit migration flow is added later.
+
 // Resolve the directory where Tauri stored its .dat files for the given app identifier.
 // Mirrors Tauri's AppLocalData / AppData resolution per OS.
 function tauriDir(id: string) {

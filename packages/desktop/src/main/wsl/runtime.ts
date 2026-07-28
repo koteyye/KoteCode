@@ -4,6 +4,7 @@ import { join } from "node:path"
 import * as pty from "@lydell/node-pty"
 import type { WslDistroProbe, WslInstalledDistro, WslOnlineDistro, WslRuntimeCheck } from "../../preload/types"
 import { wslTerminalArgs } from "./policy"
+import { WSL_DISABLED_MESSAGE, WSL_ENABLED } from "../constants"
 
 export type WslCommandLine = {
   stream: "stdout" | "stderr"
@@ -259,16 +260,12 @@ export async function installWslDistro(name: string, opts?: RunWslOptions) {
   )
 }
 
-export async function installWslOpencode(version: string, distro: string, opts?: RunWslOptions) {
-  return runInteractiveCommand(
-    resolveSystem32Command("wsl.exe"),
-    wslArgs(
-      ["bash", "-lc", `curl -fsSL https://opencode.ai/install | bash -s -- --version ${shellEscape(version)}`],
-      distro,
-    ),
-    withTimeout(opts, DEFAULT_WSL_INSTALL_TIMEOUT_MS),
-    DEFAULT_WSL_INSTALL_TIMEOUT_MS,
-  )
+export async function installWslOpencode(
+  _version: string,
+  _distro: string,
+  _opts?: RunWslOptions,
+): Promise<WslCommandResult> {
+  throw new Error(WSL_DISABLED_MESSAGE)
 }
 
 export async function probeWslDistro(name: string, opts?: RunWslOptions): Promise<WslDistroProbe> {
@@ -302,16 +299,9 @@ export async function probeWslDistro(name: string, opts?: RunWslOptions): Promis
   }
 }
 
-export async function resolveWslOpencode(distro: string, opts?: RunWslOptions) {
-  return firstLine(
-    (
-      await runWslSh(
-        'if [ -x "$HOME/.opencode/bin/opencode" ]; then printf "%s\\n" "$HOME/.opencode/bin/opencode"; fi',
-        distro,
-        opts,
-      )
-    ).stdout,
-  )
+export async function resolveWslOpencode(_distro: string, _opts?: RunWslOptions) {
+  if (!WSL_ENABLED) return ""
+  throw new Error("KoteCode WSL sidecar support is not implemented")
 }
 
 export async function readWslCommandVersion(command: string, distro: string, opts?: RunWslOptions) {
