@@ -1,65 +1,114 @@
 # Network audit
 
-Every network endpoint KoteCode contacts, with what it is for, when it happens, what
-data is sent, and whether it can be disabled. There are **no hidden or undocumented**
-calls to KoteCode-owned services.
-
-KoteCode inherits OpenCode's network surface and adds the Kote Gateway bootstrap
-fetch. The table below covers both. "Infra" marks whether a call uses OpenCode's or
-KoteCode's infrastructure.
+KoteCode inherits OpenCode's provider surface and adds one KoteCode-owned service:
+Kote Proxy. The Proxy is a standard HTTPS `CONNECT` transport; it is not an LLM
+provider and has no provider API key.
 
 ## Endpoints
 
-| #   | Domain                                                                                 | Purpose                                                                 | When                                                              | Data sent                                                                                                                 | Disable                                                                                                | Infra                         |
-| --- | -------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ | ----------------------------- |
-| 1   | `bootstrap.kotencode.ai` (default; overridable via `KOTECODE_BOOTSTRAP_URL`)           | Fetch the signed Kote Gateway bootstrap config                          | Launch, before the Kote Gateway provider is used                  | GET only; no body; no API key; `accept: application/json` header                                                          | Use `KOTECODE_GATEWAY_URL` to skip bootstrap entirely (direct override)                                | **KoteCode**                  |
-| 2   | `<gateway base_url>` (resolved from #1 or `KOTECODE_GATEWAY_URL`)                      | Kote Gateway model calls (chat, tools, streaming)                       | When the user picks the Kote Gateway provider and sends a message | Prompts, code, file contents the user includes; `Authorization`/API key; `X-Title: kotencode`                             | Choose a different provider, or don't use KoteCode                                                     | **KoteCode** (your gateway)   |
-| 3   | `<gateway models_url>` (optional, from #1)                                             | List models offered by the gateway                                      | When the user opens model selection for Kote Gateway              | GET only; API key                                                                                                         | Don't configure Kote Gateway                                                                           | **KoteCode**                  |
-| 4   | `models.dev` (overridable via `OPENCODE_MODELS_URL`)                                   | Global model catalog (prices, capabilities)                             | Periodically (background refresh) + at launch                     | GET only; `User-Agent: kotencode/<channel>/<version>/<client>`                                                            | `OPENCODE_DISABLE_MODELS_FETCH=1`                                                                      | **OpenCode**                  |
-| 5   | Each AI provider's own API (`api.openai.com`, `api.anthropic.com`, `openrouter.ai`, …) | Direct provider calls when the user selects a non-Kote-Gateway provider | When the user picks that provider                                 | Prompts, code, file contents; the provider's API key; attribution headers (`X-Title`, `HTTP-Referer`) branded `kotencode` | Choose a different provider, or `enabled_providers`/`disabled_providers` in config                     | **OpenCode** (the provider's) |
-| 6   | KoteCode GitHub Releases (future)                                                      | Version/update checks                                                   | **Disabled in the current alpha; no request is made**             | None while disabled                                                                                                       | Disabled by the alpha safety lock; `KOTECODE_DISABLE_UPDATE_CHECK=1` remains the permanent kill switch | **KoteCode**                  |
-| 7   | `opncd.ai` (legacy) or account `url` (authenticated)                                   | Session sharing                                                         | Only when the user explicitly shares a session                    | The shared session content; auth bearer token for authenticated shares                                                    | `OPENCODE_DISABLE_SHARE=1`                                                                             | **OpenCode**                  |
-| 8   | Account `url`/`server` (device-code OAuth)                                             | Account login (console/enterprise)                                      | Only when the user runs account login                             | Device-code flow; no password                                                                                             | Don't run account login                                                                                | **OpenCode** (the account's)  |
-| 9   | `OTEL_EXPORTER_OTLP_ENDPOINT` (user-configured)                                        | OpenTelemetry traces                                                    | Only if the user configures OTEL                                  | Trace spans the user's exporter expects                                                                                   | Don't set OTEL env                                                                                     | User's own                    |
+| #   | Endpoint                                                                         | Purpose                         | Data visible to endpoint                                                  | Disable                                                                     |
+| --- | -------------------------------------------------------------------------------- | ------------------------------- | ------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| 1   | `bootstrap.kotencode.ai`                                                         | Fetch signed Proxy bootstrap    | GET, no body or API key                                                   | Set `KOTECODE_PROXY_URL`, or use `KOTECODE_DISABLE_PROXY=1`                 |
+| 2   | Signed Proxy origin                                                              | Open an HTTPS `CONNECT` tunnel  | Client IP, target hostname/port, timing and byte counts                   | `KOTECODE_DISABLE_PROXY=1`                                                  |
+| 3   | Selected AI provider (`api.openai.com`, `api.anthropic.com`, `openrouter.ai`, …) | Model request                   | User API key/OAuth token, prompts, code, tools, attachments and responses | Select another provider or do not send a request                            |
+| 4   | `models.dev` or `OPENCODE_MODELS_URL`                                            | Model catalog                   | GET and branded User-Agent                                                | `OPENCODE_DISABLE_MODELS_FETCH=1`                                           |
+| 5   | KoteCode GitHub Releases                                                         | Future update checks            | Disabled in the current alpha                                             | Already disabled; `KOTECODE_DISABLE_UPDATE_CHECK=1` remains the kill switch |
+| 6   | `opncd.ai` or authenticated account URL                                          | Explicit session sharing        | Shared session and account bearer token                                   | `OPENCODE_DISABLE_SHARE=1`                                                  |
+| 7   | Provider/account authorization endpoints                                         | API-key/OAuth login and refresh | Provider-specific auth data                                               | Do not run the authorization flow                                           |
+| 8   | User-configured `OTEL_EXPORTER_OTLP_ENDPOINT`                                    | OpenTelemetry                   | Trace data expected by the user's exporter                                | Do not configure OTEL                                                       |
 
-## The dynamic Kote Gateway endpoint
+## End-to-end TLS through Kote Proxy
 
-The Kote Gateway working endpoint is **determined at runtime**; it is not in the source:
+For an HTTPS provider request, KoteCode asks the Proxy to connect to the original
+provider host:
 
-- **Where it comes from:** the signed bootstrap config (endpoint #1), or the
-  `KOTECODE_GATEWAY_URL` env override.
-- **Format received:** see [`BOOTSTRAP.md`](./BOOTSTRAP.md) — `{ config_version, gateway: { base_url, models_url }, issued_at, expires_at, signature }`.
-- **Verification:** Ed25519 signature checked against the public key embedded in
-  `packages/core/src/kote/keys.ts` before any URL is used.
-- **How to see the actually-used endpoint:** the resolved source
-  (`environment` | `remote` | `cache`) is surfaced in diagnostics; `KOTECODE_GATEWAY_URL`
-  prints through to the provider's `baseURL`.
-- **What is sent to the gateway:** the model request (prompts, tool definitions, any
-  file contents the user includes), the user's API key, and a `X-Title: kotencode`
-  attribution header. **No telemetry, no extra endpoints, no third parties.**
+```text
+CONNECT api.openai.com:443
+```
 
-## What KoteCode does NOT do
+After the Proxy returns `200 Connection Established`, KoteCode creates TLS directly
+with `api.openai.com` through the byte tunnel. Therefore:
 
-- It does **not** embed a shared OpenRouter API key.
-- It does **not** embed the real gateway URL in source (only the bootstrap URL and
-  the public verification key).
-- It does **not** send code, prompts, or responses to any endpoint beyond the one the
-  user selected (Kote Gateway, a direct provider, etc.).
-- It does **not** silently switch the user between direct mode and Kote Gateway.
-- It does **not** follow redirects on the bootstrap fetch (`redirect: "error"`).
-- It does **not** execute code or commands from the bootstrap config.
-- The alpha desktop does **not** install or launch OpenCode inside WSL. The inherited
-  WSL integration is disabled until a KoteCode-owned Linux sidecar is available.
+- Kote Proxy sees the client IP, provider hostname, timing, and traffic volume;
+- Kote Proxy does not see the provider URL path/query;
+- Kote Proxy does not see the user's API key or OAuth token;
+- Kote Proxy does not see prompts, code, tools, attachments, or responses;
+- the provider sees the same authenticated request it would receive in direct mode;
+- KoteCode validates the provider's TLS certificate;
+- no KoteCode CA is installed and no TLS interception is performed.
 
-## Optional OpenCode services
+The Proxy server enforces a provider host/port allowlist so it cannot be used as an
+arbitrary public relay.
 
-If a piece of OpenCode functionality depends on OpenCode's official infrastructure
-(sharing via `opncd.ai`, account login to an OpenCode-hosted console), KoteCode keeps
-it **optional** and clearly marked as an OpenCode service (rows 7–8 above). Nothing is
-silently re-pointed at KoteCode infrastructure.
+## What is proxied
+
+Only runtime requests made by a selected provider SDK receive the Kote Proxy option.
+The following remain direct:
+
+- bootstrap fetch, avoiding a circular dependency;
+- `models.dev`;
+- npm/GitHub/update traffic;
+- MCP and plugin network calls;
+- session sharing;
+- browser authorization pages;
+- local plain-HTTP providers such as Ollama.
+
+OAuth acquisition can remain direct while subsequent bearer-authenticated model
+requests use the Proxy tunnel.
+
+## Failure and direct mode
+
+KoteCode does not silently fall back to direct HTTPS when the signed Proxy is
+unavailable. The provider request fails with a Proxy diagnostic.
+
+The user can explicitly choose direct transport:
+
+```bash
+KOTECODE_DISABLE_PROXY=1 kotencode
+```
+
+The active source and sanitized endpoint are available without exposing credentials:
+
+```bash
+kotencode debug proxy
+kotencode debug proxy --model openai/gpt-5
+```
+
+For development, a Proxy origin can be forced without changing bootstrap:
+
+```bash
+KOTECODE_PROXY_URL=https://proxy.example:443 kotencode
+```
+
+## Dynamic Proxy address
+
+The Proxy origin comes from:
+
+1. explicit direct mode;
+2. `KOTECODE_PROXY_URL`;
+3. verified remote bootstrap;
+4. verified cached bootstrap.
+
+The bootstrap format is documented in [`BOOTSTRAP.md`](./BOOTSTRAP.md). It contains
+`{ config_version, proxy: { url }, issued_at, expires_at, signature }`.
+
+## What KoteCode does not do
+
+- It does not embed a provider API key.
+- It does not give users free LLM credits.
+- It does not send provider credentials as Proxy authentication.
+- It does not replace OpenAI/OpenRouter/Anthropic with a KoteCode provider.
+- It does not decrypt Proxy tunnel traffic.
+- It does not silently switch between Proxy and direct transport.
+- It does not follow redirects while fetching bootstrap.
+- It does not execute code or commands from bootstrap.
+- The alpha desktop does not install or launch OpenCode inside WSL.
+
+## Optional inherited OpenCode services
+
+Session sharing and OpenCode-hosted account services remain optional inherited
+features. They are not silently redirected to KoteCode infrastructure.
 
 ## Reproducibility
 
-`bunfig.toml` pins the package registry to `registry.npmjs.org/` so dependency
-installation only ever talks to the official npm registry, regardless of any
-machine-local mirror — keeping installs reproducible and auditable.
+`bunfig.toml` pins dependency installation to `registry.npmjs.org`.

@@ -1,6 +1,6 @@
 // KoteCode signed bootstrap configuration resolver.
 //
-// Resolves the Kote Gateway endpoint address from an Ed25519-signed remote
+// Resolves the Kote Proxy endpoint address from an Ed25519-signed remote
 // config, with a local last-known-good cache and clear precedence rules.
 //
 // Spec: ТЗ §9.2–9.4. See docs/BOOTSTRAP.md for the format and signing process,
@@ -14,7 +14,7 @@
 //   - no code/command execution from config
 //   - invalid new config never overwrites last-known-good
 //   - corrupted cache never crashes the app
-//   - no hidden fallback gateway URL is embedded
+//   - no hidden fallback proxy URL is embedded
 
 import { signAsync, verifyAsync } from "@noble/ed25519"
 import { Global } from "../global"
@@ -33,14 +33,13 @@ import {
 // Matches the example in ТЗ §9.2. The `signature` field is detached during
 // verification (it is NOT part of the signed message).
 
-export interface GatewayInfo {
-  base_url: string
-  models_url?: string
+export interface ProxyInfo {
+  url: string
 }
 
 export interface BootstrapConfig {
   config_version: number
-  gateway: GatewayInfo
+  proxy: ProxyInfo
   issued_at: string
   expires_at: string
   signature: string
@@ -55,43 +54,50 @@ function requireIsoDate(value: unknown, field: string): string {
   return value
 }
 
-function requireGatewayUrl(value: unknown, field: string): string {
+function requireProxyUrl(value: unknown, field: string): string {
   if (typeof value !== "string" || value.trim() === "") throw new Error(`bootstrap: ${field} missing`)
-  let url: URL
-  try {
-    url = new URL(value)
-  } catch {
-    throw new Error(`bootstrap: ${field} must be a valid URL`)
-  }
+  const url = URL.parse(value)
+  if (!url) throw new Error(`bootstrap: ${field} must be a valid URL`)
   if (url.protocol !== "https:") throw new Error(`bootstrap: ${field} must use HTTPS`)
+  if (url.username || url.password) throw new Error(`bootstrap: ${field} must not contain credentials`)
+  if (url.pathname !== "/" || url.search || url.hash) {
+    throw new Error(`bootstrap: ${field} must be an HTTPS origin without path, query, or fragment`)
+  }
+  return url.origin
+}
+
+function requireObject(value: unknown, field: string) {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new Error(`bootstrap: ${field} missing`)
+  }
+  return value as Record<string, unknown>
+}
+
+function requireVersion(value: unknown) {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    throw new Error("bootstrap: config_version missing")
+  }
+  return value
+}
+
+function requireSignature(value: unknown) {
+  if (typeof value !== "string" || value.trim() === "") throw new Error("bootstrap: signature missing")
   return value
 }
 
 /** Parse + structurally validate a raw object into a BootstrapConfig (throws on malformed). */
 export function parseConfig(raw: unknown): BootstrapConfig {
-  if (typeof raw !== "object" || raw === null) throw new Error("bootstrap: not an object")
-  const obj = raw as Record<string, unknown>
-  const config_version = obj["config_version"]
-  const gateway = obj["gateway"]
-  const issued_at = obj["issued_at"]
-  const expires_at = obj["expires_at"]
-  const signature = obj["signature"]
-  if (typeof config_version !== "number" || !Number.isFinite(config_version))
-    throw new Error("bootstrap: config_version missing")
-  if (typeof gateway !== "object" || gateway === null) throw new Error("bootstrap: gateway missing")
-  const g = gateway as Record<string, unknown>
-  const baseUrl = requireGatewayUrl(g["base_url"], "gateway.base_url")
-  const modelsUrl = g["models_url"] === undefined ? undefined : requireGatewayUrl(g["models_url"], "gateway.models_url")
-  const issuedAt = requireIsoDate(issued_at, "issued_at")
-  const expiresAt = requireIsoDate(expires_at, "expires_at")
+  const obj = requireObject(raw, "config")
+  const proxy = requireObject(obj["proxy"], "proxy")
+  const issuedAt = requireIsoDate(obj["issued_at"], "issued_at")
+  const expiresAt = requireIsoDate(obj["expires_at"], "expires_at")
   if (new Date(expiresAt) <= new Date(issuedAt)) throw new Error("bootstrap: expires_at must be after issued_at")
-  if (typeof signature !== "string" || signature.trim() === "") throw new Error("bootstrap: signature missing")
   return {
-    config_version,
-    gateway: { base_url: baseUrl, ...(modelsUrl ? { models_url: modelsUrl } : {}) },
+    config_version: requireVersion(obj["config_version"]),
+    proxy: { url: requireProxyUrl(proxy["url"], "proxy.url") },
     issued_at: issuedAt,
     expires_at: expiresAt,
-    signature,
+    signature: requireSignature(obj["signature"]),
   }
 }
 
@@ -99,16 +105,12 @@ export function parseConfig(raw: unknown): BootstrapConfig {
 // serialized as deterministic (canonically-keyed) JSON. This is stable across
 // platforms/JSON libraries so the signer and verifier agree byte-for-byte.
 export function signingMessage(input: BootstrapConfig): string {
-  const unsigned: Omit<BootstrapConfig, "signature"> = {
+  return canonicalJson({
     config_version: input.config_version,
-    gateway: { base_url: input.gateway.base_url },
+    proxy: { url: input.proxy.url },
     issued_at: input.issued_at,
     expires_at: input.expires_at,
-  }
-  if (input.gateway.models_url !== undefined) {
-    unsigned.gateway.models_url = input.gateway.models_url
-  }
-  return canonicalJson(unsigned)
+  } satisfies Omit<BootstrapConfig, "signature">)
 }
 
 /** Deterministic JSON: keys sorted recursively, no whitespace. */
@@ -187,11 +189,11 @@ export async function signConfig(
   unsigned: Omit<BootstrapConfig, "signature">,
   privateKeyHex: string,
 ): Promise<BootstrapConfig> {
-  const withPlaceholder: BootstrapConfig = { ...unsigned, signature: "" }
-  const msg = new TextEncoder().encode(signingMessage(withPlaceholder))
+  const normalized = parseConfig({ ...unsigned, signature: "unsigned" })
+  const msg = new TextEncoder().encode(signingMessage(normalized))
   const priv = Buffer.from(privateKeyHex, "hex")
   const sig = await signAsync(msg, priv)
-  return { ...unsigned, signature: Buffer.from(sig).toString("hex") }
+  return { ...normalized, signature: Buffer.from(sig).toString("hex") }
 }
 
 // ── Cache (last-known-good) ─────────────────────────────────────────────────
@@ -261,10 +263,13 @@ const DEFAULT_BOOTSTRAP_URL = "https://bootstrap.kotencode.ai/bootstrap.json"
 export async function fetchRemote(
   url: string = Flag.KOTECODE_BOOTSTRAP_URL ?? DEFAULT_BOOTSTRAP_URL,
 ): Promise<unknown> {
+  const target = URL.parse(url)
+  if (!target || target.protocol !== "https:") throw new Error("bootstrap URL must use HTTPS")
+  if (target.username || target.password) throw new Error("bootstrap URL must not contain credentials")
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), KOTE_BOOTSTRAP_TIMEOUT_MS)
   try {
-    const res = await fetch(url, {
+    const res = await fetch(target, {
       signal: controller.signal,
       redirect: "error", // reject any redirect: bootstrap URL is pinned and trusted
       headers: { accept: "application/json" },
@@ -294,60 +299,61 @@ export async function fetchRemote(
 
 // ── Resolution (the public entry point) ─────────────────────────────────────
 
-export type ConfigSource = "environment" | "remote" | "cache" | "none"
-
-export interface ResolvedGateway {
-  baseUrl: string
-  modelsUrl?: string
-  source: ConfigSource
+export interface ResolvedProxy {
+  url: string
+  source: Exclude<ConfigSource, "disabled" | "none">
   config?: BootstrapConfig
 }
 
 /**
- * Resolve the Kote Gateway endpoint per the precedence rules (ТЗ §9.4):
- *   1. KOTECODE_GATEWAY_URL (explicit env) — highest priority
- *   2. fresh remote bootstrap (signature + window verified)
- *   3. last-known-good cache (still usable, incl. grace period)
- *   4. none — returns a descriptive error
+ * Resolve the Kote Proxy endpoint:
+ *   1. KOTECODE_DISABLE_PROXY — explicit direct mode
+ *   2. KOTECODE_PROXY_URL — explicit proxy override
+ *   3. fresh remote bootstrap (signature + window verified)
+ *   4. last-known-good cache (still usable, incl. grace period)
+ *   5. none — returns a descriptive error
  *
  * A verified remote config is persisted to the cache (invalid ones never overwrite it).
- * Returns source = "environment" | "remote" | "cache".
  */
+export interface DisabledProxy {
+  source: "disabled"
+}
+
 export interface ResolveFailure {
   source: "none"
   reason: string
   hint?: string
 }
 
-export interface ResolveGatewayOptions {
+export type ConfigSource = "disabled" | "environment" | "remote" | "cache" | "none"
+export type ResolveProxyResult = DisabledProxy | ResolvedProxy | ResolveFailure
+
+export interface ResolveProxyOptions {
   fetch?: () => Promise<unknown>
   cacheFile?: string
   now?: Date
   publicKeyHex?: string
 }
 
-export async function resolveGateway(options: ResolveGatewayOptions = {}): Promise<ResolvedGateway | ResolveFailure> {
-  // 1. Explicit env override.
-  const envUrl = Flag.KOTECODE_GATEWAY_URL
+export async function resolveProxy(options: ResolveProxyOptions = {}): Promise<ResolveProxyResult> {
+  if (Flag.KOTECODE_DISABLE_PROXY) return { source: "disabled" }
+
+  const envUrl = Flag.KOTECODE_PROXY_URL
   if (envUrl) {
-    let baseUrl: string
     try {
-      baseUrl = requireGatewayUrl(envUrl, "KOTECODE_GATEWAY_URL")
+      return {
+        url: requireProxyUrl(envUrl, "KOTECODE_PROXY_URL"),
+        source: "environment",
+      }
     } catch (error) {
       return {
         source: "none",
-        reason: error instanceof Error ? error.message : "KOTECODE_GATEWAY_URL is invalid.",
-        hint: "Set KOTECODE_GATEWAY_URL to a valid HTTPS gateway URL.",
+        reason: error instanceof Error ? error.message : "KOTECODE_PROXY_URL is invalid.",
+        hint: "Set KOTECODE_PROXY_URL to a valid HTTPS proxy origin or use KOTECODE_DISABLE_PROXY=1.",
       }
-    }
-    return {
-      baseUrl,
-      modelsUrl: undefined,
-      source: "environment",
     }
   }
 
-  // 2. Remote bootstrap.
   let remoteReason = "remote bootstrap is unreachable"
   try {
     const raw = await (options.fetch ?? fetchRemote)()
@@ -355,8 +361,7 @@ export async function resolveGateway(options: ResolveGatewayOptions = {}): Promi
     if (result.ok) {
       await writeCache(result.config, options.cacheFile) // persist last-known-good
       return {
-        baseUrl: result.config.gateway.base_url,
-        modelsUrl: result.config.gateway.models_url,
+        url: result.config.proxy.url,
         source: "remote",
         config: result.config,
       }
@@ -367,23 +372,22 @@ export async function resolveGateway(options: ResolveGatewayOptions = {}): Promi
     // Remote unreachable or malformed — fall through to cache.
   }
 
-  // 3. Last-known-good cache.
+  // 4. Last-known-good cache.
   const cached = await readCache(options.cacheFile, { now: options.now, publicKeyHex: options.publicKeyHex })
   if (cached && isCacheUsable(cached, options.now)) {
     return {
-      baseUrl: cached.gateway.base_url,
-      modelsUrl: cached.gateway.models_url,
+      url: cached.proxy.url,
       source: "cache",
       config: cached,
     }
   }
 
-  // 4. Nothing available.
+  // 5. Nothing available.
   return {
     source: "none",
-    reason: `Kote Gateway endpoint could not be resolved: ${remoteReason}, and no usable cached bootstrap exists.`,
+    reason: `Kote Proxy endpoint could not be resolved: ${remoteReason}, and no usable cached bootstrap exists.`,
     hint:
-      "Set KOTECODE_GATEWAY_URL to point at a gateway directly, " +
-      "or ensure the bootstrap service is reachable and the local cache is valid.",
+      "Set KOTECODE_PROXY_URL to an HTTPS proxy origin, use KOTECODE_DISABLE_PROXY=1 for explicit direct mode, " +
+      "or restore the bootstrap service/cache.",
   }
 }

@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "bun:test"
+import { afterEach, beforeEach, describe, expect, it } from "bun:test"
 import { getPublicKeyAsync } from "@noble/ed25519"
 import { randomBytes } from "node:crypto"
 import fs from "node:fs/promises"
@@ -7,10 +7,11 @@ import path from "node:path"
 import {
   cachePath,
   canonicalJson,
+  fetchRemote,
   isCacheUsable,
   parseConfig,
   readCache,
-  resolveGateway,
+  resolveProxy,
   signConfig,
   signingMessage,
   verifyConfig,
@@ -32,10 +33,7 @@ function unsigned(
 ): Omit<BootstrapConfig, "signature"> {
   return {
     config_version: 1,
-    gateway: {
-      base_url: "https://gw.example.kote/api/v1",
-      models_url: "https://gw.example.kote/api/v1/models",
-    },
+    proxy: { url: "https://proxy.example.kote" },
     issued_at: issuedAt.toISOString(),
     expires_at: expiresAt.toISOString(),
   }
@@ -59,6 +57,21 @@ async function temporaryCache() {
   }
 }
 
+const originalProxyUrl = process.env.KOTECODE_PROXY_URL
+const originalDisableProxy = process.env.KOTECODE_DISABLE_PROXY
+
+beforeEach(() => {
+  delete process.env.KOTECODE_PROXY_URL
+  delete process.env.KOTECODE_DISABLE_PROXY
+})
+
+afterEach(() => {
+  if (originalProxyUrl === undefined) delete process.env.KOTECODE_PROXY_URL
+  else process.env.KOTECODE_PROXY_URL = originalProxyUrl
+  if (originalDisableProxy === undefined) delete process.env.KOTECODE_DISABLE_PROXY
+  else process.env.KOTECODE_DISABLE_PROXY = originalDisableProxy
+})
+
 describe("kote bootstrap canonical form", () => {
   it("sorts keys deterministically and drops undefined", () => {
     expect(canonicalJson({ b: 1, a: 2, c: undefined, nested: { z: 1, y: 2 } })).toBe(
@@ -69,7 +82,7 @@ describe("kote bootstrap canonical form", () => {
   it("excludes the signature from the signed message", () => {
     const message = signingMessage({ ...unsigned(), signature: "deadbeef" })
     expect(message).not.toContain("signature")
-    expect(message).toContain('"base_url"')
+    expect(message).toContain('"proxy"')
   })
 })
 
@@ -81,6 +94,21 @@ describe("kote bootstrap validation", () => {
       now: new Date("2026-07-15T00:00:00.000Z"),
     })
     expect(result).toEqual({ ok: true, config: fixture.config })
+  })
+
+  it("normalizes the Proxy origin before signing", async () => {
+    const keys = await keypair()
+    const config = await signConfig(
+      {
+        ...unsigned(),
+        proxy: { url: "https://proxy.example.kote:443/" },
+      },
+      keys.privateKey,
+    )
+    expect(config.proxy.url).toBe("https://proxy.example.kote")
+    expect(
+      await verifyConfig(config, { publicKeyHex: keys.publicKey, now: new Date("2026-07-15T00:00:00.000Z") }),
+    ).toEqual({ ok: true, config })
   })
 
   it("rejects malformed input and unknown versions", async () => {
@@ -115,10 +143,16 @@ describe("kote bootstrap validation", () => {
     ).toMatchObject({ ok: false, error: { _tag: "BadSignature" } })
   })
 
-  it("rejects non-HTTPS gateway URLs and invalid time windows", () => {
+  it("rejects unsafe proxy URLs and invalid time windows", () => {
+    expect(() => parseConfig({ ...unsigned(), proxy: { url: "http://proxy.example" }, signature: "00" })).toThrow(
+      "must use HTTPS",
+    )
     expect(() =>
-      parseConfig({ ...unsigned(), gateway: { base_url: "http://gateway.example/api" }, signature: "00" }),
-    ).toThrow("must use HTTPS")
+      parseConfig({ ...unsigned(), proxy: { url: "https://user:pass@proxy.example" }, signature: "00" }),
+    ).toThrow("must not contain credentials")
+    expect(() => parseConfig({ ...unsigned(), proxy: { url: "https://proxy.example/path" }, signature: "00" })).toThrow(
+      "without path",
+    )
     expect(() =>
       parseConfig({
         ...unsigned(),
@@ -181,13 +215,13 @@ describe("kote bootstrap cache", () => {
     directories.push(cache.directory)
     await writeCache(fixture.config, cache.file)
 
-    const result = await resolveGateway({
+    const result = await resolveProxy({
       fetch: async () => ({ invalid: true }),
       cacheFile: cache.file,
       now,
       publicKeyHex: fixture.publicKey,
     })
-    expect(result).toMatchObject({ source: "cache", baseUrl: fixture.config.gateway.base_url })
+    expect(result).toMatchObject({ source: "cache", url: fixture.config.proxy.url })
     expect(JSON.parse(await fs.readFile(cache.file, "utf8"))).toEqual(fixture.config)
   })
 
@@ -196,64 +230,87 @@ describe("kote bootstrap cache", () => {
     const cache = await temporaryCache()
     directories.push(cache.directory)
 
-    const result = await resolveGateway({
+    const result = await resolveProxy({
       fetch: async () => fixture.config,
       cacheFile: cache.file,
       now: new Date("2026-07-15T00:00:00.000Z"),
       publicKeyHex: fixture.publicKey,
     })
-    expect(result).toMatchObject({ source: "remote", baseUrl: fixture.config.gateway.base_url })
+    expect(result).toMatchObject({ source: "remote", url: fixture.config.proxy.url })
     expect(JSON.parse(await fs.readFile(cache.file, "utf8"))).toEqual(fixture.config)
   })
 })
 
 describe("kote bootstrap resolution", () => {
-  const originalGatewayUrl = process.env.KOTECODE_GATEWAY_URL
-
-  afterEach(() => {
-    delete process.env.KOTECODE_GATEWAY_URL
-    if (originalGatewayUrl !== undefined) process.env.KOTECODE_GATEWAY_URL = originalGatewayUrl
-  })
-
-  it("gives KOTECODE_GATEWAY_URL highest priority", async () => {
-    process.env.KOTECODE_GATEWAY_URL = "https://override.example/api/v1"
+  it("gives explicit direct mode highest priority", async () => {
+    process.env.KOTECODE_DISABLE_PROXY = "1"
+    process.env.KOTECODE_PROXY_URL = "https://override.example"
     expect(
-      await resolveGateway({
+      await resolveProxy({
         fetch: async () => {
           throw new Error("must not fetch")
         },
       }),
-    ).toMatchObject({ source: "environment", baseUrl: "https://override.example/api/v1" })
+    ).toEqual({ source: "disabled" })
+  })
+
+  it("gives KOTECODE_PROXY_URL priority over bootstrap", async () => {
+    process.env.KOTECODE_PROXY_URL = "https://override.example"
+    expect(
+      await resolveProxy({
+        fetch: async () => {
+          throw new Error("must not fetch")
+        },
+      }),
+    ).toMatchObject({ source: "environment", url: "https://override.example" })
   })
 
   it("rejects an unsafe environment override without fetching", async () => {
-    process.env.KOTECODE_GATEWAY_URL = "file:///tmp/gateway"
-    const result = await resolveGateway({
+    process.env.KOTECODE_PROXY_URL = "file:///tmp/proxy"
+    const result = await resolveProxy({
       fetch: async () => {
         throw new Error("must not fetch")
       },
     })
     expect(result).toMatchObject({ source: "none" })
-    if (!("baseUrl" in result)) expect(result.reason).toContain("must use HTTPS")
+    if (result.source === "none") expect(result.reason).toContain("must use HTTPS")
   })
 
   it("returns a diagnostic failure when remote and cache are unavailable", async () => {
     const cache = await temporaryCache()
     await fs.rm(cache.directory, { recursive: true, force: true })
-    const result = await resolveGateway({
+    const result = await resolveProxy({
       fetch: async () => {
         throw new Error("offline")
       },
       cacheFile: cache.file,
     })
     expect(result).toMatchObject({ source: "none" })
-    if (!("baseUrl" in result)) {
+    if (result.source === "none") {
       expect(result.reason).toContain("remote bootstrap is unreachable")
-      expect(result.hint).toContain("KOTECODE_GATEWAY_URL")
+      expect(result.hint).toContain("KOTECODE_PROXY_URL")
     }
   })
 
   it("keeps the production cache below the KoteCode cache directory", () => {
     expect(cachePath()).toContain(path.join("kotencode", "kote", "bootstrap.json"))
+  })
+})
+
+describe("kote bootstrap transport", () => {
+  it("rejects non-HTTPS bootstrap URLs before making a request", async () => {
+    const message = await fetchRemote("http://bootstrap.example.test/bootstrap.json").then(
+      () => "resolved unexpectedly",
+      (error) => (error instanceof Error ? error.message : String(error)),
+    )
+    expect(message).toBe("bootstrap URL must use HTTPS")
+  })
+
+  it("rejects credentials embedded in the bootstrap URL", async () => {
+    const message = await fetchRemote("https://user:secret@bootstrap.example.test/bootstrap.json").then(
+      () => "resolved unexpectedly",
+      (error) => (error instanceof Error ? error.message : String(error)),
+    )
+    expect(message).toBe("bootstrap URL must not contain credentials")
   })
 })

@@ -17,6 +17,8 @@ import {
   type LLMEvent,
 } from "@opencode-ai/llm"
 import type { LLMClientShape } from "@opencode-ai/llm/route"
+import type { ResolveProxyResult } from "@opencode-ai/core/kote/bootstrap"
+import { proxyFetch } from "@/provider/proxy"
 import { LLMNative } from "./native-request"
 
 export type RuntimeStatus =
@@ -41,6 +43,7 @@ type StreamInput = {
   readonly providerOptions?: Record<string, any>
   readonly headers: Record<string, string>
   readonly abort: AbortSignal
+  readonly proxy: ResolveProxyResult
 }
 
 export function status(input: Pick<StreamInput, "model" | "provider" | "auth">): RuntimeStatus {
@@ -72,9 +75,10 @@ function statusWithFetch(
 }
 
 export function stream(input: StreamInput): StreamResult {
-  const fetch = providerFetch(input)
-  const current = statusWithFetch(input, fetch)
+  const provider = providerFetch(input)
+  const current = statusWithFetch(input, provider)
   if (current.type === "unsupported") return current
+  const fetch = proxyFetch(provider ?? globalThis.fetch, input.proxy)
 
   // Integration point with @opencode-ai/llm: native-request lowers session data
   // into an LLMRequest, then LLMClient handles route selection and transport.

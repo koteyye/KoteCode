@@ -75,6 +75,8 @@ export namespace ProviderTest {
             Effect.succeed({ providerID: row.id, modelID: mdl.id }),
           ),
           ...override,
+          proxy:
+            override.proxy ?? Effect.fn("TestProvider.proxy")(() => Effect.succeed({ source: "disabled" as const })),
         }),
       ),
     }

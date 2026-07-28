@@ -22,8 +22,8 @@ KoteCode is an AI coding agent you run from the terminal (TUI) or as a desktop a
 all of OpenCode's core capabilities — multi-provider chat, tool calling, sessions, the `build`
 and `plan` agents — and adds:
 
-- The **Kote Gateway** as a first-class provider, whose endpoint is resolved at runtime from a
-  **signed bootstrap configuration** (no hardcoded gateway URL).
+- The **Kote Proxy**, a transparent HTTPS `CONNECT` transport for the existing OpenCode
+  providers. Its endpoint is resolved from a **signed bootstrap configuration**.
 - KoteCode-specific config directories and `KOTECODE_*` environment variables.
 - A `kotencode` CLI command and KoteCode branding.
 
@@ -36,44 +36,53 @@ Running KoteCode sends your prompts, code, and file contents to the AI provider 
 - **API costs:** Most providers bill per token. Review your provider's pricing. KoteCode
   itself is free; the model usage is not.
 - **Data:** Whatever you ask KoteCode to read or write is transmitted to the selected
-  provider's endpoint. Understand your provider's data policy before sending sensitive code.
+  provider. With Kote Proxy enabled, provider traffic remains protected by end-to-end TLS:
+  the Proxy sees the destination hostname and transport metadata, but not your API key,
+  prompts, code, or responses.
 
-## Connection modes
+## Provider transport
 
-KoteCode supports three ways to reach a model, and you always know which one is in use:
+You connect OpenAI, Anthropic, OpenRouter, and other providers exactly as in OpenCode,
+using your own API key or the provider's supported authorization flow. You pay the provider;
+KoteCode and Kote Proxy do not provide model credits.
 
-| Mode | What it is | Endpoint |
-|---|---|---|
-| **Kote Gateway** | KoteCode's own gateway | Resolved at runtime from a **signed bootstrap config** (see below) |
-| **Direct OpenRouter** | Your own OpenRouter account | `openrouter.ai` (your key) |
-| **Other providers** | Anthropic, OpenAI, Google, Bedrock, Azure, … | Each provider's own endpoint |
+By default, HTTPS model requests use Kote Proxy as a standard `CONNECT` tunnel:
 
-The Kote Gateway is presented explicitly as a provider — it is **not** a hidden substitution
-for OpenRouter or any other provider. KoteCode never silently switches you between modes.
+```text
+KoteCode ── CONNECT through Kote Proxy ── end-to-end TLS ── selected provider
+```
 
-### How the Kote Gateway endpoint is resolved
+The original provider URL, authentication, SDK, model catalog, streaming, tools, reasoning,
+and multimodal behavior stay unchanged. Local HTTP providers such as Ollama remain direct.
 
-The real Kote Gateway address is **not** hardcoded in KoteCode. At startup KoteCode:
+### How the Kote Proxy endpoint is resolved
+
+The real Kote Proxy address is **not** hardcoded in KoteCode. At startup KoteCode:
 
 1. Fetches a small, **Ed25519-signed** bootstrap configuration (over HTTPS, with a size cap
    and timeout — no redirects to unknown domains, no code execution from the config).
 2. Verifies the signature against a public key baked into the binary.
 3. Checks `config_version`, `issued_at`, and `expires_at`.
-4. Uses the signed `gateway.base_url` as the provider's `baseURL`.
+4. Uses the signed `proxy.url` for HTTPS provider requests.
 
-This lets the gateway address change **without rebuilding KoteCode**. See
+This lets the Proxy address change **without rebuilding KoteCode**. See
 [`docs/BOOTSTRAP.md`](./docs/BOOTSTRAP.md) for the format and signing process.
 
-**Override for local development / diagnostics:** you can force a specific gateway address
+**Override for local development / diagnostics:** you can force a specific Proxy address
 without touching the bootstrap flow:
 
 ```bash
-KOTECODE_GATEWAY_URL=https://your-test-endpoint.example/api/v1 kotencode
+KOTECODE_PROXY_URL=https://proxy.example:443 kotencode
 ```
 
-`KOTECODE_GATEWAY_URL` takes priority over the bootstrap configuration. The source of the
-currently active configuration (environment / remote bootstrap / cached bootstrap) is visible
-in diagnostics.
+To explicitly bypass Kote Proxy and contact providers directly:
+
+```bash
+KOTECODE_DISABLE_PROXY=1 kotencode
+```
+
+KoteCode never silently falls back to a direct HTTPS request when the configured Proxy is
+unavailable.
 
 ## Installation
 
@@ -98,25 +107,27 @@ bun run packages/opencode/script/build.ts --single # produces dist/kotencode-*/b
 
 KoteCode reads config from its own directories (separate from OpenCode's):
 
-| OS | Config dir |
-|---|---|
-| Linux | `~/.config/kotencode` |
-| macOS | `~/Library/Application Support/kotencode` |
-| Windows | `%APPDATA%\kotencode` |
+| OS      | Config dir                                |
+| ------- | ----------------------------------------- |
+| Linux   | `~/.config/kotencode`                     |
+| macOS   | `~/Library/Application Support/kotencode` |
+| Windows | `%APPDATA%\kotencode`                     |
 
-Create `~/.config/kotencode/kotencode.jsonc` (or use env vars):
+Provider configuration remains OpenCode-compatible. For example:
 
 ```jsonc
 {
-  // Use the Kote Gateway (endpoint resolved from signed bootstrap)
+  // Your own provider credentials and models; Kote Proxy is transport, not a provider.
   "provider": {
-    "kote-gateway": { "models": { /* your model ids */ } }
-  }
+    "openai": {},
+  },
 }
 ```
 
-API keys: set `KOTECODE_GATEWAY_API_KEY` (Kote Gateway) or the provider's own env var. Keys
-are never written to logs or error messages. See [`docs/CONFIGURATION.md`](./docs/CONFIGURATION.md).
+Provide the normal provider credential (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`,
+`OPENROUTER_API_KEY`, or the built-in authorization command). Credentials remain inside the
+end-to-end TLS tunnel and are never sent as Proxy authentication. See
+[`docs/CONFIGURATION.md`](./docs/CONFIGURATION.md).
 
 ### Migrating from an existing OpenCode install
 
@@ -134,15 +145,15 @@ Your original OpenCode files are left untouched.
 
 KoteCode adds `KOTECODE_*` variables on top of OpenCode's `OPENCODE_*` (both still work):
 
-| Variable | Purpose |
-|---|---|
-| `KOTECODE_CONFIG` | Path to a config file |
-| `KOTECODE_CONFIG_DIR` | Override the config directory |
-| `KOTECODE_DATA_DIR` | Override the data directory |
-| `KOTECODE_CACHE_DIR` | Override the cache directory |
-| `KOTECODE_BOOTSTRAP_URL` | Override the bootstrap config URL (dev/testing) |
-| `KOTECODE_GATEWAY_URL` | Force the gateway address (priority over bootstrap) |
-| `KOTECODE_GATEWAY_API_KEY` | Provide the gateway key via env (not written to config) |
+| Variable                        | Purpose                                                               |
+| ------------------------------- | --------------------------------------------------------------------- |
+| `KOTECODE_CONFIG`               | Path to a config file                                                 |
+| `KOTECODE_CONFIG_DIR`           | Override the config directory                                         |
+| `KOTECODE_DATA_DIR`             | Override the data directory                                           |
+| `KOTECODE_CACHE_DIR`            | Override the cache directory                                          |
+| `KOTECODE_BOOTSTRAP_URL`        | Override the bootstrap config URL (dev/testing)                       |
+| `KOTECODE_PROXY_URL`            | Force the HTTPS Proxy origin (priority over bootstrap)                |
+| `KOTECODE_DISABLE_PROXY`        | Explicitly use direct provider transport                              |
 | `KOTECODE_DISABLE_UPDATE_CHECK` | Reserved update-check kill switch; alpha updates are already disabled |
 
 Full reference: [`docs/CONFIGURATION.md`](./docs/CONFIGURATION.md).
@@ -153,8 +164,10 @@ Full reference: [`docs/CONFIGURATION.md`](./docs/CONFIGURATION.md).
 - [`docs/UPSTREAM.md`](./docs/UPSTREAM.md) — syncing from upstream OpenCode
 - [`docs/BOOTSTRAP.md`](./docs/BOOTSTRAP.md) — signed bootstrap config format & signing
 - [`docs/NETWORK.md`](./docs/NETWORK.md) — every network call KoteCode makes
+- [`docs/PROXY_COMPATIBILITY.md`](./docs/PROXY_COMPATIBILITY.md) — verified and pending provider paths
 - [`docs/CONFIGURATION.md`](./docs/CONFIGURATION.md) — directories, env vars, modes
 - [`docs/BUILD.md`](./docs/BUILD.md) — building from source
+- [`docs/TZ-2-KOTE-PROXY.md`](./docs/TZ-2-KOTE-PROXY.md) — Kote Proxy contract and threat model
 
 ## License
 

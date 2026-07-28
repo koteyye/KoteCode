@@ -1,4 +1,4 @@
-// KoteCode Kote Gateway support.
+// KoteCode Proxy bootstrap support.
 //
 // - keys.ts:        embedded Ed25519 public key + safety constants
 // - bootstrap.ts:   signed bootstrap config resolver + last-known-good cache

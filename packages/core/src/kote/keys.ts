@@ -1,4 +1,4 @@
-// Embedded public key for verifying Kote Gateway bootstrap configurations.
+// Embedded public key for verifying Kote Proxy bootstrap configurations.
 //
 // Only the PUBLIC key lives in the repository. The corresponding private key is
 // kept by the project owner OUTSIDE the repo (see docs/BOOTSTRAP.md) and is used
@@ -7,8 +7,7 @@
 //
 // Algorithm: Ed25519 (32-byte public key, hex-encoded).
 
-export const KOTE_BOOTSTRAP_PUBLIC_KEY_HEX =
-  "d5e1f3f5353848e49e341ede50622b2d5c96bbf2817a02539c4b7e4ba0ef7bb3"
+export const KOTE_BOOTSTRAP_PUBLIC_KEY_HEX = "d5e1f3f5353848e49e341ede50622b2d5c96bbf2817a02539c4b7e4ba0ef7bb3"
 
 // Config schema version this client understands. Bootstrap configs must declare
 // config_version === 1 to be accepted; unknown versions are rejected.

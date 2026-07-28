@@ -42,8 +42,8 @@ git merge upstream/dev
 ```
 
 Expect conflicts **only** in the files listed in §3. Everything else should merge cleanly
-because the public rebrand is localized to a small set of single-constant touchpoints and the
-Kote Gateway / bootstrap code lives in new files that upstream does not touch.
+because the public rebrand is localized to a small set of touchpoints and the signed
+Kote Proxy bootstrap code lives in new files that upstream does not touch.
 
 ### Resolving branding conflicts
 
@@ -75,7 +75,8 @@ and expected. The merge procedure is "take upstream logic, keep KoteCode brand."
 - `packages/opencode/src/cli/ui.ts` — KoteCode non-TTY wordmark
 - `packages/core/src/installation/version.ts` — KoteCode version composition
 - `packages/core/src/models-dev.ts` — `kotencode` User-Agent
-- `packages/opencode/src/provider/provider.ts` — KoteCode provider attribution headers + the `kote-gateway` case
+- `packages/opencode/src/provider/provider.ts` — KoteCode provider attribution headers + Proxy transport injection
+- `packages/opencode/src/provider/proxy.ts` — fail-closed HTTPS provider Proxy selection
 - `packages/opencode/package.json` — `name: "kotencode"`, `bin`, `version`
 - `packages/opencode/bin/kotencode` — launcher and `kotencode-*` package names
 - `packages/opencode/script/build.ts` — outfile `kotencode`, KoteCode User-Agent in `execArgv`
@@ -144,9 +145,9 @@ Build a single binary to confirm the pipeline (per [`BUILD.md`](./BUILD.md)):
 Then run the KoteCode-specific checks:
 
 ```bash
-# Branding & bootstrap tests (per docs/BUILD.md and the test plan in the spec)
-cd packages/core    && bun test src/kote
-cd packages/opencode && bun test src/kote
+# Branding, bootstrap, and Proxy transport tests
+cd packages/core     && bun test test/kote-bootstrap.test.ts test/kote-security.test.ts
+cd packages/opencode && bun test test/provider/proxy.test.ts
 ```
 
 If the merge changes upstream's provider registry or version plumbing, re-verify the

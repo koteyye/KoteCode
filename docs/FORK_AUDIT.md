@@ -131,7 +131,7 @@ Documented in full in [`NETWORK.md`](./NETWORK.md). Summary:
 - **Provider traffic** — to each AI provider's baseURL with attribution headers.
 - **Telemetry** — OpenTelemetry via `OTEL_EXPORTER_OTLP_ENDPOINT` (user-configured).
 
-## 8. Provider mechanism (Kote Gateway extension point)
+## 8. Provider transport injection point
 
 Registry: `packages/opencode/src/provider/provider.ts`.
 
@@ -140,10 +140,14 @@ Registry: `packages/opencode/src/provider/provider.ts`.
 - `custom(dep)` function: per-provider-ID loader returning
   `{ autoload, options?: { baseURL, apiKey, headers, ... }, getModel?, vars?, discoverModels? }`.
 - `resolveSDK`: baseURL precedence is `provider.options.baseURL` > `model.api.url` (catalog),
-  with `${VAR}` substitution. apiKey from options or `provider.key`. **This is how Kote Gateway
-  injects its bootstrap-resolved baseURL with highest precedence — no separate HTTP client.**
-- Closest analogs to Kote Gateway: the `llmgateway`/`openrouter` cases (header-only gateways)
-  and `snowflake-cortex` (returns a computed `baseURL` from credentials).
+  with `${VAR}` substitution. apiKey comes from options or `provider.key`.
+- The shared external `fetch` wrapper in `resolveSDK` is the Kote Proxy injection point.
+  Bun's `fetch` accepts a forward-proxy option, so HTTPS provider traffic can use the Proxy
+  without changing provider SDKs, provider endpoints, API keys, OAuth tokens, or headers.
+- Provider-specific fetch wrappers such as Vertex and Snowflake preserve the shared request
+  options, including the Proxy option.
+- TLS remains end-to-end between KoteCode and the selected provider through an HTTPS
+  `CONNECT` tunnel. The Proxy is a transport, not a model provider or HTTP API.
 
 ## 9. Plugins and custom tools
 
@@ -181,7 +185,7 @@ Ed25519 verification **from scratch** in `packages/core/src/kote/`, adding `@nob
 
 ## 12. Conclusion and scope decisions
 
-- Kote Gateway plugs into the existing `custom()` provider registry — **no new architecture**,
+- Kote Proxy plugs into the shared provider fetch transport — **no second provider stack**,
   scope is not extended beyond ТЗ.
 - Public rebrand touches a small, mostly-constant set of files (audit §4).
 - The signed bootstrap subsystem is genuinely new code (audit §10), localized to `packages/core/src/kote/`.

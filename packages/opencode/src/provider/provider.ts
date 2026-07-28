@@ -31,11 +31,10 @@ import { ModelV2 } from "@opencode-ai/core/model"
 import { ModelStatus } from "./model-status"
 import { RuntimeFlags } from "@/effect/runtime-flags"
 import { ProviderError } from "./error"
-import { resolveGateway } from "@opencode-ai/core/kote/bootstrap"
-import { Flag } from "@opencode-ai/core/flag/flag"
+import { resolveProxy, type ResolveProxyResult } from "@opencode-ai/core/kote/bootstrap"
+import { proxyRequestInit } from "./proxy"
 
 const OPENAI_HEADER_TIMEOUT_DEFAULT = 300_000
-const KOTE_MODELS_MAX_BYTES = 1024 * 1024
 
 function wrapSSE(res: Response, ms: number, ctl: AbortController) {
   if (typeof ms !== "number" || ms <= 0) return res
@@ -152,79 +151,6 @@ type CustomDep = {
   config: () => Effect.Effect<ConfigV1.Info>
   env: () => Effect.Effect<Record<string, string | undefined>>
   get: (key: string) => Effect.Effect<string | undefined>
-}
-
-async function discoverKoteGatewayModels(input: {
-  baseUrl: string
-  modelsUrl: string
-  apiKey?: string
-}): Promise<Record<string, Model>> {
-  const response = await fetch(input.modelsUrl, {
-    redirect: "error",
-    signal: AbortSignal.timeout(10_000),
-    headers: {
-      accept: "application/json",
-      ...(input.apiKey ? { authorization: `Bearer ${input.apiKey}` } : {}),
-    },
-  })
-  if (!response.ok) throw new Error(`Kote Gateway models request failed with HTTP ${response.status}`)
-  const contentLength = Number(response.headers.get("content-length") ?? 0)
-  if (contentLength > KOTE_MODELS_MAX_BYTES) throw new Error("Kote Gateway models response is too large")
-
-  const reader = response.body?.getReader()
-  if (!reader) throw new Error("Kote Gateway models response has no body")
-  const chunks: Uint8Array[] = []
-  let total = 0
-  for (;;) {
-    const part = await reader.read()
-    if (part.done) break
-    total += part.value.byteLength
-    if (total > KOTE_MODELS_MAX_BYTES) throw new Error("Kote Gateway models response is too large")
-    chunks.push(part.value)
-  }
-
-  const raw = JSON.parse(new TextDecoder().decode(Buffer.concat(chunks)))
-  const items = isRecord(raw) && Array.isArray(raw.data) ? raw.data : Array.isArray(raw) ? raw : []
-  return Object.fromEntries(
-    items.flatMap((item) => {
-      if (!isRecord(item) || typeof item.id !== "string" || item.id.trim() === "") return []
-      const id = item.id.trim()
-      const context =
-        typeof item.context_window === "number" && Number.isFinite(item.context_window) ? item.context_window : 0
-      const output =
-        typeof item.max_output_tokens === "number" && Number.isFinite(item.max_output_tokens)
-          ? item.max_output_tokens
-          : 0
-      const model: Model = {
-        id: ModelV2.ID.make(id),
-        providerID: ProviderV2.ID.make("kote-gateway"),
-        name: typeof item.name === "string" && item.name.trim() ? item.name : id,
-        family: typeof item.family === "string" ? item.family : "",
-        api: {
-          id,
-          url: input.baseUrl,
-          npm: "@ai-sdk/openai-compatible",
-        },
-        status: "active",
-        headers: {},
-        options: {},
-        cost: { input: 0, output: 0, cache: { read: 0, write: 0 } },
-        limit: { context, output },
-        capabilities: {
-          temperature: true,
-          reasoning: false,
-          attachment: false,
-          toolcall: true,
-          input: { text: true, audio: false, image: false, video: false, pdf: false },
-          output: { text: true, audio: false, image: false, video: false, pdf: false },
-          interleaved: false,
-        },
-        release_date: "",
-        variants: {},
-      }
-      return [[id, model] as const]
-    }),
-  )
 }
 
 function selectAzureLanguageModel(sdk: any, modelID: string, useChat: boolean) {
@@ -1035,43 +961,6 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
         options,
       }
     }),
-    "kote-gateway": Effect.fnUntraced(function* (input: Info) {
-      const resolved = yield* Effect.promise(() => resolveGateway())
-
-      if (!("baseUrl" in resolved)) {
-        const failure = resolved
-        return {
-          autoload: input.source === "config",
-          async getModel() {
-            throw new Error(`Kote Gateway is unavailable: ${failure.reason}${failure.hint ? " — " + failure.hint : ""}`)
-          },
-        }
-      }
-
-      const auth = yield* dep.auth(input.id)
-      const configApiKey = typeof input.options?.apiKey === "string" ? input.options.apiKey : undefined
-      const apiKey =
-        Flag.KOTECODE_GATEWAY_API_KEY ??
-        configApiKey ??
-        (auth?.type === "api" ? auth.key : auth?.type === "oauth" ? auth.access : undefined)
-      return {
-        autoload: input.source === "config",
-        options: {
-          baseURL: resolved.baseUrl,
-          headers: { "X-Title": "kotencode" },
-        },
-        ...(resolved.modelsUrl
-          ? {
-              discoverModels: () =>
-                discoverKoteGatewayModels({
-                  baseUrl: resolved.baseUrl,
-                  modelsUrl: resolved.modelsUrl!,
-                  apiKey,
-                }),
-            }
-          : {}),
-      }
-    }),
   }
 }
 
@@ -1260,6 +1149,7 @@ export type Error = ModelNotFoundError | InitError | NoProvidersError | NoModels
 
 export interface Interface {
   readonly list: () => Effect.Effect<Record<ProviderV2.ID, Info>>
+  readonly proxy: () => Effect.Effect<ResolveProxyResult>
   readonly getProvider: (providerID: ProviderV2.ID) => Effect.Effect<Info>
   readonly getModel: (providerID: ProviderV2.ID, modelID: ModelV2.ID) => Effect.Effect<Model, ModelNotFoundError>
   readonly getLanguage: (model: Model) => Effect.Effect<LanguageModelV3, ModelNotFoundError>
@@ -1278,6 +1168,7 @@ interface State {
   sdk: Map<string, BundledSDK>
   modelLoaders: Record<string, CustomModelLoader>
   varsLoaders: Record<string, CustomVarsLoader>
+  proxy: ResolveProxyResult
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/Provider") {}
@@ -1452,6 +1343,7 @@ const layer = Layer.effect(
       Effect.gen(function* () {
         const bridge = yield* EffectBridge.make()
         const cfg = yield* config.get()
+        const proxy = yield* Effect.promise(() => resolveProxy())
         const modelsDev = yield* modelsDevSvc.get()
         const catalog = mapValues(modelsDev, fromModelsDevProvider)
         const database = mapValues(catalog, toPublicInfo)
@@ -1698,11 +1590,7 @@ const layer = Layer.effect(
           const partial: Partial<Info> = { source: "config" }
           if (provider.env) partial.env = provider.env
           if (provider.name) partial.name = provider.name
-          if (provider.options) {
-            const options = { ...provider.options }
-            if (providerID === "kote-gateway") delete options.baseURL
-            partial.options = options
-          }
+          if (provider.options) partial.options = provider.options
           mergeProvider(providerID, partial)
         }
 
@@ -1777,6 +1665,7 @@ const layer = Layer.effect(
           sdk,
           modelLoaders,
           varsLoaders,
+          proxy,
         }
       }),
     )
@@ -1787,9 +1676,6 @@ const layer = Layer.effect(
       try {
         const provider = s.providers[model.providerID]
         const options = { ...provider.options }
-        if (model.providerID === "kote-gateway" && Flag.KOTECODE_GATEWAY_API_KEY) {
-          options.apiKey = Flag.KOTECODE_GATEWAY_API_KEY
-        }
 
         if (
           model.providerID === "google-vertex" &&
@@ -1845,6 +1731,7 @@ const layer = Layer.effect(
             providerID: model.providerID,
             npm: model.api.npm,
             options,
+            proxy: s.proxy.source === "disabled" || s.proxy.source === "none" ? s.proxy.source : s.proxy.url,
           }),
         )
         const existing = s.sdk.get(key)
@@ -1874,7 +1761,7 @@ const layer = Layer.effect(
           if (combined) opts.signal = combined
 
           const res = await fetchFn(input, {
-            ...opts,
+            ...proxyRequestInit(input, opts, s.proxy),
             // @ts-ignore see here: https://github.com/oven-sh/bun/issues/16682
             timeout: false,
           }).finally(() => headerTimeoutCtl?.clear())
@@ -1923,6 +1810,8 @@ const layer = Layer.effect(
     const getProvider = Effect.fn("Provider.getProvider")((providerID: ProviderV2.ID) =>
       InstanceState.use(state, (s) => s.providers[providerID]),
     )
+
+    const proxy = Effect.fn("Provider.proxy")(() => InstanceState.use(state, (s) => s.proxy))
 
     const getModel = Effect.fn("Provider.getModel")(function* (providerID: ProviderV2.ID, modelID: ModelV2.ID) {
       const s = yield* InstanceState.get(state)
@@ -2095,7 +1984,7 @@ const layer = Layer.effect(
       }
     })
 
-    return Service.of({ list, getProvider, getModel, getLanguage, closest, getSmallModel, defaultModel })
+    return Service.of({ list, proxy, getProvider, getModel, getLanguage, closest, getSmallModel, defaultModel })
   }),
 )
 

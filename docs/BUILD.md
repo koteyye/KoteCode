@@ -29,12 +29,7 @@ bun dev <dir>                 # run against a specific project directory
 
 ## Type checking & lint
 
-```bash
-bun typecheck                 # turbo typecheck across all packages (run from root)
-bun run lint                  # oxlint
-```
-
-Per-package typecheck (faster, isolated):
+Run type checking from package directories:
 
 ```bash
 cd packages/core     && bun run typecheck
@@ -43,6 +38,12 @@ cd packages/tui      && bun run typecheck
 ```
 
 > Never run `tsc` directly — the project uses `tsgo` (TypeScript native preview).
+
+Linting is available from the repository root:
+
+```bash
+bun run lint
+```
 
 ## Tests
 
@@ -54,11 +55,11 @@ cd packages/opencode && bun test --timeout 30000
 cd packages/core     && bun test --timeout 30000
 ```
 
-KoteCode bootstrap tests:
+KoteCode bootstrap and Proxy transport tests:
 
 ```bash
-cd packages/core     && bun test src/kote
-cd packages/opencode && bun test src/kote
+cd packages/core     && bun test test/kote-bootstrap.test.ts test/kote-security.test.ts
+cd packages/opencode && bun test test/provider/proxy.test.ts
 ```
 
 ## Build a single binary (release build)
@@ -101,10 +102,10 @@ and, when `KOTE_BUILD_RELEASE=1` / running in CI release mode, archives them
 The draft release workflow `.github/workflows/kotecode-release.yml` builds the
 three primary targets on `workflow_dispatch`:
 
-| Target | Artifact |
-|---|---|
-| Windows x64 | `kotencode-windows-x64.zip` |
-| Linux x64 | `kotencode-linux-x64.tar.gz` |
+| Target      | Artifact                     |
+| ----------- | ---------------------------- |
+| Windows x64 | `kotencode-windows-x64.zip`  |
+| Linux x64   | `kotencode-linux-x64.tar.gz` |
 | macOS arm64 | `kotencode-darwin-arm64.zip` |
 
 > **Signing:** these artifacts are **unsigned**. Upstream OpenCode uses Azure
@@ -114,15 +115,14 @@ three primary targets on `workflow_dispatch`:
 
 ## Signing a bootstrap config (project owner only)
 
-The Kote Gateway endpoint is delivered via a signed bootstrap config. To produce
+The Kote Proxy origin is delivered via a signed bootstrap config. To produce
 one (requires the private key, kept outside the repo — see
 [`BOOTSTRAP.md`](./BOOTSTRAP.md)):
 
 ```bash
 bun run scripts/sign-bootstrap.ts \
   --key /path/to/ed25519-private.key \
-  --base-url https://<current-kote-gateway>/api/v1 \
-  --models-url https://<current-kote-gateway>/api/v1/models \
+  --proxy-url https://proxy.kotencode.ai \
   --days 30 \
   --out bootstrap.signed.json
 ```

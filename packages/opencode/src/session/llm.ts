@@ -92,12 +92,13 @@ const live: Layer.Layer<
         mode: input.agent.mode,
       })
 
-      const [language, cfg, item, info] = yield* Effect.all(
+      const [language, cfg, item, info, proxy] = yield* Effect.all(
         [
           provider.getLanguage(input.model),
           config.get(),
           provider.getProvider(input.model.providerID),
           auth.get(input.model.providerID),
+          provider.proxy(),
         ],
         { concurrency: "unbounded" },
       )
@@ -239,6 +240,7 @@ const live: Layer.Layer<
           providerOptions: prepared.params.options,
           headers: prepared.headers,
           abort: input.abort,
+          proxy,
         })
         if (native.type === "supported") {
           yield* Effect.logInfo("llm runtime selected", {

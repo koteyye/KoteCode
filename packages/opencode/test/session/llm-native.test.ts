@@ -581,6 +581,7 @@ describe("session.llm-native.request", () => {
         tools: { lookup },
         headers: {},
         abort: new AbortController().signal,
+        proxy: { source: "disabled" },
       })
       expect(native.type).toBe("supported")
       if (native.type === "unsupported") throw new Error(native.reason)
@@ -712,11 +713,15 @@ describe("session.llm-native.request", () => {
 
   it.effect("uses provider fetch override for native OpenAI OAuth requests", () =>
     Effect.gen(function* () {
-      const captures: Array<{ url: string; body: unknown }> = []
+      const captures: Array<{ url: string; body: unknown; proxy?: string }> = []
       const customFetch = Object.assign(
         async (input: Parameters<typeof fetch>[0], init: Parameters<typeof fetch>[1]) => {
           const request = input instanceof Request ? input : new Request(input, init)
-          captures.push({ url: request.url, body: await request.clone().json() })
+          captures.push({
+            url: request.url,
+            body: await request.clone().json(),
+            proxy: init && "proxy" in init && typeof init.proxy === "string" ? init.proxy : undefined,
+          })
           return responsesStream([
             { type: "response.output_text.delta", item_id: "msg_1", delta: "Hello" },
             { type: "response.completed", response: { usage: { input_tokens: 1, output_tokens: 1 } } },
@@ -736,6 +741,7 @@ describe("session.llm-native.request", () => {
         providerOptions: { instructions: "You are concise." },
         headers: {},
         abort: new AbortController().signal,
+        proxy: { source: "environment", url: "https://proxy.kotencode.test" },
       })
       expect(native.type).toBe("supported")
       if (native.type === "unsupported") throw new Error(native.reason)
@@ -744,6 +750,7 @@ describe("session.llm-native.request", () => {
       expect(captures).toHaveLength(1)
       expect(captures[0]).toMatchObject({
         url: "https://api.openai.com/v1/responses",
+        proxy: "https://proxy.kotencode.test",
         body: {
           model: "gpt-5-mini",
           instructions: "You are concise.",

@@ -96,11 +96,11 @@ export const Flag = {
   get KOTECODE_BOOTSTRAP_URL() {
     return process.env["KOTECODE_BOOTSTRAP_URL"]
   },
-  get KOTECODE_GATEWAY_URL() {
-    return process.env["KOTECODE_GATEWAY_URL"]
+  get KOTECODE_PROXY_URL() {
+    return process.env["KOTECODE_PROXY_URL"]
   },
-  get KOTECODE_GATEWAY_API_KEY() {
-    return process.env["KOTECODE_GATEWAY_API_KEY"]
+  get KOTECODE_DISABLE_PROXY() {
+    return truthy("KOTECODE_DISABLE_PROXY")
   },
   get KOTECODE_DISABLE_UPDATE_CHECK() {
     return truthy("KOTECODE_DISABLE_UPDATE_CHECK")
