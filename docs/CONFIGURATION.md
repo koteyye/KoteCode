@@ -111,7 +111,7 @@ For local development or diagnostics, force a Proxy origin without touching the
 bootstrap flow:
 
 ```bash
-KOTECODE_PROXY_URL=https://proxy.example:443 kotencode
+KOTECODE_PROXY_URL=https://kote-proxy.kotey-ye.ru kotencode
 ```
 
 Use explicit direct transport:

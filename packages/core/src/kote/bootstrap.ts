@@ -247,7 +247,7 @@ export function isCacheUsable(config: BootstrapConfig, now: Date = new Date()): 
 
 // ── Remote fetch (hardened) ─────────────────────────────────────────────────
 
-const DEFAULT_BOOTSTRAP_URL = "https://bootstrap.kotencode.ai/bootstrap.json"
+const DEFAULT_BOOTSTRAP_URL = "https://kote-bootstrap.kotey-ye.ru/bootstrap.json"
 
 /**
  * Fetch a bootstrap config over HTTPS with size/timeout/redirect guards.

@@ -8,7 +8,7 @@ provider and has no provider API key.
 
 | #   | Endpoint                                                                         | Purpose                         | Data visible to endpoint                                                  | Disable                                                                     |
 | --- | -------------------------------------------------------------------------------- | ------------------------------- | ------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| 1   | `bootstrap.kotencode.ai`                                                         | Fetch signed Proxy bootstrap    | GET, no body or API key                                                   | Set `KOTECODE_PROXY_URL`, or use `KOTECODE_DISABLE_PROXY=1`                 |
+| 1   | `kote-bootstrap.kotey-ye.ru`                                                     | Fetch signed Proxy bootstrap    | GET, no body or API key                                                   | Set `KOTECODE_PROXY_URL`, or use `KOTECODE_DISABLE_PROXY=1`                 |
 | 2   | Signed Proxy origin                                                              | Open an HTTPS `CONNECT` tunnel  | Client IP, target hostname/port, timing and byte counts                   | `KOTECODE_DISABLE_PROXY=1`                                                  |
 | 3   | Selected AI provider (`api.openai.com`, `api.anthropic.com`, `openrouter.ai`, …) | Model request                   | User API key/OAuth token, prompts, code, tools, attachments and responses | Select another provider or do not send a request                            |
 | 4   | `models.dev` or `OPENCODE_MODELS_URL`                                            | Model catalog                   | GET and branded User-Agent                                                | `OPENCODE_DISABLE_MODELS_FETCH=1`                                           |
@@ -77,7 +77,7 @@ kotencode debug proxy --model openai/gpt-5
 For development, a Proxy origin can be forced without changing bootstrap:
 
 ```bash
-KOTECODE_PROXY_URL=https://proxy.example:443 kotencode
+KOTECODE_PROXY_URL=https://kote-proxy.kotey-ye.ru kotencode
 ```
 
 ## Dynamic Proxy address

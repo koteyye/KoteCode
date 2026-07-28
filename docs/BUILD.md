@@ -122,12 +122,12 @@ one (requires the private key, kept outside the repo — see
 ```bash
 bun run scripts/sign-bootstrap.ts \
   --key /path/to/ed25519-private.key \
-  --proxy-url https://proxy.kotencode.ai \
+  --proxy-url https://kote-proxy.kotey-ye.ru \
   --days 30 \
   --out bootstrap.signed.json
 ```
 
 Publish the signed JSON at your bootstrap HTTPS endpoint (default
-`https://bootstrap.kotencode.ai/bootstrap.json`, overridable via
+`https://kote-bootstrap.kotey-ye.ru/bootstrap.json`, overridable via
 `KOTECODE_BOOTSTRAP_URL`). The private key never enters the repo, build, CI logs,
 or release artifacts.

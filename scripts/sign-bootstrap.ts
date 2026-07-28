@@ -6,7 +6,7 @@
 //
 //   bun run scripts/sign-bootstrap.ts \
 //     --key /path/to/ed25519-private.key \
-//     --proxy-url https://proxy.example.kote \
+//     --proxy-url https://kote-proxy.kotey-ye.ru \
 //     --days 30 \
 //     > bootstrap.signed.json
 //

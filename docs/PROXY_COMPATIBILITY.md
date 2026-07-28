@@ -4,6 +4,8 @@ This matrix describes KoteCode client transport support. It does not claim
 end-to-end provider compatibility until the production Proxy and its allowlist are
 available for smoke testing.
 
+The production Proxy origin is `https://kote-proxy.kotey-ye.ru`.
+
 | Provider/runtime path                                    | Client transport status                                    | End-to-end status                    |
 | -------------------------------------------------------- | ---------------------------------------------------------- | ------------------------------------ |
 | OpenAI-compatible AI SDK over HTTPS                      | Proxy option injected into the shared provider fetch       | Pending Proxy deployment             |

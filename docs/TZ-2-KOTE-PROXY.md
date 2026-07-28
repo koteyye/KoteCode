@@ -366,7 +366,7 @@ IP limits не являются идентификацией и могут об�
 {
   "config_version": 1,
   "proxy": {
-    "url": "https://proxy.kotencode.ai:443"
+    "url": "https://kote-proxy.kotey-ye.ru"
   },
   "issued_at": "2026-07-28T00:00:00.000Z",
   "expires_at": "2026-08-27T00:00:00.000Z",

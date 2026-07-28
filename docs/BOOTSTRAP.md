@@ -14,7 +14,7 @@ TLS.
 {
   "config_version": 1,
   "proxy": {
-    "url": "https://proxy.kotencode.ai"
+    "url": "https://kote-proxy.kotey-ye.ru"
   },
   "issued_at": "2026-07-28T00:00:00.000Z",
   "expires_at": "2026-08-27T00:00:00.000Z",
@@ -59,7 +59,7 @@ JSON:
 ```bash
 bun run scripts/sign-bootstrap.ts \
   --key /path/outside/repos/ed25519-private.key \
-  --proxy-url https://proxy.kotencode.ai \
+  --proxy-url https://kote-proxy.kotey-ye.ru \
   --days 30 \
   --out bootstrap.signed.json
 ```
@@ -67,8 +67,10 @@ bun run scripts/sign-bootstrap.ts \
 The key path can also come from `KOTE_BOOTSTRAP_PRIVATE_KEY`. The signer verifies its
 own output before writing and never prints the private key.
 
-Publish the JSON at `https://bootstrap.kotencode.ai/bootstrap.json`. Development and
-tests can override that URL with `KOTECODE_BOOTSTRAP_URL`.
+Publish the JSON at `https://kote-bootstrap.kotey-ye.ru/bootstrap.json`. Development and
+tests can override that URL with `KOTECODE_BOOTSTRAP_URL`. The bootstrap endpoint is
+separate from `https://kote-proxy.kotey-ye.ru`: the Proxy intentionally exposes only
+`CONNECT` and `GET /health`.
 
 ## Resolution order
 

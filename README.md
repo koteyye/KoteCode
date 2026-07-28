@@ -72,7 +72,7 @@ This lets the Proxy address change **without rebuilding KoteCode**. See
 without touching the bootstrap flow:
 
 ```bash
-KOTECODE_PROXY_URL=https://proxy.example:443 kotencode
+KOTECODE_PROXY_URL=https://kote-proxy.kotey-ye.ru kotencode
 ```
 
 To explicitly bypass Kote Proxy and contact providers directly:
