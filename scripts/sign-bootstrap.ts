@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 //
-// sign-bootstrap.ts — sign a Kote Proxy bootstrap configuration.
+// sign-bootstrap.ts — sign a Kote Gateway bootstrap configuration.
 //
 // USAGE (run from the repo root, with Bun):
 //
@@ -48,7 +48,7 @@ function parseArgs(argv: string[]): Args {
         break
       case "-h":
       case "--help":
-        console.log(`sign-bootstrap.ts — sign a Kote Proxy bootstrap config
+        console.log(`sign-bootstrap.ts — sign a Kote Gateway bootstrap config
 
 Options:
   --key <path>        path to the Ed25519 private key (or set KOTE_BOOTSTRAP_PRIVATE_KEY)

@@ -1,6 +1,6 @@
-# Kote Proxy bootstrap configuration
+# Kote Gateway bootstrap configuration
 
-The Kote Proxy address is not hardcoded in KoteCode. KoteCode fetches a small
+The Kote Gateway address is not hardcoded in KoteCode. KoteCode fetches a small
 Ed25519-signed bootstrap configuration, verifies it, and applies the signed Proxy
 origin to HTTPS provider requests.
 
@@ -51,7 +51,7 @@ JSON:
 - Algorithm: Ed25519 via `@noble/ed25519`.
 - Key pair: 32-byte private key and 32-byte public key.
 - The client contains only `KOTE_BOOTSTRAP_PUBLIC_KEY_HEX`.
-- The private key stays outside both the KoteCode and Kote Proxy repositories,
+- The private key stays outside both the KoteCode and Kote Gateway repositories,
   builds, CI logs, and release artifacts.
 
 ## Signing

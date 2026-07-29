@@ -9,6 +9,8 @@ import { State } from "./state"
 import { resolveProxy, type ResolveProxyResult } from "./kote/bootstrap"
 import { proxyFetch } from "./kote/proxy"
 import { ProviderRouting } from "./kote/provider-routing"
+import { Config } from "./config"
+import { Gateway } from "./kote/gateway"
 
 type SDK = any
 
@@ -155,6 +157,8 @@ export class Service extends Context.Service<Service, Interface>()("@opencode/v2
 export const locationLayer = Layer.effect(
   Service,
   Effect.gen(function* () {
+    const config = yield* Config.Service
+    const customProxyUrl = Gateway.customProxyUrl(Config.latest(yield* config.entries(), "gateway"))
     let sdkHooks: ((event: SDKEvent) => Effect.Effect<void> | void)[] = []
     let languageHooks: ((event: LanguageEvent) => Effect.Effect<void> | void)[] = []
     const languages = new Map<string, LanguageModelV3>()
@@ -215,7 +219,10 @@ export const locationLayer = Layer.effect(
         const proxy =
           routing === "direct"
             ? ProviderRouting.transport(routing, { source: "disabled" })
-            : ProviderRouting.transport(routing, yield* Effect.promise(() => resolveProxy()))
+            : ProviderRouting.transport(
+                routing,
+                yield* Effect.promise(() => resolveProxy({ customUrl: customProxyUrl })),
+              )
         const options = prepareOptions(model, model.api.package, proxy)
         const sdkKey = JSON.stringify({
           providerID: model.providerID,
@@ -243,4 +250,4 @@ export const locationLayer = Layer.effect(
   }),
 )
 
-export const node = makeLocationNode({ service: Service, layer: locationLayer, deps: [] })
+export const node = makeLocationNode({ service: Service, layer: locationLayer, deps: [Config.node] })

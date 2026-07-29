@@ -1,6 +1,6 @@
 // KoteCode signed bootstrap configuration resolver.
 //
-// Resolves the Kote Proxy endpoint address from an Ed25519-signed remote
+// Resolves the Kote Gateway endpoint address from an Ed25519-signed remote
 // config, with a local last-known-good cache and clear precedence rules.
 //
 // Spec: ТЗ §9.2–9.4. See docs/BOOTSTRAP.md for the format and signing process,
@@ -306,7 +306,7 @@ export interface ResolvedProxy {
 }
 
 /**
- * Resolve the Kote Proxy endpoint:
+ * Resolve the Kote Gateway endpoint:
  *   1. KOTECODE_DISABLE_PROXY — explicit direct mode
  *   2. KOTECODE_PROXY_URL — explicit proxy override
  *   3. fresh remote bootstrap (signature + window verified)
@@ -325,7 +325,7 @@ export interface ResolveFailure {
   hint?: string
 }
 
-export type ConfigSource = "disabled" | "environment" | "remote" | "cache" | "none"
+export type ConfigSource = "disabled" | "environment" | "custom" | "remote" | "cache" | "none"
 export type ResolveProxyResult = DisabledProxy | ResolvedProxy | ResolveFailure
 
 export interface ResolveProxyOptions {
@@ -333,6 +333,7 @@ export interface ResolveProxyOptions {
   cacheFile?: string
   now?: Date
   publicKeyHex?: string
+  customUrl?: string
 }
 
 export async function resolveProxy(options: ResolveProxyOptions = {}): Promise<ResolveProxyResult> {
@@ -351,6 +352,16 @@ export async function resolveProxy(options: ResolveProxyOptions = {}): Promise<R
         reason: error instanceof Error ? error.message : "KOTECODE_PROXY_URL is invalid.",
         hint: "Set KOTECODE_PROXY_URL to a valid HTTPS proxy origin or use KOTECODE_DISABLE_PROXY=1.",
       }
+    }
+  }
+
+  if (options.customUrl) {
+    const value = customProxyUrl(options.customUrl)
+    if (value) return { url: value, source: "custom" }
+    return {
+      source: "none",
+      reason: "The selected custom proxy URL is invalid.",
+      hint: "Set the custom proxy to an HTTP or HTTPS origin without a path, query, or fragment.",
     }
   }
 
@@ -385,9 +396,18 @@ export async function resolveProxy(options: ResolveProxyOptions = {}): Promise<R
   // 5. Nothing available.
   return {
     source: "none",
-    reason: `Kote Proxy endpoint could not be resolved: ${remoteReason}, and no usable cached bootstrap exists.`,
+    reason: `Kote Gateway endpoint could not be resolved: ${remoteReason}, and no usable cached bootstrap exists.`,
     hint:
       "Set KOTECODE_PROXY_URL to an HTTPS proxy origin, use KOTECODE_DISABLE_PROXY=1 for explicit direct mode, " +
       "or restore the bootstrap service/cache.",
   }
+}
+
+export function customProxyUrl(value: string): string | undefined {
+  const url = URL.parse(value)
+  if (!url) return undefined
+  if (url.protocol !== "http:" && url.protocol !== "https:") return undefined
+  if (url.pathname !== "/" || url.search || url.hash) return undefined
+  const credentials = url.username || url.password ? `${url.username}${url.password ? `:${url.password}` : ""}@` : ""
+  return `${url.protocol}//${credentials}${url.host}`
 }

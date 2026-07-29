@@ -34,6 +34,7 @@ import { ProviderError } from "./error"
 import { resolveProxy, type ResolveProxyResult } from "@opencode-ai/core/kote/bootstrap"
 import { proxyFetch } from "./proxy"
 import { ProviderRouting } from "@opencode-ai/core/kote/provider-routing"
+import { Gateway } from "@opencode-ai/core/kote/gateway"
 
 const OPENAI_HEADER_TIMEOUT_DEFAULT = 300_000
 
@@ -1345,7 +1346,7 @@ const layer = Layer.effect(
       Effect.gen(function* () {
         const bridge = yield* EffectBridge.make()
         const cfg = yield* config.get()
-        const proxy = yield* Effect.promise(() => resolveProxy())
+        const proxy = yield* Effect.promise(() => resolveProxy({ customUrl: Gateway.customProxyUrl(cfg.gateway) }))
         const modelsDev = yield* modelsDevSvc.get()
         const catalog = mapValues(modelsDev, fromModelsDevProvider)
         const database = mapValues(catalog, toPublicInfo)

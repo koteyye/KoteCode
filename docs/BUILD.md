@@ -115,7 +115,7 @@ three primary targets on `workflow_dispatch`:
 
 ## Signing a bootstrap config (project owner only)
 
-The Kote Proxy origin is delivered via a signed bootstrap config. To produce
+The Kote Gateway origin is delivered via a signed bootstrap config. To produce
 one (requires the private key, kept outside the repo — see
 [`BOOTSTRAP.md`](./BOOTSTRAP.md)):
 

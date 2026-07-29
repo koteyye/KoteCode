@@ -48,7 +48,7 @@ KOTECODE_CONFIG=/path/to/my-config.jsonc kotencode
 
 ```jsonc
 {
-  // Configure the normal OpenCode provider. Kote Proxy is transport, not a provider.
+  // Configure the normal OpenCode provider. Kote Gateway is transport, not a provider.
   "provider": {
     "openai": {},
   },
@@ -103,18 +103,26 @@ An explicit `tui.json` value takes precedence over the environment variable.
 
 ## Provider transport
 
-Kote Proxy wraps existing providers; it does not add a provider ID or credential.
+Kote Gateway wraps existing providers; it does not add a provider ID or credential.
 
 | Transport                | Provider URL and credentials | Network path                                    |
 | ------------------------ | ---------------------------- | ----------------------------------------------- |
-| **Kote Proxy** (default) | Unchanged                    | HTTPS `CONNECT` tunnel from signed Proxy origin |
+| **Kote Gateway** (default) | Unchanged                    | HTTPS `CONNECT` tunnel from signed Proxy origin |
 | **Direct**               | Unchanged                    | KoteCode connects directly to the provider      |
 
 The Desktop app lets you choose this mode while connecting each provider and change
 it later in **Settings → Providers**. The model selector shows the selected mode once
 in the provider group heading.
 
-The same choice can be configured manually per provider:
+Use the same setting from the CLI interactively or pass both values explicitly:
+
+```bash
+kotencode providers routing
+kotencode providers routing openai gateway
+kotencode providers routing anthropic direct
+```
+
+The same choice can also be configured manually per provider:
 
 ```jsonc
 {
@@ -129,7 +137,7 @@ The same choice can be configured manually per provider:
 }
 ```
 
-Providers without an explicit `routing` value use Kote Proxy. The
+Providers without an explicit `routing` value use Kote Gateway. The
 `KOTECODE_DISABLE_PROXY=1` environment override still forces all providers to use
 direct transport.
 
@@ -199,9 +207,9 @@ KoteCode publishes and verifies its own Linux sidecar.
 
 - Provider API keys are provided through provider-specific variables, the auth store,
   or config exactly as in OpenCode.
-- Kote Proxy has no LLM key and does not require a separate client key.
+- Kote Gateway has no LLM key and does not require a separate client key.
 - Provider credentials remain inside the end-to-end TLS tunnel and are not visible
-  to Kote Proxy.
+  to Kote Gateway.
 - Keys are **never written to logs or error messages.**
 - The bootstrap signing **private key** is kept outside the repo (see
   [`BOOTSTRAP.md`](./BOOTSTRAP.md)); only the public verification key ships in the client.

@@ -1,4 +1,4 @@
-# KoteCode — ТЗ №2: Kote Proxy
+# KoteCode — ТЗ №2: Kote Gateway
 
 Статус: черновик для согласования  
 Дата: 2026-07-28  
@@ -6,7 +6,7 @@
 
 ## 1. Цель
 
-Kote Proxy — бесплатный сетевой transport для пользователей KoteCode.
+Kote Gateway — бесплатный сетевой transport для пользователей KoteCode.
 
 Пользователь по-прежнему подключает существующего провайдера OpenCode обычным
 способом:
@@ -16,9 +16,9 @@ Kote Proxy — бесплатный сетевой transport для пользо
 - самостоятельно оплачивает использование модели по правилам провайдера.
 
 KoteCode использует существующий provider layer и существующий AI SDK. Единственное
-изменение: HTTPS-запрос к API провайдера проходит через Kote Proxy.
+изменение: HTTPS-запрос к API провайдера проходит через Kote Gateway.
 
-Kote Proxy:
+Kote Gateway:
 
 - не предоставляет доступ к LLM за счёт владельца KoteCode;
 - не содержит общего OpenAI/OpenRouter/Anthropic key;
@@ -36,7 +36,7 @@ KoteCode
   │
   │ CONNECT api.openai.com:443
   ▼
-Kote Proxy
+Kote Gateway
   │
   │ непрозрачный TCP tunnel
   ▼
@@ -48,7 +48,7 @@ KoteCode ───── TLS напрямую до api.openai.com ────�
 
 Последовательность:
 
-1. KoteCode подключается к Kote Proxy по HTTPS.
+1. KoteCode подключается к Kote Gateway по HTTPS.
 2. KoteCode отправляет `CONNECT <provider-host>:443`.
 3. Proxy проверяет host и port по allowlist.
 4. Proxy открывает TCP-соединение до разрешённого провайдера.
@@ -65,7 +65,7 @@ KoteCode ───── TLS напрямую до api.openai.com ────�
 
 ## 3. Почему не нужен отдельный LLM-провайдер
 
-Kote Proxy является transport layer, а не provider.
+Kote Gateway является transport layer, а не provider.
 
 В KoteCode уже существуют:
 
@@ -82,7 +82,7 @@ Kote Proxy является transport layer, а не provider.
 Все эти механизмы продолжают работать штатно. В общий `fetch`, который использует
 выбранный provider SDK, добавляется proxy URL.
 
-Следовательно, Kote Proxy не нужны:
+Следовательно, Kote Gateway не нужны:
 
 - `POST /chat/completions`;
 - `GET /models`;
@@ -95,7 +95,7 @@ Kote Proxy является transport layer, а не provider.
 
 ## 4. Что именно проксируется
 
-Через Kote Proxy проходят только runtime-запросы provider SDK к моделям:
+Через Kote Gateway проходят только runtime-запросы provider SDK к моделям:
 
 - генерация ответа;
 - streaming;
@@ -103,7 +103,7 @@ Kote Proxy является transport layer, а не provider.
 - provider-side model API, если конкретный SDK вызывает его во время работы;
 - refresh-запрос, если он выполняется тем же внедрённым provider transport.
 
-По умолчанию через Kote Proxy не проходят:
+По умолчанию через Kote Gateway не проходят:
 
 - загрузка bootstrap;
 - `models.dev`;
@@ -142,7 +142,7 @@ API key или prompt. Без компрометации KoteCode, provider ил
 
 ### 5.2 Не открытый proxy
 
-Kote Proxy доступен бесплатно и не требует аккаунта, но не должен быть универсальным
+Kote Gateway доступен бесплатно и не требует аккаунта, но не должен быть универсальным
 public proxy.
 
 Разрешается только:
@@ -297,11 +297,11 @@ Proxy обязан:
 - OAuth bearer token;
 - provider-specific credentials и подписи.
 
-Эти данные находятся внутри end-to-end TLS и не обрабатываются Kote Proxy.
+Эти данные находятся внутри end-to-end TLS и не обрабатываются Kote Gateway.
 
-### 9.2 Kote Proxy
+### 9.2 Kote Gateway
 
-В alpha Kote Proxy бесплатен и не требует отдельного proxy key.
+В alpha Kote Gateway бесплатен и не требует отдельного proxy key.
 
 Статический секрет нельзя вшивать в KoteCode: он будет извлечён и не обеспечит
 ограничение только официальным клиентом.
@@ -523,7 +523,7 @@ OpenCode. Для первой alpha публикуется явная compatibil
 Локальный тест поднимает:
 
 1. HTTPS target с тестовым сертификатом;
-2. Kote Proxy;
+2. Kote Gateway;
 3. Bun fetch с `proxy`;
 4. streaming response.
 
@@ -651,8 +651,8 @@ CI использует fake providers и не требует реальных �
 5. Где размещается TLS endpoint, поддерживающий `CONNECT`?
 6. Какой срок хранения client IP в transport logs?
 7. Требуется ли bandwidth cap на tunnel?
-8. URL нового репозитория Kote Proxy.
+8. URL нового репозитория Kote Gateway.
 
 Эти решения не меняют основную модель: пользовательские credentials и выбранный
-provider остаются штатными, а Kote Proxy является только непрозрачным HTTPS
+provider остаются штатными, а Kote Gateway является только непрозрачным HTTPS
 transport.

@@ -28,6 +28,7 @@ import type {
   RunInput,
   RunPrompt,
   RunProvider,
+  RunProviderRouting,
   RunTuiConfig,
   StreamCommit,
 } from "@/cli/cmd/run/types"
@@ -157,6 +158,7 @@ async function renderFooter(
     commands?: RunCommand[]
     theme?: () => RunTheme
     providers?: RunProvider[]
+    providerRouting?: Record<string, RunProviderRouting>
     currentModel?: RunInput["model"]
     currentVariant?: string
     subagents?: FooterSubagentState
@@ -190,6 +192,7 @@ async function renderFooter(
           resources={() => []}
           commands={() => input.commands ?? []}
           providers={() => input.providers}
+          providerRouting={() => input.providerRouting ?? {}}
           currentModel={() => input.currentModel}
           variants={() => []}
           currentVariant={() => input.currentVariant}
@@ -973,6 +976,7 @@ test("direct footer shows editable prompts and additional queued work while runn
           resources={() => []}
           commands={() => []}
           providers={() => undefined}
+          providerRouting={() => ({})}
           currentModel={() => ({
             providerID: "opencode",
             modelID: "a-model-name-long-enough-to-force-responsive-truncation",
@@ -1063,6 +1067,7 @@ test("direct footer shows editable prompts and additional queued work while runn
 test("direct footer separates a lone context hint from model and command hint", async () => {
   const app = await renderFooter({
     providers: [provider()],
+    providerRouting: { opencode: "proxy" },
     currentModel: { providerID: "opencode", modelID: "gpt-5" },
     currentVariant: "xhigh",
     subagents: {
@@ -1080,9 +1085,27 @@ test("direct footer separates a lone context hint from model and command hint", 
     const frame = app.captureCharFrame()
 
     expect(frame).toContain("GPT-5")
+    expect(frame).toContain("GPT-5 opencode · Kote Gateway · xhigh")
     expect(frame).toContain("xhigh · ctrl+x down subagents · ctrl+p cmd")
     expect(frame).not.toContain("ctrl+b background")
     expect(frame).not.toContain("queued")
+  } finally {
+    app.cleanup()
+  }
+})
+
+test("direct footer shows direct provider routing in the selected language", async () => {
+  const app = await renderFooter({
+    tuiConfig: createTuiResolvedConfig({ language: "ru" }),
+    providers: [provider()],
+    providerRouting: { opencode: "direct" },
+    currentModel: { providerID: "opencode", modelID: "gpt-5" },
+    width: 160,
+  })
+
+  try {
+    await app.renderOnce()
+    expect(app.captureCharFrame()).toContain("GPT-5 opencode · Напрямую")
   } finally {
     app.cleanup()
   }

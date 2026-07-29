@@ -57,6 +57,7 @@ import { usePromptWorkspace } from "./workspace"
 import { usePromptMove } from "./move"
 import { readLocalAttachment } from "./local-attachment"
 import { useLocation } from "../../context/location"
+import { resolvePromptProviderRouting } from "./provider-routing"
 
 registerOpencodeSpinner()
 
@@ -212,6 +213,9 @@ export function Prompt(props: PromptProps) {
   const move = usePromptMove({ projectID: project.project, sessionID: () => props.sessionID })
   const [cursorVersion, setCursorVersion] = createSignal(0)
   const currentProviderLabel = createMemo(() => local.model.parsed().provider)
+  const currentProviderRouting = createMemo(() =>
+    resolvePromptProviderRouting(sync.data.config, local.model.current()?.providerID),
+  )
   const hasRightContent = createMemo(() => Boolean(props.right))
 
   function promptModelWarning() {
@@ -1461,6 +1465,21 @@ export function Prompt(props: PromptProps) {
                             {local.model.parsed().model}
                           </text>
                           <text fg={fadeColor(theme.textMuted, modelMetaAlpha())}>{currentProviderLabel()}</text>
+                          <Show when={currentProviderRouting()}>
+                            {(routing) => (
+                              <>
+                                <text fg={fadeColor(theme.textMuted, modelMetaAlpha())}>·</text>
+                                <text
+                                  fg={fadeColor(
+                                    routing() === "proxy" ? theme.primary : theme.textMuted,
+                                    modelMetaAlpha(),
+                                  )}
+                                >
+                                  {t(routing() === "proxy" ? "Kote Gateway" : "Direct")}
+                                </text>
+                              </>
+                            )}
+                          </Show>
                           <Show when={showVariant()}>
                             <text fg={fadeColor(theme.textMuted, variantMetaAlpha())}>·</text>
                             <text>

@@ -13,6 +13,7 @@ import { resolveProxy } from "../../kote/bootstrap"
 import { proxyFetch } from "../../kote/proxy"
 import { ProviderRouting } from "../../kote/provider-routing"
 import { Config } from "../../config"
+import { Gateway } from "../../kote/gateway"
 import type { PluginInternal } from "../internal"
 
 const clientID = "app_EMoamEEZ73f0CkXaXp7hrann"
@@ -40,7 +41,7 @@ type Claims = {
   "https://api.openai.com/auth"?: { chatgpt_account_id?: string }
 }
 
-function browser(routing: ProviderRouting.Mode) {
+function browser(routing: ProviderRouting.Mode, customProxyUrl?: string) {
   return {
     integrationID: Integration.ID.make("openai"),
     method: {
@@ -54,7 +55,7 @@ function browser(routing: ProviderRouting.Mode) {
         const pkce = yield* Effect.promise(generatePKCE)
         const state = base64UrlEncode(crypto.getRandomValues(new Uint8Array(32)).buffer)
         const code = yield* Deferred.make<string, Error>()
-        const fetch = yield* Effect.promise(() => oauthFetch(selectedRouting))
+        const fetch = yield* Effect.promise(() => oauthFetch(selectedRouting, customProxyUrl))
         const redirect = `http://localhost:${callbackPort}/auth/callback`
         const server = createServer((request, response) => {
           const url = new URL(request.url ?? "/", `http://localhost:${callbackPort}`)
@@ -99,11 +100,11 @@ function browser(routing: ProviderRouting.Mode) {
           ),
         }
       }),
-    refresh: (value) => refresh(browserMethodID, value, routing),
+    refresh: (value) => refresh(browserMethodID, value, routing, customProxyUrl),
   } satisfies IntegrationOAuthMethodRegistration
 }
 
-function headless(routing: ProviderRouting.Mode) {
+function headless(routing: ProviderRouting.Mode, customProxyUrl?: string) {
   return {
     integrationID: Integration.ID.make("openai"),
     method: {
@@ -114,7 +115,7 @@ function headless(routing: ProviderRouting.Mode) {
     authorize: (inputs) =>
       Effect.gen(function* () {
         const selectedRouting = ProviderRouting.read(inputs[ProviderRouting.RequestKey] ?? routing)
-        const fetch = yield* Effect.promise(() => oauthFetch(selectedRouting))
+        const fetch = yield* Effect.promise(() => oauthFetch(selectedRouting, customProxyUrl))
         const device = yield* request<{ device_auth_id: string; user_code: string; interval: string }>(
           `${issuer}/api/accounts/deviceauth/usercode`,
           {
@@ -168,7 +169,7 @@ function headless(routing: ProviderRouting.Mode) {
           }),
         }
       }),
-    refresh: (value) => refresh(headlessMethodID, value, routing),
+    refresh: (value) => refresh(headlessMethodID, value, routing, customProxyUrl),
   } satisfies IntegrationOAuthMethodRegistration
 }
 
@@ -176,15 +177,17 @@ export const OpenAIPlugin = define({
   id: "openai",
   effect: Effect.fn(function* (ctx) {
     const config = yield* Config.Service
+    const entries = yield* config.entries()
     const routing = ProviderRouting.read(
-      (yield* config.entries())
+      entries
         .filter((entry): entry is Config.Document => entry.type === "document")
         .flatMap((entry) => (entry.info.providers?.openai ? [entry.info.providers.openai] : []))
         .findLast((provider) => provider.routing !== undefined)?.routing,
     )
+    const customProxyUrl = Gateway.customProxyUrl(Config.latest(entries, "gateway"))
     yield* ctx.integration.transform((draft) => {
-      draft.method.update(browser(routing))
-      draft.method.update(headless(routing))
+      draft.method.update(browser(routing, customProxyUrl))
+      draft.method.update(headless(routing, customProxyUrl))
     })
     yield* ctx.catalog.transform(
       Effect.fn(function* (evt) {
@@ -242,8 +245,9 @@ function refresh(
   methodID: Integration.MethodID,
   value: Pick<Credential.OAuth, "refresh" | "metadata">,
   routing: ProviderRouting.Mode,
+  customProxyUrl?: string,
 ) {
-  return Effect.promise(() => oauthFetch(routing)).pipe(
+  return Effect.promise(() => oauthFetch(routing, customProxyUrl)).pipe(
     Effect.flatMap((fetch) =>
       request<TokenResponse>(
         `${issuer}/oauth/token`,
@@ -277,9 +281,12 @@ function request<A>(url: string, init: RequestInit, fetch: typeof globalThis.fet
   })
 }
 
-async function oauthFetch(routing: ProviderRouting.Mode) {
+async function oauthFetch(routing: ProviderRouting.Mode, customProxyUrl?: string) {
   if (routing === "direct") return proxyFetch(globalThis.fetch, { source: "disabled" })
-  return proxyFetch(globalThis.fetch, ProviderRouting.transport(routing, await resolveProxy()))
+  return proxyFetch(
+    globalThis.fetch,
+    ProviderRouting.transport(routing, await resolveProxy({ customUrl: customProxyUrl })),
+  )
 }
 
 function credential(methodID: Integration.MethodID, tokens: TokenResponse, routing: ProviderRouting.Mode) {

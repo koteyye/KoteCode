@@ -23,6 +23,7 @@ import { createEventListener } from "@solid-primitives/event-listener"
 import { filterConnectedModels } from "./dialog-select-model-filter"
 import { matchesModelSearch } from "./dialog-select-model-search"
 import { useProviderRouting } from "@/hooks/use-provider-routing"
+import { useGatewayName } from "@/hooks/use-gateway-name"
 
 const isFree = (provider: string, cost: { input: number } | undefined) =>
   provider === "opencode" && (!cost || cost.input === 0)
@@ -56,6 +57,7 @@ const ModelList: Component<{
   const model = props.model ?? local.model
   const providers = useProviders(() => decode64(local.slug()))
   const routing = useProviderRouting()
+  const gatewayName = useGatewayName()
   const language = useLanguage()
 
   const models = createMemo(() =>
@@ -88,11 +90,9 @@ const ModelList: Component<{
         <>
           <span class="min-w-0 truncate">{group.items[0].provider.name}</span>
           <Tag class="shrink-0">
-            {language.t(
-              routing.get(group.items[0].provider.id) === "proxy"
-                ? "provider.routing.proxy.short"
-                : "provider.routing.direct.short",
-            )}
+            {routing.get(group.items[0].provider.id) === "proxy"
+              ? gatewayName()
+              : language.t("provider.routing.direct.short")}
           </Tag>
         </>
       )}
@@ -254,6 +254,7 @@ export function ModelSelectorPopoverV2(props: {
   const model = props.model ?? local.model
   const providers = useProviders(() => decode64(local.slug()))
   const routing = useProviderRouting()
+  const gatewayName = useGatewayName()
   const language = useLanguage()
   const dialog = useDialog()
   const [store, setStore] = createStore({ open: false, search: "", active: "" })
@@ -457,11 +458,9 @@ export function ModelSelectorPopoverV2(props: {
                       <MenuV2.GroupLabel class="gap-2 px-3">
                         <span class="min-w-0 truncate">{group.items[0].provider.name}</span>
                         <TagV2 class="shrink-0">
-                          {language.t(
-                            routing.get(group.items[0].provider.id) === "proxy"
-                              ? "provider.routing.proxy.short"
-                              : "provider.routing.direct.short",
-                          )}
+                          {routing.get(group.items[0].provider.id) === "proxy"
+                            ? gatewayName()
+                            : language.t("provider.routing.direct.short")}
                         </TagV2>
                       </MenuV2.GroupLabel>
                       <MenuV2.RadioGroup value={current()}>

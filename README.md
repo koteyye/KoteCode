@@ -24,8 +24,8 @@ KoteCode is an AI coding agent you run from the terminal (TUI) or as a desktop a
 all of OpenCode's core capabilities — multi-provider chat, tool calling, sessions, the `build`
 and `plan` agents — and adds:
 
-- The **Kote Proxy**, a transparent HTTPS `CONNECT` transport for the existing OpenCode
-  providers. Its endpoint is resolved from a **signed bootstrap configuration**.
+- **Kote Gateway**, a network gateway for stable connectivity to API providers. Its
+  endpoint is resolved from a **signed bootstrap configuration**.
 - KoteCode-specific config directories and `KOTECODE_*` environment variables.
 - A `kotencode` CLI command and KoteCode branding.
 
@@ -38,20 +38,20 @@ Running KoteCode sends your prompts, code, and file contents to the AI provider 
 - **API costs:** Most providers bill per token. Review your provider's pricing. KoteCode
   itself is free; the model usage is not.
 - **Data:** Whatever you ask KoteCode to read or write is transmitted to the selected
-  provider. With Kote Proxy enabled, provider traffic remains protected by end-to-end TLS:
-  the Proxy sees the destination hostname and transport metadata, but not your API key,
+  provider. With Kote Gateway enabled, provider traffic remains protected by end-to-end TLS:
+  the gateway sees the destination hostname and transport metadata, but not your API key,
   prompts, code, or responses.
 
 ## Provider transport
 
 You connect OpenAI, Anthropic, OpenRouter, and other providers exactly as in OpenCode,
 using your own API key or the provider's supported authorization flow. You pay the provider;
-KoteCode and Kote Proxy do not provide model credits.
+KoteCode and Kote Gateway do not provide model credits.
 
-By default, HTTPS model requests use Kote Proxy as a standard `CONNECT` tunnel:
+By default, HTTPS model requests use Kote Gateway as a standard `CONNECT` tunnel:
 
 ```text
-KoteCode ── CONNECT through Kote Proxy ── end-to-end TLS ── selected provider
+KoteCode ── CONNECT through Kote Gateway ── end-to-end TLS ── selected provider
 ```
 
 The original provider URL, authentication, SDK, model catalog, streaming, tools, reasoning,
@@ -59,9 +59,9 @@ and multimodal behavior stay unchanged. Local HTTP providers such as Ollama rema
 In the Desktop app, routing is selected separately for each provider during connection
 and can be changed later under **Settings → Providers**.
 
-### How the Kote Proxy endpoint is resolved
+### How the Kote Gateway endpoint is resolved
 
-The real Kote Proxy address is **not** hardcoded in KoteCode. At startup KoteCode:
+The real Kote Gateway address is **not** hardcoded in KoteCode. At startup KoteCode:
 
 1. Fetches a small, **Ed25519-signed** bootstrap configuration (over HTTPS, with a size cap
    and timeout — no redirects to unknown domains, no code execution from the config).
@@ -69,23 +69,23 @@ The real Kote Proxy address is **not** hardcoded in KoteCode. At startup KoteCod
 3. Checks `config_version`, `issued_at`, and `expires_at`.
 4. Uses the signed `proxy.url` for HTTPS provider requests.
 
-This lets the Proxy address change **without rebuilding KoteCode**. See
+This lets the gateway address change **without rebuilding KoteCode**. See
 [`docs/BOOTSTRAP.md`](./docs/BOOTSTRAP.md) for the format and signing process.
 
-**Override for local development / diagnostics:** you can force a specific Proxy address
+**Override for local development / diagnostics:** you can force a specific gateway address
 without touching the bootstrap flow:
 
 ```bash
 KOTECODE_PROXY_URL=https://kote-proxy.kotey-ye.ru kotencode
 ```
 
-To explicitly bypass Kote Proxy and contact providers directly:
+To explicitly bypass Kote Gateway and contact providers directly:
 
 ```bash
 KOTECODE_DISABLE_PROXY=1 kotencode
 ```
 
-KoteCode never silently falls back to a direct HTTPS request when the configured Proxy is
+KoteCode never silently falls back to a direct HTTPS request when the configured gateway is
 unavailable.
 
 ## Installation
@@ -121,7 +121,7 @@ Provider configuration remains OpenCode-compatible. For example:
 
 ```jsonc
 {
-  // Your own provider credentials and models; Kote Proxy is transport, not a provider.
+  // Your own provider credentials and models; Kote Gateway is transport, not a provider.
   "provider": {
     "openai": {},
   },
@@ -187,7 +187,7 @@ Full reference: [`docs/CONFIGURATION.md`](./docs/CONFIGURATION.md).
 - [`docs/PROXY_COMPATIBILITY.md`](./docs/PROXY_COMPATIBILITY.md) — verified and pending provider paths
 - [`docs/CONFIGURATION.md`](./docs/CONFIGURATION.md) — directories, env vars, modes
 - [`docs/BUILD.md`](./docs/BUILD.md) — building from source
-- [`docs/TZ-2-KOTE-PROXY.md`](./docs/TZ-2-KOTE-PROXY.md) — Kote Proxy contract and threat model
+- [`docs/TZ-2-KOTE-PROXY.md`](./docs/TZ-2-KOTE-PROXY.md) — Kote Gateway contract and threat model
 
 ## License
 

@@ -42,6 +42,7 @@ import { llmClient } from "../../effect/app-node-platform"
 import { resolveProxy } from "../../kote/bootstrap"
 import { proxyFetch } from "../../kote/proxy"
 import { ProviderRouting } from "../../kote/provider-routing"
+import { Gateway } from "../../kote/gateway"
 import { FetchHttpClient } from "effect/unstable/http"
 
 /**
@@ -201,8 +202,9 @@ const layer = Layer.effect(
       const system =
         initialized ?? (yield* SessionContextEpoch.prepare(db, events, loadSystemContext(agent), session.id))
       const model = yield* models.resolve(session)
+      const configEntries = yield* config.entries()
       const routing = ProviderRouting.read(
-        (yield* config.entries())
+        configEntries
           .filter((entry): entry is Config.Document => entry.type === "document")
           .flatMap((entry) => {
             const provider = entry.info.providers?.[model.provider]
@@ -211,7 +213,11 @@ const layer = Layer.effect(
           .findLast((provider) => provider.routing !== undefined)?.routing,
       )
       const transport =
-        routing === "direct" ? { source: "disabled" as const } : yield* Effect.promise(() => resolveProxy())
+        routing === "direct"
+          ? { source: "disabled" as const }
+          : yield* Effect.promise(() =>
+              resolveProxy({ customUrl: Gateway.customProxyUrl(Config.latest(configEntries, "gateway")) }),
+            )
       const fetch = proxyFetch(globalThis.fetch, transport)
       const entries = yield* SessionHistory.entriesForRunner(db, session.id, system.baselineSeq)
       const context = entries.map((entry) => entry.message)

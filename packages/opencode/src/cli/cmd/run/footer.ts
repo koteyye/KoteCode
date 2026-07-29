@@ -55,6 +55,7 @@ import type {
   RunInput,
   RunPrompt,
   RunProvider,
+  RunProviderRouting,
   RunResource,
   RunTuiConfig,
   StreamCommit,
@@ -186,6 +187,8 @@ export class RunFooter implements FooterApi {
   private setCommands: Setter<RunCommand[] | undefined>
   private providers: Accessor<RunProvider[] | undefined>
   private setProviders: Setter<RunProvider[] | undefined>
+  private providerRouting: Accessor<Record<string, RunProviderRouting>>
+  private setProviderRouting: Setter<Record<string, RunProviderRouting>>
   private currentModel: Accessor<RunInput["model"]>
   private setCurrentModel: Setter<RunInput["model"]>
   private variants: Accessor<string[]>
@@ -265,6 +268,9 @@ export class RunFooter implements FooterApi {
     const [providers, setProviders] = createSignal<RunProvider[] | undefined>()
     this.providers = providers
     this.setProviders = setProviders
+    const [providerRouting, setProviderRouting] = createSignal<Record<string, RunProviderRouting>>({})
+    this.providerRouting = providerRouting
+    this.setProviderRouting = setProviderRouting
     const [currentModel, setCurrentModel] = createSignal<RunInput["model"]>(options.model)
     this.currentModel = currentModel
     this.setCurrentModel = setCurrentModel
@@ -315,6 +321,7 @@ export class RunFooter implements FooterApi {
               resources: footer.resources,
               commands: footer.commands,
               providers: footer.providers,
+              providerRouting: footer.providerRouting,
               currentModel: footer.currentModel,
               variants: footer.variants,
               currentVariant: footer.currentVariant,
@@ -425,6 +432,7 @@ export class RunFooter implements FooterApi {
       }
 
       this.setProviders(next.providers)
+      this.setProviderRouting(next.routing)
       return
     }
 

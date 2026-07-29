@@ -441,7 +441,7 @@ async function runInteractiveRuntime(input: RunRuntimeInput, deps: RunRuntimeDep
       return
     }
 
-    footer.event({ type: "models", providers: info.providers })
+    footer.event({ type: "models", providers: info.providers, routing: info.routing })
     footer.event({ type: "variants", variants: state.variants, current: state.activeVariant })
     if (!state.model) {
       return

@@ -1,7 +1,7 @@
 # Network audit
 
 KoteCode inherits OpenCode's provider surface and adds one KoteCode-owned service:
-Kote Proxy. The Proxy is a standard HTTPS `CONNECT` transport; it is not an LLM
+Kote Gateway. The Proxy is a standard HTTPS `CONNECT` transport; it is not an LLM
 provider and has no provider API key.
 
 ## Endpoints
@@ -17,7 +17,7 @@ provider and has no provider API key.
 | 7   | Provider/account authorization endpoints                                         | API-key/OAuth login and refresh | Provider-specific auth data                                               | Do not run the authorization flow                                           |
 | 8   | User-configured `OTEL_EXPORTER_OTLP_ENDPOINT`                                    | OpenTelemetry                   | Trace data expected by the user's exporter                                | Do not configure OTEL                                                       |
 
-## End-to-end TLS through Kote Proxy
+## End-to-end TLS through Kote Gateway
 
 For an HTTPS provider request, KoteCode asks the Proxy to connect to the original
 provider host:
@@ -29,10 +29,10 @@ CONNECT api.openai.com:443
 After the Proxy returns `200 Connection Established`, KoteCode creates TLS directly
 with `api.openai.com` through the byte tunnel. Therefore:
 
-- Kote Proxy sees the client IP, provider hostname, timing, and traffic volume;
-- Kote Proxy does not see the provider URL path/query;
-- Kote Proxy does not see the user's API key or OAuth token;
-- Kote Proxy does not see prompts, code, tools, attachments, or responses;
+- Kote Gateway sees the client IP, provider hostname, timing, and traffic volume;
+- Kote Gateway does not see the provider URL path/query;
+- Kote Gateway does not see the user's API key or OAuth token;
+- Kote Gateway does not see prompts, code, tools, attachments, or responses;
 - the provider sees the same authenticated request it would receive in direct mode;
 - KoteCode validates the provider's TLS certificate;
 - no KoteCode CA is installed and no TLS interception is performed.
@@ -42,7 +42,7 @@ arbitrary public relay.
 
 ## What is proxied
 
-Only runtime requests made by a selected provider SDK receive the Kote Proxy option.
+Only runtime requests made by a selected provider SDK receive the Kote Gateway option.
 The following remain direct:
 
 - bootstrap fetch, avoiding a circular dependency;

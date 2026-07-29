@@ -131,9 +131,16 @@ describe("plugin.codex", () => {
     })
   })
 
-  test("installs websocket transport only when experimental websockets are enabled", async () => {
+  test("installs websocket transport only when experimental websockets are enabled in direct mode", async () => {
     const disabled = await CodexAuthPlugin({} as never)
-    const enabled = await CodexAuthPlugin({} as never, { experimentalWebSockets: true })
+    const enabled = await CodexAuthPlugin({} as never, {
+      experimentalWebSockets: true,
+      resolveProxy: async () => ({ source: "disabled" }),
+    })
+    const proxied = await CodexAuthPlugin({} as never, {
+      experimentalWebSockets: true,
+      resolveProxy: async () => ({ source: "environment", url: "https://proxy.kotencode.test" }),
+    })
 
     const disabledOptions = await disabled.auth!.loader!(
       async () => ({ type: "api", key: "sk-test" }) as never,
@@ -143,13 +150,18 @@ describe("plugin.codex", () => {
       async () => ({ type: "api", key: "sk-test" }) as never,
       {} as never,
     )
+    const proxiedOptions = await proxied.auth!.loader!(
+      async () => ({ type: "api", key: "sk-test" }) as never,
+      {} as never,
+    )
 
     expect(disabledOptions.fetch).toBeUndefined()
     expect(enabledOptions.fetch).toBeFunction()
+    expect(proxiedOptions.fetch).toBeUndefined()
     await enabled.dispose?.()
   })
 
-  test("routes ChatGPT device authorization through Kote Proxy", async () => {
+  test("routes ChatGPT device authorization through Kote Gateway", async () => {
     const calls: Array<{ input: RequestInfo | URL; init?: BunFetchRequestInit }> = []
     const runtimeFetch = Object.assign(
       async (input: RequestInfo | URL, init?: BunFetchRequestInit) => {

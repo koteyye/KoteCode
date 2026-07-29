@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { ProviderRouting } from "@opencode-ai/core/kote/provider-routing"
 
 describe("ProviderRouting", () => {
-  test("defaults to Kote Proxy", () => {
+  test("defaults to Kote Gateway", () => {
     expect(ProviderRouting.read(undefined)).toBe("proxy")
     expect(ProviderRouting.read("unknown")).toBe("proxy")
   })

@@ -553,6 +553,144 @@
   padding-bottom: 24px;
 }
 
+.settings-v2-gateway-header .settings-v2-tab-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.settings-v2-gateway {
+  gap: 24px;
+}
+
+.settings-v2-gateway-intro {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.settings-v2-gateway-intro .settings-v2-section-title {
+  padding-bottom: 0;
+  font-size: 13px;
+  font-weight: 530;
+  line-height: 1;
+}
+
+.settings-v2-gateway-intro p {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 440;
+  line-height: 20px;
+  color: var(--v2-text-text-muted);
+}
+
+.settings-v2-gateway [data-component="settings-v2-list"] {
+  padding-block: 4px;
+}
+
+.settings-v2-gateway-options [data-slot="radio-v2-items"] {
+  gap: 0;
+}
+
+.settings-v2-gateway-options [data-slot="radio-v2-item"] {
+  align-items: center;
+  padding-block: 16px;
+}
+
+.settings-v2-gateway-options [data-slot="radio-v2-item"]:not(:last-child) {
+  border-bottom: 0.5px solid var(--v2-border-border-base);
+}
+
+.settings-v2-gateway-options [data-slot="radio-v2-item-control-stack"] {
+  flex-shrink: 0;
+}
+
+.settings-v2-gateway-options [data-slot="radio-v2-item-label"] {
+  min-width: 0;
+  flex: 1;
+}
+
+.settings-v2-gateway-options [data-slot="radio-v2-item-text"],
+.settings-v2-gateway-options [data-slot="radio-v2-item-label-text"] {
+  width: 100%;
+  min-width: 0;
+}
+
+.settings-v2-gateway-option {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.settings-v2-gateway-option-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.settings-v2-gateway-option-name {
+  overflow: hidden;
+  color: var(--v2-text-text-base);
+  font-size: 13px;
+  font-weight: 530;
+  line-height: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-v2-gateway-option-description {
+  overflow: hidden;
+  color: var(--v2-text-text-muted);
+  font-size: 11px;
+  font-weight: 440;
+  line-height: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-v2-gateway-option-actions {
+  display: flex;
+  flex-shrink: 0;
+}
+
+[data-component="dialog-v2"].settings-v2-gateway-dialog [data-slot="dialog-container"] {
+  width: 480px;
+  max-width: calc(100vw - 32px);
+  height: auto;
+  align-items: stretch;
+  border-radius: 8px;
+}
+
+[data-component="dialog-v2"].settings-v2-gateway-dialog [data-slot="dialog-content"] {
+  align-items: stretch;
+  width: 100%;
+}
+
+[data-component="dialog-v2"].settings-v2-gateway-dialog [data-slot="dialog-header"] {
+  align-items: center;
+  padding: 24px 24px 16px;
+}
+
+.settings-v2-gateway-dialog-label {
+  color: var(--v2-text-text-base);
+  font-size: 13px;
+  font-weight: 530;
+  line-height: 1;
+}
+
+.settings-v2-gateway-dialog-error {
+  color: var(--v2-state-fg-danger);
+  font-size: 12px;
+  font-weight: 440;
+  line-height: 16px;
+}
+
 .settings-v2-servers [data-component="settings-v2-list"] {
   display: flex;
   flex-direction: column;

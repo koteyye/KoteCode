@@ -141,7 +141,7 @@ Registry: `packages/opencode/src/provider/provider.ts`.
   `{ autoload, options?: { baseURL, apiKey, headers, ... }, getModel?, vars?, discoverModels? }`.
 - `resolveSDK`: baseURL precedence is `provider.options.baseURL` > `model.api.url` (catalog),
   with `${VAR}` substitution. apiKey comes from options or `provider.key`.
-- The shared external `fetch` wrapper in `resolveSDK` is the Kote Proxy injection point.
+- The shared external `fetch` wrapper in `resolveSDK` is the Kote Gateway injection point.
   Bun's `fetch` accepts a forward-proxy option, so HTTPS provider traffic can use the Proxy
   without changing provider SDKs, provider endpoints, API keys, OAuth tokens, or headers.
 - Provider-specific fetch wrappers such as Vertex and Snowflake preserve the shared request
@@ -185,7 +185,7 @@ Ed25519 verification **from scratch** in `packages/core/src/kote/`, adding `@nob
 
 ## 12. Conclusion and scope decisions
 
-- Kote Proxy plugs into the shared provider fetch transport — **no second provider stack**,
+- Kote Gateway plugs into the shared provider fetch transport — **no second provider stack**,
   scope is not extended beyond ТЗ.
 - Public rebrand touches a small, mostly-constant set of files (audit §4).
 - The signed bootstrap subsystem is genuinely new code (audit §10), localized to `packages/core/src/kote/`.

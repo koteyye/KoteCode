@@ -83,7 +83,7 @@ describe("provider proxy transport", () => {
     } as const
     expect(() => proxyForRequest("https://api.openai.com/v1/responses", result)).toThrow(ProxyUnavailableError)
     expect(() => proxyForRequest("https://api.openai.com/v1/responses", result)).toThrow(
-      "Kote Proxy is unavailable: remote bootstrap is unreachable",
+      "Kote Gateway is unavailable: remote bootstrap is unreachable",
     )
   })
 })

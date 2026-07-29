@@ -125,20 +125,25 @@ type PathApi = {
   readonly get: (input?: PathGetInput) => Promise<PathGetOutput>
 }
 
-export const loadProjectsQuery = (scope: ServerScope, api: ProjectApi) =>
+export const loadProjectsQuery = (
+  scope: ServerScope,
+  api: ProjectApi,
+  legacy?: OpencodeClient,
+  protocol?: Promise<ServerProtocol>,
+) =>
   queryOptions({
     queryKey: [scope, "project"],
     queryFn: () =>
-      retry(() =>
-        api.list().then((projects) => {
-          return projects
-            .filter((p) => !!p?.id)
-            .filter((p) => !!p.worktree && !p.worktree.includes("opencode-test"))
-            .map(normalizeProjectInfo)
-            .slice()
-            .sort((a, b) => cmp(a.id, b.id))
-        }),
-      ),
+      retry(async () => {
+        const projects =
+          (await protocol) === "v1" && legacy ? ((await legacy.project.list()).data ?? []) : await api.list()
+        return projects
+          .filter((p) => !!p?.id)
+          .filter((p) => !!p.worktree && !p.worktree.includes("opencode-test"))
+          .map(normalizeProjectInfo)
+          .slice()
+          .sort((a, b) => cmp(a.id, b.id))
+      }),
   })
 
 export async function bootstrapGlobal(input: {
@@ -158,10 +163,13 @@ export async function bootstrapGlobal(input: {
       input.queryClient.fetchQuery(
         loadProvidersQuery(input.scope, null, input.serverAPI, input.serverSDK, input.protocol),
       ),
-    () => input.queryClient.fetchQuery(loadPathQuery(input.scope, null, input.serverAPI.path)),
+    () =>
+      input.queryClient.fetchQuery(
+        loadPathQuery(input.scope, null, input.serverAPI.path, input.serverSDK, input.protocol),
+      ),
     () =>
       input.queryClient
-        .fetchQuery(loadProjectsQuery(input.scope, input.serverAPI.project))
+        .fetchQuery(loadProjectsQuery(input.scope, input.serverAPI.project, input.serverSDK, input.protocol))
         .then((data) => input.setGlobalStore("project", data)),
   ]
   await runAll(slow)
@@ -296,10 +304,20 @@ export const loadCommands = (
     return api.list({ location: { directory } }).then((result) => result.data)
   })
 
-export const loadPathQuery = (scope: ServerScope, directory: string | null, api: PathApi) =>
+export const loadPathQuery = (
+  scope: ServerScope,
+  directory: string | null,
+  api: PathApi,
+  legacy?: OpencodeClient,
+  protocol?: Promise<ServerProtocol>,
+) =>
   queryOptions<Path>({
     queryKey: [scope, directory, "path"],
-    queryFn: () => retry(() => api.get(directory ? { location: { directory } } : undefined)),
+    queryFn: () =>
+      retry(async () => {
+        if ((await protocol) === "v1" && legacy) return (await legacy.path.get()).data!
+        return api.get(directory ? { location: { directory } } : undefined)
+      }),
   })
 
 export const loadReferencesQuery = (
@@ -402,25 +420,35 @@ export async function bootstrapDirectory(input: {
         ),
       !seededProject &&
         (() =>
-          retry(() => input.api.project.current({ location: { directory: input.directory } })).then((project) =>
-            input.setStore("project", project.id),
-          )),
+          retry(async () => {
+            if ((await input.protocol) === "v1") {
+              const project = await input.sdk.project.current()
+              input.setStore("project", project.data!.id)
+              return
+            }
+            const project = await input.api.project.current({ location: { directory: input.directory } })
+            input.setStore("project", project.id)
+          })),
       !seededPath &&
         (() =>
           input.queryClient
-            .ensureQueryData(loadPathQuery(input.scope, input.directory, input.api.path))
+            .ensureQueryData(loadPathQuery(input.scope, input.directory, input.api.path, input.sdk, input.protocol))
             .then((data) => {
               const next = projectID(data.directory ?? input.directory, input.global.project)
               if (next) input.setStore("project", next)
             })),
       () =>
-        retry(() =>
-          input.api.vcs.get({ location: { directory: input.directory } }).then((result) => {
-            const next = { branch: result.data.branch, default_branch: result.data.defaultBranch }
-            input.setStore("vcs", next)
-            if (next) input.vcsCache.setStore("value", next)
-          }),
-        ),
+        retry(async () => {
+          const next =
+            (await input.protocol) === "v1"
+              ? ((await input.sdk.vcs.get()).data ?? input.store.vcs)
+              : await input.api.vcs.get({ location: { directory: input.directory } }).then((result) => ({
+                  branch: result.data.branch,
+                  default_branch: result.data.defaultBranch,
+                }))
+          input.setStore("vcs", next)
+          if (next) input.vcsCache.setStore("value", next)
+        }),
       input.mcp &&
         (() =>
           loadCommands(input.directory, input.api.command, input.sdk, input.protocol).then((commands) =>
@@ -503,9 +531,16 @@ export async function bootstrapDirectory(input: {
           }),
         ),
       () => Promise.resolve(input.loadSessions(input.directory)),
-      input.mcp && (() => input.queryClient.fetchQuery(loadMcpQuery(input.scope, input.directory, input.api.mcp))),
       input.mcp &&
-        (() => input.queryClient.fetchQuery(loadMcpResourcesQuery(input.scope, input.directory, input.api.mcp))),
+        (() =>
+          input.queryClient.fetchQuery(
+            loadMcpQuery(input.scope, input.directory, input.api.mcp, input.sdk, input.protocol),
+          )),
+      input.mcp &&
+        (() =>
+          input.queryClient.fetchQuery(
+            loadMcpResourcesQuery(input.scope, input.directory, input.api.mcp, input.sdk, input.protocol),
+          )),
       () =>
         input.queryClient
           .fetchQuery(loadProvidersQuery(input.scope, input.directory, input.api, input.sdk, input.protocol))

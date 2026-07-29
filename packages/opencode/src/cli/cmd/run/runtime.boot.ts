@@ -9,13 +9,22 @@ import { Context, Effect, Layer } from "effect"
 import { resolve } from "@opencode-ai/tui/config"
 import { TuiConfig } from "@/config/tui"
 import { makeRuntime } from "@/effect/run-service"
+import { isRecord } from "@/util/record"
 import { reusePendingTask } from "./runtime.shared"
 import { resolveSession, sessionHistory } from "./session.shared"
-import type { RunDiffStyle, RunInput, RunPrompt, RunProvider, RunTuiConfig } from "./types"
+import type {
+  RunDiffStyle,
+  RunInput,
+  RunPrompt,
+  RunProvider,
+  RunProviderRouting,
+  RunTuiConfig,
+} from "./types"
 import { pickVariant } from "./variant.shared"
 
 export type ModelInfo = {
   providers: RunProvider[]
+  routing: Record<string, RunProviderRouting>
   variants: string[]
   limits: Record<string, number>
 }
@@ -53,9 +62,20 @@ function loadConfig() {
 function emptyModelInfo(): ModelInfo {
   return {
     providers: [],
+    routing: {},
     variants: [],
     limits: {},
   }
+}
+
+function resolveProviderRouting(config: unknown, providers: RunProvider[]) {
+  const configured = isRecord(config) && isRecord(config.provider) ? config.provider : {}
+  return Object.fromEntries(
+    providers.map((provider) => {
+      const value = configured[provider.id]
+      return [provider.id, isRecord(value) && value.routing === "direct" ? "direct" : "proxy"]
+    }),
+  ) as Record<string, RunProviderRouting>
 }
 
 function emptySessionInfo(): SessionInfo {
@@ -96,11 +116,17 @@ const layer = Layer.effect(
       directory: string,
       model: RunInput["model"],
     ) {
-      const connected = yield* Effect.promise(() =>
-        sdk.config
-          .providers({ directory })
-          .then((item) => item.data?.providers)
-          .catch(() => undefined),
+      const [connected, config] = yield* Effect.promise(() =>
+        Promise.all([
+          sdk.config
+            .providers({ directory })
+            .then((item) => item.data?.providers)
+            .catch(() => undefined),
+          sdk.config
+            .get({ directory })
+            .then((item) => item.data)
+            .catch(() => undefined),
+        ]),
       )
       const providers = yield* Effect.promise(() =>
         connected
@@ -126,6 +152,7 @@ const layer = Layer.effect(
       if (!model) {
         return {
           providers,
+          routing: resolveProviderRouting(config, providers),
           variants: [],
           limits,
         }
@@ -134,6 +161,7 @@ const layer = Layer.effect(
       const info = providers.find((item) => item.id === model.providerID)?.models?.[model.modelID]
       return {
         providers,
+        routing: resolveProviderRouting(config, providers),
         variants: Object.keys(info?.variants ?? {}),
         limits,
       }

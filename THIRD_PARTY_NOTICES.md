@@ -49,11 +49,11 @@ Code added by KoteCode on top of OpenCode is licensed under the same MIT License
 KoteCode-only components:
 
 - **Signed bootstrap configuration resolver** (`packages/core/src/kote/`) — fetches and
-  Ed25519-verifies the Kote Proxy endpoint configuration. Uses the following dependency:
+  Ed25519-verifies the Kote Gateway endpoint configuration. Uses the following dependency:
   - [`@noble/ed25519`](https://github.com/paulmillr/noble-curves) — MIT License.
     Used for signature verification only (no signing happens in the client).
 
-- **Kote Proxy transport** — applies the bootstrap-resolved HTTPS Proxy origin to the
+- **Kote Gateway transport** — applies the bootstrap-resolved HTTPS Proxy origin to the
   existing provider fetch transport. It does not add or replace an LLM provider and
   introduces no additional dependency.
 

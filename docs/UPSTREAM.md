@@ -43,7 +43,7 @@ git merge upstream/dev
 
 Expect conflicts **only** in the files listed in §3. Everything else should merge cleanly
 because the public rebrand is localized to a small set of touchpoints and the signed
-Kote Proxy bootstrap code lives in new files that upstream does not touch.
+Kote Gateway bootstrap code lives in new files that upstream does not touch.
 
 ### Resolving branding conflicts
 
