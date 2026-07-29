@@ -1164,6 +1164,24 @@ test("direct footer mode label keeps left padding without a status pill", async 
   }
 })
 
+test("direct footer renders Russian labels when configured", async () => {
+  const app = await renderFooter({
+    tuiConfig: createTuiResolvedConfig({ language: "ru" }),
+    state: { phase: "running" },
+  })
+
+  try {
+    await app.renderOnce()
+    const frame = app.captureCharFrame()
+
+    expect(frame).toContain("СБОРКА")
+    expect(frame).toContain("прервать")
+    expect(frame).not.toContain("BUILD")
+  } finally {
+    app.cleanup()
+  }
+})
+
 test("direct question body separates single-select checkmark from label", async () => {
   const request = {
     id: "question-1",

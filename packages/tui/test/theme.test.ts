@@ -2,9 +2,14 @@ import { expect, test } from "bun:test"
 import { mkdir, writeFile } from "node:fs/promises"
 import path from "node:path"
 import type { TerminalColors } from "@opentui/core"
-import { DEFAULT_THEMES, addTheme, allThemes, hasTheme, resolveTheme, terminalMode } from "../src/theme"
+import { DEFAULT_THEME, DEFAULT_THEMES, addTheme, allThemes, hasTheme, resolveTheme, terminalMode } from "../src/theme"
 import { discoverThemes } from "../src/context/theme"
 import { tmpdir } from "./fixture/fixture"
+
+test("uses the orange KoteCode theme by default", () => {
+  expect(DEFAULT_THEME).toBe("kotecode")
+  expect(DEFAULT_THEMES[DEFAULT_THEME]?.defs?.darkStep9).toBe("#ff7300")
+})
 
 test("addTheme writes into module theme store", () => {
   const name = `plugin-theme-${Date.now()}`

@@ -5,6 +5,7 @@ import { createStore } from "solid-js/store"
 import { For } from "solid-js"
 import { Locale } from "../util/locale"
 import { useBindings } from "../keymap"
+import { useTuiConfig } from "../config"
 
 export type DialogConfirmProps = {
   title: string
@@ -19,6 +20,8 @@ export type DialogConfirmResult = boolean | undefined
 export function DialogConfirm(props: DialogConfirmProps) {
   const dialog = useDialog()
   const { theme } = useTheme()
+  const config = useTuiConfig()
+  const t = (input: string) => Locale.translate(input, config.language)
   const [store, setStore] = createStore({
     active: "confirm" as "confirm" | "cancel",
   })
@@ -57,14 +60,14 @@ export function DialogConfirm(props: DialogConfirmProps) {
     <box paddingLeft={2} paddingRight={2} gap={1}>
       <box flexDirection="row" justifyContent="space-between">
         <text attributes={TextAttributes.BOLD} fg={theme.text}>
-          {props.title}
+          {t(props.title)}
         </text>
         <text fg={theme.textMuted} onMouseUp={() => dialog.clear()}>
           esc
         </text>
       </box>
       <box paddingBottom={1}>
-        <text fg={theme.textMuted}>{props.message}</text>
+        <text fg={theme.textMuted}>{t(props.message)}</text>
       </box>
       <box flexDirection="row" justifyContent="flex-end" paddingBottom={1}>
         <For each={["cancel", "confirm"] as const}>
@@ -80,7 +83,7 @@ export function DialogConfirm(props: DialogConfirmProps) {
               }}
             >
               <text fg={key === store.active ? theme.selectedListItemText : theme.textMuted}>
-                {Locale.titlecase(key === "cancel" ? (props.label ?? key) : key)}
+                {t(Locale.titlecase(key === "cancel" ? (props.label ?? key) : key))}
               </text>
             </box>
           )}

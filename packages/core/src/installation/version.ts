@@ -21,8 +21,9 @@ export const InstallationChannel = typeof OPENCODE_CHANNEL === "string" ? OPENCO
 export const InstallationLocal = InstallationChannel === "local"
 
 // KoteCode's own version. Bump here for each KoteCode release.
-// First release: 0.1.0-alpha.1 (see docs and UPSTREAM_STATE.md).
-export const KoteCodeVersion = typeof KOTECODE_VERSION === "string" ? KOTECODE_VERSION : "0.1.0-alpha.1"
+// The public KoteCode version line starts at 1.0.0 and remains independent
+// from the upstream compatibility version below.
+export const KoteCodeVersion = typeof KOTECODE_VERSION === "string" ? KOTECODE_VERSION : "1.0.0"
 
 // Upstream OpenCode version this KoteCode was forked from (see UPSTREAM_STATE.md).
 export const UpstreamBaseVersion = "1.18.5"
@@ -36,6 +37,6 @@ export const InstallationVersion = UpstreamVersion
 
 // Human-readable version shown by `kotencode --version` and the TUI.
 export function versionString(): string {
-  return `KoteCode ${KoteCodeVersion}
+  return `KoteCode v${KoteCodeVersion}
 Based on OpenCode ${UpstreamVersion} (fork base ${UpstreamBaseVersion} ${UpstreamBaseCommit})`
 }

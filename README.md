@@ -4,6 +4,8 @@
 █ ▀█ ▀▀▀▀  ▀▀  ▀▀▀▀  ▀▀▀▀ ▀▀▀▀ ▀▀▀▀ ▀▀▀▀
 ```
 
+[English](README.md) | [Русский](README.ru.md)
+
 # KoteCode
 
 **KoteCode — AI coding agent based on OpenCode.**
@@ -12,7 +14,7 @@ KoteCode is an independent fork of [OpenCode](https://github.com/anomalyco/openc
 **not** affiliated with, endorsed by, or an official product of the OpenCode team. It is a
 separate project that builds on OpenCode's MIT-licensed source code.
 
-> **Status:** `0.1.0-alpha.1` — internal testing only. Based on OpenCode `1.18.5`.
+> **Status:** `v1.0.0` — first KoteCode release line. Based on OpenCode `1.18.5`.
 
 ---
 
@@ -54,6 +56,8 @@ KoteCode ── CONNECT through Kote Proxy ── end-to-end TLS ── selected
 
 The original provider URL, authentication, SDK, model catalog, streaming, tools, reasoning,
 and multimodal behavior stay unchanged. Local HTTP providers such as Ollama remain direct.
+In the Desktop app, routing is selected separately for each provider during connection
+and can be changed later under **Settings → Providers**.
 
 ### How the Kote Proxy endpoint is resolved
 
@@ -145,16 +149,32 @@ Your original OpenCode files are left untouched.
 
 KoteCode adds `KOTECODE_*` variables on top of OpenCode's `OPENCODE_*` (both still work):
 
-| Variable                        | Purpose                                                               |
-| ------------------------------- | --------------------------------------------------------------------- |
-| `KOTECODE_CONFIG`               | Path to a config file                                                 |
-| `KOTECODE_CONFIG_DIR`           | Override the config directory                                         |
-| `KOTECODE_DATA_DIR`             | Override the data directory                                           |
-| `KOTECODE_CACHE_DIR`            | Override the cache directory                                          |
-| `KOTECODE_BOOTSTRAP_URL`        | Override the bootstrap config URL (dev/testing)                       |
-| `KOTECODE_PROXY_URL`            | Force the HTTPS Proxy origin (priority over bootstrap)                |
-| `KOTECODE_DISABLE_PROXY`        | Explicitly use direct provider transport                              |
-| `KOTECODE_DISABLE_UPDATE_CHECK` | Reserved update-check kill switch; alpha updates are already disabled |
+| Variable                        | Purpose                                                           |
+| ------------------------------- | ----------------------------------------------------------------- |
+| `KOTECODE_CONFIG`               | Path to a config file                                             |
+| `KOTECODE_CONFIG_DIR`           | Override the config directory                                     |
+| `KOTECODE_DATA_DIR`             | Override the data directory                                       |
+| `KOTECODE_CACHE_DIR`            | Override the cache directory                                      |
+| `KOTECODE_BOOTSTRAP_URL`        | Override the bootstrap config URL (dev/testing)                   |
+| `KOTECODE_PROXY_URL`            | Force the HTTPS Proxy origin (priority over bootstrap)            |
+| `KOTECODE_DISABLE_PROXY`        | Explicitly use direct provider transport                          |
+| `KOTECODE_DISABLE_UPDATE_CHECK` | Reserved update-check kill switch; updates are currently disabled |
+| `KOTECODE_LANG`                 | Terminal UI language: `ru` or `en`                                |
+
+The terminal interface defaults to Russian. It can be switched only between Russian and English
+in `tui.json` inside the configuration directory:
+
+```json
+{
+  "language": "en"
+}
+```
+
+For a one-off Russian launch:
+
+```bash
+KOTECODE_LANG=ru kotencode
+```
 
 Full reference: [`docs/CONFIGURATION.md`](./docs/CONFIGURATION.md).
 

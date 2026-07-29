@@ -33,12 +33,15 @@ import { footerWidthPolicy } from "./footer.width"
 import { toolFiletype } from "./tool"
 import { transparent, type RunBlockTheme, type RunFooterTheme } from "./theme"
 import type { PermissionReply, RunDiffStyle } from "./types"
+import type { Language } from "@opencode-ai/tui/util/locale"
+import { Locale } from "@/util/locale"
 
 function buttons(
   list: PermissionOption[],
   selected: PermissionOption,
   theme: RunFooterTheme,
   disabled: boolean,
+  language: Language,
   onHover: (option: PermissionOption) => void,
   onSelect: (option: PermissionOption) => void,
 ) {
@@ -57,7 +60,9 @@ function buttons(
               if (!disabled) onSelect(option)
             }}
           >
-            <text fg={option === selected ? theme.surface : theme.muted}>{permissionLabel(option)}</text>
+            <text fg={option === selected ? theme.surface : theme.muted}>
+              {Locale.translate(permissionLabel(option), language)}
+            </text>
           </box>
         )}
       </For>
@@ -67,6 +72,7 @@ function buttons(
 
 /** @internal Exported to test managed textarea submission without permission navigation. */
 export function RejectField(props: {
+  language?: Language
   theme: RunFooterTheme
   text: string
   disabled: boolean
@@ -100,7 +106,7 @@ export function RejectField(props: {
       minHeight={1}
       maxHeight={3}
       wrapMode="word"
-      placeholder="Tell OpenCode what to do differently"
+      placeholder={Locale.translate("Tell KoteCode what to do differently", props.language ?? "en")}
       placeholderColor={props.theme.muted}
       textColor={props.theme.text}
       focusedTextColor={props.theme.text}
@@ -130,12 +136,15 @@ export function RejectField(props: {
 }
 
 export function RunPermissionBody(props: {
+  language?: Language
   request: PermissionRequest
   theme: RunFooterTheme
   block: RunBlockTheme
   diffStyle?: RunDiffStyle
   onReply: (input: PermissionReply) => void | Promise<void>
 }) {
+  const language = () => props.language ?? "en"
+  const t = (input: string) => Locale.translate(input, language())
   const dims = useTerminalDimensions()
   const [state, setState] = createSignal(createPermissionBodyState(props.request.id))
   const info = createMemo(() => permissionInfo(props.request))
@@ -145,14 +154,14 @@ export function RunPermissionBody(props: {
   const busy = createMemo(() => state().submitting)
   const title = createMemo(() => {
     if (state().stage === "always") {
-      return "Always allow"
+      return t("Always allow")
     }
 
     if (state().stage === "reject") {
-      return "Reject permission"
+      return t("Reject permission")
     }
 
-    return "Permission required"
+    return t("Permission required")
   })
 
   createEffect(() => {
@@ -278,13 +287,13 @@ export function RunPermissionBody(props: {
                 {info().icon}
               </text>
               <text fg={props.theme.text} wrapMode="word">
-                {info().title}
+                {t(info().title)}
               </text>
             </box>
           </Match>
           <Match when={state().stage === "reject"}>
             <box paddingLeft={1}>
-              <text fg={props.theme.muted}>Tell OpenCode what to do differently</text>
+              <text fg={props.theme.muted}>{t("Tell KoteCode what to do differently")}</text>
             </box>
           </Match>
         </Switch>
@@ -308,6 +317,7 @@ export function RunPermissionBody(props: {
             >
               <box width={narrow() ? "100%" : undefined} flexGrow={1} flexShrink={1}>
                 <RejectField
+                  language={language()}
                   theme={props.theme}
                   text={state().message}
                   disabled={busy()}
@@ -325,16 +335,16 @@ export function RunPermissionBody(props: {
                 when={!busy()}
                 fallback={
                   <text fg={props.theme.muted} wrapMode="word" flexShrink={0}>
-                    Waiting for permission event...
+                    {t("Waiting for permission event...")}
                   </text>
                 }
               >
                 <box flexDirection="row" gap={2} flexShrink={0}>
                   <text fg={props.theme.text}>
-                    enter <span style={{ fg: props.theme.muted }}>confirm</span>
+                    enter <span style={{ fg: props.theme.muted }}>{t("confirm")}</span>
                   </text>
                   <text fg={props.theme.text}>
-                    esc <span style={{ fg: props.theme.muted }}>cancel</span>
+                    esc <span style={{ fg: props.theme.muted }}>{t("cancel")}</span>
                   </text>
                 </box>
               </Show>
@@ -363,7 +373,7 @@ export function RunPermissionBody(props: {
                         <For each={info().lines}>
                           {(line) => (
                             <text fg={props.theme.text} wrapMode="word">
-                              {line}
+                              {t(line)}
                             </text>
                           )}
                         </For>
@@ -392,7 +402,7 @@ export function RunPermissionBody(props: {
                   </Show>
                   <Show when={!info().diff && info().lines.length === 0}>
                     <box paddingLeft={1}>
-                      <text fg={props.theme.muted}>No diff provided</text>
+                      <text fg={props.theme.muted}>{t("No diff provided")}</text>
                     </box>
                   </Show>
                 </box>
@@ -413,7 +423,7 @@ export function RunPermissionBody(props: {
                   <For each={permissionAlwaysLines(props.request)}>
                     {(line) => (
                       <text fg={props.theme.text} wrapMode="word">
-                        {line}
+                        {t(line)}
                       </text>
                     )}
                   </For>
@@ -440,6 +450,7 @@ export function RunPermissionBody(props: {
             state().selected,
             props.theme,
             busy(),
+            language(),
             (option) => {
               setState((prev) => permissionHover(prev, option))
             },
@@ -449,19 +460,19 @@ export function RunPermissionBody(props: {
             when={!busy()}
             fallback={
               <text fg={props.theme.muted} wrapMode="word" flexShrink={0}>
-                Waiting for permission event...
+                {t("Waiting for permission event...")}
               </text>
             }
           >
             <box flexDirection="row" gap={2} flexShrink={0}>
               <text fg={props.theme.text}>
-                {"⇆"} <span style={{ fg: props.theme.muted }}>select</span>
+                {"⇆"} <span style={{ fg: props.theme.muted }}>{t("select")}</span>
               </text>
               <text fg={props.theme.text}>
-                enter <span style={{ fg: props.theme.muted }}>confirm</span>
+                enter <span style={{ fg: props.theme.muted }}>{t("confirm")}</span>
               </text>
               <text fg={props.theme.text}>
-                esc <span style={{ fg: props.theme.muted }}>{state().stage === "always" ? "cancel" : "reject"}</span>
+                esc <span style={{ fg: props.theme.muted }}>{t(state().stage === "always" ? "cancel" : "reject")}</span>
               </text>
             </box>
           </Show>

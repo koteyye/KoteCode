@@ -481,6 +481,7 @@ async function runInteractiveRuntime(input: RunRuntimeInput, deps: RunRuntimeDep
         replayLimit: input.replayLimit,
         limits: () => state.limits,
         providers: () => state.providers,
+        language: tuiConfig.language,
         footer,
         trace: log,
       })

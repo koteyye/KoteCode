@@ -9,6 +9,7 @@ import { IconButtonV2 } from "@opencode-ai/ui/v2/icon-button-v2"
 import { KeybindV2 } from "@opencode-ai/ui/v2/keybind-v2"
 import { MenuV2 } from "@opencode-ai/ui/v2/menu-v2"
 import { TooltipV2 } from "@opencode-ai/ui/v2/tooltip-v2"
+import { useI18n } from "@opencode-ai/ui/context/i18n"
 import { AttachmentCardV2 } from "../attachment-card-v2"
 import { CommentCardV2 } from "../comment-card-v2"
 import { typeLabel } from "../../../components/message-file"
@@ -44,6 +45,7 @@ export type PromptInputV2Props = {
 }
 
 export function PromptInputV2(props: PromptInputV2Props) {
+  const i18n = useI18n()
   const state = props.controller.state
   const view = props.controller.view
   let editor: HTMLDivElement | undefined
@@ -85,14 +87,14 @@ export function PromptInputV2(props: PromptInputV2Props) {
       />
       <Show when={state.popover.type !== "closed"}>
         <PromptInputV2Popover
-          emptyLabel="No matching items"
+          emptyLabel={i18n.t("ui.prompt.empty")}
           items={props.controller.suggestions()}
           activeID={state.popover.type === "closed" ? undefined : state.popover.activeID}
           search={
             state.popover.type === "command-menu"
               ? {
                   value: state.popover.query,
-                  label: "Commands",
+                  label: i18n.t("ui.prompt.commands"),
                   placeholder: "/",
                   onValueChange: props.controller.setQuery,
                   onKeyDown: props.controller.onKeyDown,
@@ -122,7 +124,7 @@ export function PromptInputV2(props: PromptInputV2Props) {
       >
         <Show when={state.drag === "active"}>
           <div class="pointer-events-none absolute inset-0 z-20 grid place-items-center rounded-xl bg-v2-background-bg-base/90 text-v2-text-text-base">
-            Drop files to attach
+            {i18n.t("ui.prompt.dropFiles")}
           </div>
         </Show>
 
@@ -131,7 +133,7 @@ export function PromptInputV2(props: PromptInputV2Props) {
             attachments={props.controller.attachments()}
             comments={props.controller.comments()}
             activeCommentID={state.activeContextID}
-            removeLabel="Remove attachment"
+            removeLabel={i18n.t("ui.prompt.removeAttachment")}
             onAttachmentClick={props.controller.openAttachment}
             onAttachmentRemove={(attachment) => props.controller.removeAttachment(attachment.id)}
             onCommentClick={(comment) => props.controller.toggleContext(comment.key)}
@@ -149,7 +151,7 @@ export function PromptInputV2(props: PromptInputV2Props) {
             data-component="prompt-input"
             role="textbox"
             aria-multiline="true"
-            aria-label="Prompt"
+            aria-label={i18n.t("ui.prompt.label")}
             contenteditable={!props.disabled && !props.readOnly}
             autocapitalize={state.mode === "normal" ? "sentences" : "off"}
             autocorrect={state.mode === "normal" ? "on" : "off"}
@@ -184,7 +186,9 @@ export function PromptInputV2(props: PromptInputV2Props) {
               classList={{ "font-mono!": state.mode === "shell" }}
             >
               {view.placeholder?.() ??
-                (state.mode === "shell" ? "Enter shell command..." : "Ask anything, / for commands, @ for context...")}
+                (state.mode === "shell"
+                  ? i18n.t("ui.prompt.placeholder.shell")
+                  : i18n.t("ui.prompt.placeholder.normal"))}
             </div>
           </Show>
         </div>
@@ -198,13 +202,13 @@ export function PromptInputV2(props: PromptInputV2Props) {
           >
             <PromptInputV2AddMenu
               disabled={state.mode === "shell"}
-              title="Add images and files"
+              title={i18n.t("ui.prompt.addFiles")}
               keybind={props.attachKeybind ?? ["Mod", "U"]}
-              attachLabel="Images and files"
+              attachLabel={i18n.t("ui.prompt.files")}
               attachShortcut={props.attachShortcut ?? "Mod+U"}
-              commandsLabel="Commands"
-              contextLabel="Context"
-              shellLabel="Shell command"
+              commandsLabel={i18n.t("ui.prompt.commands")}
+              contextLabel={i18n.t("ui.prompt.context")}
+              shellLabel={i18n.t("ui.prompt.shell")}
               onAttach={props.controller.attach}
               onCommands={props.controller.openCommands}
               onContext={props.controller.openContext}
@@ -212,7 +216,11 @@ export function PromptInputV2(props: PromptInputV2Props) {
             />
             <Show when={view.agent}>
               {(control) => (
-                <PromptInputV2ConfiguredSelect title="Choose agent" keybind={["Mod", "."]} control={control()} />
+                <PromptInputV2ConfiguredSelect
+                  title={i18n.t("ui.prompt.chooseAgent")}
+                  keybind={["Mod", "."]}
+                  control={control()}
+                />
               )}
             </Show>
             <Show
@@ -221,7 +229,7 @@ export function PromptInputV2(props: PromptInputV2Props) {
                 <Show when={view.model}>
                   {(control) => (
                     <PromptInputV2ConfiguredSelect
-                      title="Choose model"
+                      title={i18n.t("ui.prompt.chooseModel")}
                       keybind={["Mod", "M"]}
                       control={control()}
                       model
@@ -236,7 +244,7 @@ export function PromptInputV2(props: PromptInputV2Props) {
               {(control) => (
                 <Show when={control().options().length > 1}>
                   <PromptInputV2ConfiguredSelect
-                    title="Choose model variant"
+                    title={i18n.t("ui.prompt.chooseVariant")}
                     keybind={["Shift", "Mod", "D"]}
                     control={control()}
                   />
@@ -248,8 +256,8 @@ export function PromptInputV2(props: PromptInputV2Props) {
             mode={state.mode}
             stopping={view.submit.stopping()}
             disabled={!props.controller.canSubmit()}
-            sendLabel="Send"
-            stopLabel="Stop"
+            sendLabel={i18n.t("ui.prompt.send")}
+            stopLabel={i18n.t("ui.prompt.stop")}
             onSubmit={props.controller.submit}
             onStop={props.controller.stop}
           />
@@ -375,6 +383,7 @@ export function PromptInputV2Attachments(props: {
   onCommentClick?: (comment: PromptInputV2Comment) => void
   onCommentRemove?: (comment: PromptInputV2Comment) => void
 }) {
+  const i18n = useI18n()
   return (
     <Show when={props.attachments.length > 0 || (props.comments?.length ?? 0) > 0}>
       <div data-slot="prompt-attachments" class="relative">
@@ -418,7 +427,7 @@ export function PromptInputV2Attachments(props: {
                     when={attachment.mime.startsWith("image/")}
                     fallback={
                       <AttachmentCardV2 title={attachment.filename}>
-                        {typeLabel(attachment.filename, attachment.mime)}
+                        {typeLabel(attachment.filename, attachment.mime, i18n.t("ui.file.type"))}
                       </AttachmentCardV2>
                     }
                   >

@@ -71,7 +71,7 @@ export const dict = {
 
   "dialog.usageExceeded.freeTier.title": "Достигнут бесплатный лимит",
   "dialog.usageExceeded.freeTier.description":
-    "Подпишитесь на OpenCode Go для надёжного доступа к лучшим моделям с открытым исходным кодом, от $5/месяц.",
+    "Подпишитесь на OpenCode Go для надёжного доступа к лучшим моделям с открытым исходным кодом — от $5 в месяц.",
   "dialog.usageExceeded.freeTier.actionLabel": "Подписаться",
   "dialog.usageExceeded.accountRateLimit.title": "Достигнут лимит Go",
   "dialog.usageExceeded.accountRateLimit.description":
@@ -127,6 +127,8 @@ export const dict = {
   "ui.tool.grep": "Grep",
   "ui.tool.webfetch": "Webfetch",
   "ui.tool.websearch": "Веб-поиск",
+  "ui.tool.websearch.parallel": "Веб-поиск Parallel",
+  "ui.tool.websearch.exa": "Веб-поиск Exa",
   "ui.tool.shell": "Оболочка",
   "ui.tool.patch": "Патч",
   "ui.tool.todos": "Задачи",
@@ -137,6 +139,7 @@ export const dict = {
 
   "ui.common.file.one": "файл",
   "ui.common.file.other": "файлов",
+  "ui.file.type": "Файл",
   "ui.common.question.one": "вопрос",
   "ui.common.question.other": "вопросов",
 
@@ -149,6 +152,23 @@ export const dict = {
   "ui.common.next": "Далее",
   "ui.common.submit": "Отправить",
   "ui.common.showMore": "Показать ещё",
+
+  "ui.prompt.empty": "Совпадений не найдено",
+  "ui.prompt.commands": "Команды",
+  "ui.prompt.dropFiles": "Перетащите файлы для прикрепления",
+  "ui.prompt.removeAttachment": "Удалить вложение",
+  "ui.prompt.label": "Запрос",
+  "ui.prompt.placeholder.shell": "Введите команду оболочки...",
+  "ui.prompt.placeholder.normal": "Спросите что угодно; / — команды, @ — контекст...",
+  "ui.prompt.addFiles": "Добавить изображения и файлы",
+  "ui.prompt.files": "Изображения и файлы",
+  "ui.prompt.context": "Контекст",
+  "ui.prompt.shell": "Команда оболочки",
+  "ui.prompt.chooseAgent": "Выбрать агента",
+  "ui.prompt.chooseModel": "Выбрать модель",
+  "ui.prompt.chooseVariant": "Выбрать вариант модели",
+  "ui.prompt.send": "Отправить",
+  "ui.prompt.stop": "Остановить",
 
   "ui.permission.deny": "Запретить",
   "ui.permission.allowAlways": "Разрешить всегда",

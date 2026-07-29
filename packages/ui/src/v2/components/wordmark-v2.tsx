@@ -1,71 +1,65 @@
-import { createUniqueId, type ComponentProps } from "solid-js"
+import { type ComponentProps } from "solid-js"
 
 export function WordmarkV2(props: Pick<ComponentProps<"svg">, "class">) {
-  const mask = createUniqueId()
-  const maskGradient = createUniqueId()
-
   return (
     <svg
+      data-component="wordmark-v2"
       xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 720 129"
-      fill="none"
+      viewBox="0 0 720 150"
       classList={{ [props.class ?? ""]: !!props.class }}
+      role="img"
+      aria-label="KoteCode"
     >
-      <g opacity="0.6">
-        <g mask={`url(#${mask})`}>
-          <g opacity="0.16">
-            <path
-              opacity="0.7"
-              d="M55.3846 36.4286H18.4615V91.7143H55.3846V36.4286ZM73.8462 110.143H0V18H73.8462V110.143Z"
-              fill="currentColor"
-            />
-            <path
-              opacity="0.7"
-              d="M110.462 91.7143H147.385V36.4286H110.462V91.7143ZM165.846 110.143H110.462V128.571H92V18H165.846V110.143Z"
-              fill="currentColor"
-            />
-            <path
-              opacity="0.7"
-              d="M258.846 73.2857H203.462V91.7143H258.846V110.143H185V18H258.846V73.2857ZM203.462 54.8571H240.385V36.4286H203.462V54.8571Z"
-              fill="currentColor"
-            />
-            <path
-              opacity="0.7"
-              d="M332.385 36.4286H295.462V110.143H277V18H332.385V36.4286ZM350.846 110.143H332.385V36.4286H350.846V110.143Z"
-              fill="currentColor"
-            />
-            <path
-              opacity="0.7"
-              d="M442.846 36.4286H387.462V91.7143H442.846V110.143H369V18H442.846V36.4286Z"
-              fill="currentColor"
-            />
-            <path
-              opacity="0.7"
-              d="M517.385 36.4286H480.462V91.7143H517.385V36.4286ZM535.846 110.143H462V18H535.846V110.143Z"
-              fill="currentColor"
-            />
-            <path
-              opacity="0.7"
-              d="M609.385 36.8571H572.462V92.1429H609.385V36.8571ZM627.846 110.571H554V18.4286H609.385V0H627.846V110.571Z"
-              fill="currentColor"
-            />
-            <path
-              opacity="0.7"
-              d="M664.462 36.4286V54.8571H701.385V36.4286H664.462ZM719.846 73.2857H664.462V91.7143H719.846V110.143H646V18H719.846V73.2857Z"
-              fill="currentColor"
-            />
-          </g>
-        </g>
+      <g transform="translate(5 10) scale(2)">
+        <path
+          d="M9 23 6 5l17 10.5A28 28 0 0 1 32 14a28 28 0 0 1 9 1.5L58 5l-3 18c4 5 6 11 5 18-1.8 12.6-12.8 20-28 20S5.8 53.6 4 41c-1-7 1-13 5-18Z"
+          fill="#ff7300"
+        />
+        <path
+          d="m11.5 12 2.3 12.3 9-6.4L11.5 12Zm41 0-2.3 12.3-9-6.4L52.5 12Z"
+          fill="#090909"
+          opacity="0.72"
+        />
+        <path
+          d="m26 27-6 5 6 5m12-10 6 5-6 5m-3-12-6 14"
+          fill="none"
+          stroke="#090909"
+          stroke-width="4"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+        <path d="m28.5 44 3.5-2 3.5 2-3.5 3-3.5-3Z" fill="#090909" />
+        <path
+          d="M32 46.5V49m0 0c-2.8 3.3-6.2 3.5-9 1.2M32 49c2.8 3.3 6.2 3.5 9 1.2"
+          fill="none"
+          stroke="#090909"
+          stroke-width="2.4"
+          stroke-linecap="round"
+        />
       </g>
-      <defs>
-        <mask id={mask} style="mask-type:alpha" maskUnits="userSpaceOnUse" x="0" y="0" width="720" height="129">
-          <rect width="720" height="129" fill={`url(#${maskGradient})`} />
-        </mask>
-        <linearGradient id={maskGradient} x1="360" y1="68" x2="360" y2="129" gradientUnits="userSpaceOnUse">
-          <stop stop-color="white" stop-opacity="0.7" />
-          <stop offset="1" stop-color="white" stop-opacity="0" />
-        </linearGradient>
-      </defs>
+      <text
+        x="158"
+        y="106"
+        fill="currentColor"
+        font-family="Inter, ui-sans-serif, system-ui, sans-serif"
+        font-size="104"
+        font-weight="750"
+        letter-spacing="-5"
+        opacity="0.78"
+      >
+        Kote
+      </text>
+      <text
+        x="380"
+        y="106"
+        fill="#ff7300"
+        font-family="Inter, ui-sans-serif, system-ui, sans-serif"
+        font-size="104"
+        font-weight="750"
+        letter-spacing="-5"
+      >
+        Code
+      </text>
     </svg>
   )
 }

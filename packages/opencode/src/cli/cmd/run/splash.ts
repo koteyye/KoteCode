@@ -17,9 +17,10 @@ import {
   type ScrollbackSnapshot,
   type ScrollbackWriter,
 } from "@opentui/core"
-import * as Locale from "@/util/locale"
+import { Locale } from "@/util/locale"
 import { go } from "@/cli/logo"
 import type { RunSplashTheme } from "./theme"
+import type { Language } from "@opencode-ai/tui/util/locale"
 
 export const SPLASH_TITLE_LIMIT = 50
 export const SPLASH_TITLE_FALLBACK = "Untitled session"
@@ -30,6 +31,7 @@ type SplashInput = {
 }
 
 type SplashWriterInput = SplashInput & {
+  language?: Language
   theme: RunSplashTheme
   showSession?: boolean
   detail?: string
@@ -194,7 +196,7 @@ function build(input: SplashWriterInput, kind: "entry" | "exit", ctx: Scrollback
       })
     }
 
-    push(lines, body_left, top, "OpenCode", right, undefined, TextAttributes.BOLD)
+    push(lines, body_left, top, "/\\_/\\ KoteCode", right, undefined, TextAttributes.BOLD)
     if (input.detail) {
       push(
         lines,
@@ -212,8 +214,9 @@ function build(input: SplashWriterInput, kind: "entry" | "exit", ctx: Scrollback
     const mark = go.right.slice(1)
     const top = 1
     const body_left = (mark[0]?.length ?? 0) + 2
-    const session = "Session  "
-    const label = "Continue "
+    const language = input.language ?? "en"
+    const session = language === "ru" ? "Сессия  " : "Session  "
+    const label = language === "ru" ? "Продолжить " : "Continue "
 
     for (let i = 0; i < mark.length; i += 1) {
       draw(lines, mark[i] ?? "", {
@@ -234,7 +237,7 @@ function build(input: SplashWriterInput, kind: "entry" | "exit", ctx: Scrollback
       lines,
       body_left + label.length,
       top + 1,
-      `opencode --mini -s ${meta.session_id}`,
+      `kotencode --mini -s ${meta.session_id}`,
       right,
       undefined,
       TextAttributes.BOLD,

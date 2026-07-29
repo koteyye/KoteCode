@@ -220,6 +220,7 @@ export class RunFooter implements FooterApi {
   private createScrollback(wrote: boolean): RunScrollbackStream {
     return new RunScrollbackStream(this.renderer, this.theme(), {
       diffStyle: this.options.diffStyle,
+      language: this.options.tuiConfig.language,
       wrote,
       sessionID: this.options.sessionID,
       treeSitterClient: this.options.treeSitterClient,

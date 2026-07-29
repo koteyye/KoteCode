@@ -6,6 +6,7 @@ import { entryColor, entryLook, entrySyntax } from "./scrollback.shared"
 import { toolFiletype, toolStructuredFinal } from "./tool"
 import { RUN_THEME_FALLBACK, transparent, type RunTheme } from "./theme"
 import type { EntryLayout, RunEntryBody, ScrollbackOptions, StreamCommit } from "./types"
+import { Locale } from "@/util/locale"
 
 function todoText(item: { status: string; content: string }): string {
   if (item.status === "completed") {
@@ -109,6 +110,7 @@ export function RunEntryContent(props: {
   const suppressBackgrounds = createMemo(() => props.opts?.suppressBackgrounds === true)
   const diffBg = (color: ColorInput) => (suppressBackgrounds() ? transparent : color)
   const streaming = createMemo(() => props.commit.phase === "progress")
+  const t = (input: string) => Locale.translate(input, props.opts?.language ?? "en")
   const text = createMemo(() => {
     const next = body()
     return next.type === "text" ? next : undefined
@@ -150,7 +152,7 @@ export function RunEntryContent(props: {
     <Switch fallback={null}>
       <Match when={text()}>
         <text width="100%" wrapMode="word" fg={style().fg} attributes={style().attrs}>
-          {text()!.content}
+          {t(text()!.content)}
         </text>
       </Match>
       <Match when={code()}>
@@ -168,7 +170,7 @@ export function RunEntryContent(props: {
       <Match when={code_snapshot()}>
         <box width="100%" flexDirection="column" gap={1}>
           <text width="100%" wrapMode="word" fg={theme().block.muted}>
-            {code_snapshot()!.title}
+            {t(code_snapshot()!.title)}
           </text>
           <box width="100%" paddingLeft={1}>
             <line_number width="100%" fg={theme().block.muted} minWidth={3} paddingRight={1}>
@@ -190,7 +192,7 @@ export function RunEntryContent(props: {
           {diff_snapshot()!.items.map((item) => (
             <box width="100%" flexDirection="column" gap={1}>
               <text width="100%" wrapMode="word" fg={theme().block.muted}>
-                {item.title}
+                {t(item.title)}
               </text>
               {item.diff.trim() ? (
                 <box width="100%" paddingLeft={1}>
@@ -216,7 +218,9 @@ export function RunEntryContent(props: {
                 </box>
               ) : (
                 <text width="100%" wrapMode="word" fg={theme().block.diffRemoved}>
-                  -{item.deletions ?? 0} line{item.deletions === 1 ? "" : "s"}
+                  {props.opts?.language === "ru"
+                    ? `-${item.deletions ?? 0} ${item.deletions === 1 ? "строка" : "строк"}`
+                    : `-${item.deletions ?? 0} line${item.deletions === 1 ? "" : "s"}`}
                 </text>
               )}
             </box>
@@ -226,7 +230,7 @@ export function RunEntryContent(props: {
       <Match when={task_snapshot()}>
         <box width="100%" flexDirection="column" gap={1}>
           <text width="100%" wrapMode="word" fg={theme().block.muted}>
-            {task_snapshot()!.title}
+            {t(task_snapshot()!.title)}
           </text>
           <box width="100%" flexDirection="column" gap={0} paddingLeft={1}>
             {task_snapshot()!.rows.map((row) => (
@@ -245,7 +249,7 @@ export function RunEntryContent(props: {
       <Match when={todo_snapshot()}>
         <box width="100%" flexDirection="column" gap={1}>
           <text width="100%" wrapMode="word" fg={theme().block.muted}>
-            # Todos
+            {t("# Todos")}
           </text>
           <box width="100%" flexDirection="column" gap={0}>
             {todo_snapshot()!.items.map((item) => (
@@ -264,7 +268,7 @@ export function RunEntryContent(props: {
       <Match when={question_snapshot()}>
         <box width="100%" flexDirection="column" gap={1}>
           <text width="100%" wrapMode="word" fg={theme().block.muted}>
-            # Questions
+            {t("# Questions")}
           </text>
           <box width="100%" flexDirection="column" gap={1}>
             {question_snapshot()!.items.map((item) => (

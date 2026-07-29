@@ -2,7 +2,7 @@
 #
 # Builds UNSIGNED single-binary CLI artifacts for the three primary platforms
 # (Windows x64, Linux x64, macOS arm64) on manual dispatch, and uploads them to
-# a draft GitHub Release. This is intentionally minimal for the alpha (ТЗ §11.2/§11.3):
+# a draft GitHub Release. This is intentionally minimal for the first public line (ТЗ §11.2/§11.3):
 #   - no code signing (Azure Trusted Signing / Apple codesign are out of scope)
 #   - no npm / Homebrew / Scoop / Chocolatey publishing
 #   - no desktop (Electron) build — that is a separate, larger pipeline
@@ -17,9 +17,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Release version without a leading v (e.g. 0.1.0-alpha.1)."
+        description: "Release version without a leading v (e.g. 1.0.0)."
         required: true
-        default: "0.1.0-alpha.1"
+        default: "1.0.0"
         type: string
 
 permissions:

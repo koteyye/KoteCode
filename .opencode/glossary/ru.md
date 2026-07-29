@@ -1,13 +1,9 @@
 # ru Glossary
 
-## Sources
-
-- PR #9882: https://github.com/anomalyco/opencode/pull/9882
-
 ## Do Not Translate (Locale Additions)
 
-- `OpenCode` (preserve casing in prose; keep `opencode` only in commands, package names, paths, or code)
-- `OpenCode CLI`
+- `KoteCode` (preserve casing in prose)
+- `OpenCode Go` and `OpenCode Zen` (external service and subscription names)
 - `CLI`, `TUI`, `MCP`, `OAuth`
 - Commands, flags, file paths, and code literals (keep exactly as written)
 
@@ -23,5 +19,6 @@ No PR-backed term mappings yet. Add entries here when review PRs introduce repea
 
 ## Avoid
 
+- Avoid renaming OpenCode Go or OpenCode Zen to KoteCode
 - Avoid translating product and protocol names that are fixed identifiers
 - Avoid mixing multiple Russian terms for the same recurring UI action once a preferred term is established

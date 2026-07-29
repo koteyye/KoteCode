@@ -2,6 +2,7 @@ import { CliRenderEvents, SyntaxStyle, type TerminalColors } from "@opentui/core
 import { useRenderer } from "@opentui/solid"
 import {
   DEFAULT_THEMES,
+  DEFAULT_THEME,
   addTheme,
   allThemes,
   generateSubtleSyntax,
@@ -62,6 +63,7 @@ export async function discoverThemes(directories: string[]) {
 
 export {
   DEFAULT_THEMES,
+  DEFAULT_THEME,
   addTheme,
   allThemes,
   generateSubtleSyntax,
@@ -93,7 +95,7 @@ const [store, setStore] = createStore<State>({
   themes: allThemes(),
   mode: "dark",
   lock: undefined,
-  active: "opencode",
+  active: DEFAULT_THEME,
   ready: false,
 })
 
@@ -118,15 +120,15 @@ export const { use: useTheme, provider: ThemeProvider } = createSimpleContext({
         if (!lock && pick(kv.get("theme_mode")) !== undefined) kv.set("theme_mode", undefined)
         draft.mode = mode
         draft.lock = lock
-        const active = config.theme ?? kv.get("theme", "opencode")
-        draft.active = typeof active === "string" ? active : "opencode"
+        const active = config.theme ?? kv.get("theme", DEFAULT_THEME)
+        draft.active = typeof active === "string" && active !== "opencode" ? active : DEFAULT_THEME
         draft.ready = false
       }),
     )
 
     createEffect(() => {
       const theme = config.theme
-      if (theme) setStore("active", theme)
+      if (theme) setStore("active", theme === "opencode" ? DEFAULT_THEME : theme)
     })
 
     function syncCustomThemes() {
@@ -140,7 +142,7 @@ export const { use: useTheme, provider: ThemeProvider } = createSimpleContext({
             }, {}),
           )
         })
-        .catch(() => setStore("active", "opencode"))
+        .catch(() => setStore("active", DEFAULT_THEME))
     }
 
     onMount(() => {
@@ -159,7 +161,7 @@ export const { use: useTheme, provider: ThemeProvider } = createSimpleContext({
           if (!colors.palette[0]) {
             if (hasResolvedSystemTheme) return
             setSystemTheme(undefined)
-            if (store.active === "system") setStore("active", "opencode")
+            if (store.active === "system") setStore("active", DEFAULT_THEME)
             return
           }
           const next = store.lock ?? terminalMode(colors) ?? mode
@@ -174,7 +176,7 @@ export const { use: useTheme, provider: ThemeProvider } = createSimpleContext({
         .catch(() => {
           if (hasResolvedSystemTheme) return
           setSystemTheme(undefined)
-          if (store.active === "system") setStore("active", "opencode")
+          if (store.active === "system") setStore("active", DEFAULT_THEME)
         })
     }
 
@@ -259,11 +261,11 @@ export const { use: useTheme, provider: ThemeProvider } = createSimpleContext({
 
       const saved = kv.get("theme")
       if (typeof saved === "string") {
-        const theme = store.themes[saved]
+        const theme = store.themes[saved === "opencode" ? DEFAULT_THEME : saved]
         if (theme) return resolveTheme(theme, store.mode)
       }
 
-      return resolveTheme(store.themes.opencode, store.mode)
+      return resolveTheme(store.themes[DEFAULT_THEME], store.mode)
     })
 
     createEffect(() => renderer.setBackgroundColor(values().background))
@@ -291,9 +293,10 @@ export const { use: useTheme, provider: ThemeProvider } = createSimpleContext({
       unlock: free,
       setMode: pin,
       set(theme: string) {
-        if (!hasTheme(theme)) return false
-        setStore("active", theme)
-        kv.set("theme", theme)
+        const next = theme === "opencode" ? DEFAULT_THEME : theme
+        if (!hasTheme(next)) return false
+        setStore("active", next)
+        kv.set("theme", next)
         return true
       },
       get ready() {

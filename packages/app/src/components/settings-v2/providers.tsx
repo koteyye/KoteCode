@@ -11,6 +11,9 @@ import { useServerSync } from "@/context/server-sync"
 import { DialogConnectProvider, useProviderConnectController } from "../dialog-connect-provider"
 import { DialogCustomProvider } from "../dialog-custom-provider"
 import { SettingsListV2 } from "./parts/list"
+import { ProviderRoutingSwitch } from "../provider-routing-switch"
+import { useProviderRouting } from "@/hooks/use-provider-routing"
+import type { ProviderRouting } from "@/utils/provider-routing"
 import "./settings-v2.css"
 
 type ProviderSource = "env" | "api" | "config" | "custom"
@@ -36,6 +39,7 @@ export const SettingsProvidersV2: Component<{ onBack?: () => void }> = (props) =
   const protocol = useServerProtocol()
   const serverSync = useServerSync()
   const providers = useProviders()
+  const routing = useProviderRouting()
   const providerConnect = useProviderConnectController({ onBack: props.onBack })
 
   const connect = (provider?: string) => {
@@ -139,6 +143,13 @@ export const SettingsProvidersV2: Component<{ onBack?: () => void }> = (props) =
       })
   }
 
+  const changeRouting = async (providerID: string, value: ProviderRouting) => {
+    await routing.update(providerID, value).catch((err: unknown) => {
+      const message = err instanceof Error ? err.message : String(err)
+      showToast({ title: language.t("common.requestFailed"), description: message })
+    })
+  }
+
   return (
     <>
       <div class="settings-v2-tab-header">
@@ -170,18 +181,34 @@ export const SettingsProvidersV2: Component<{ onBack?: () => void }> = (props) =
                         <Tag>{type(item)}</Tag>
                       </div>
                     </div>
-                    <Show
-                      when={canDisconnect(item)}
-                      fallback={
-                        <span class="settings-v2-provider-env-hint">
-                          {language.t("settings.providers.connected.environmentDescription")}
-                        </span>
-                      }
-                    >
-                      <ButtonV2 size="normal" variant="ghost-muted" onClick={() => void disconnect(item.id, item.name)}>
-                        {language.t("common.disconnect")}
-                      </ButtonV2>
-                    </Show>
+                    <div class="flex items-center gap-2">
+                      <ProviderRoutingSwitch
+                        compact
+                        v2
+                        value={routing.get(item.id)}
+                        disabled={routing.pending(item.id)}
+                        onChange={(value) => void changeRouting(item.id, value)}
+                      />
+                      <Show
+                        when={canDisconnect(item)}
+                        fallback={
+                          <span
+                            class="settings-v2-provider-env-hint"
+                            title={language.t("settings.providers.connected.environmentDescription")}
+                          >
+                            {language.t("settings.providers.tag.environment")}
+                          </span>
+                        }
+                      >
+                        <ButtonV2
+                          size="normal"
+                          variant="ghost-muted"
+                          onClick={() => void disconnect(item.id, item.name)}
+                        >
+                          {language.t("common.disconnect")}
+                        </ButtonV2>
+                      </Show>
+                    </div>
                   </div>
                 )}
               </For>

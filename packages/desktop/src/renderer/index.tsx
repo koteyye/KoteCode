@@ -255,7 +255,7 @@ const createPlatform = (windowState: DesktopWindowState): Platform => {
 
       const notification = new Notification(title, {
         body: description ?? "",
-        icon: "https://opencode.ai/favicon-96x96-v3.png",
+        icon: "./favicon-96x96-v3.png",
       })
       notification.onclick = () => {
         void window.api.showWindow()
@@ -392,7 +392,7 @@ function DesktopRoot(props: { windowState: DesktopWindowState }) {
       const list: ServerConnection.Any[] = []
       if (data) {
         list.push({
-          displayName: "Local Server",
+          displayName: t("desktop.server.local"),
           type: "sidecar",
           variant: "base",
           http: {

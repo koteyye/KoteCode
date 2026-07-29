@@ -55,6 +55,7 @@ import type {
 } from "./types"
 import type { RunTheme } from "./theme"
 import { modelInfo } from "./variant.shared"
+import { Locale } from "@/util/locale"
 
 registerOpencodeSpinner()
 
@@ -116,6 +117,8 @@ type RunFooterViewProps = {
 export { TEXTAREA_MIN_ROWS, TEXTAREA_MAX_ROWS } from "./footer.prompt"
 
 export function RunFooterView(props: RunFooterViewProps) {
+  const language = () => props.tuiConfig.language
+  const t = (input: string) => Locale.translate(input, language())
   const term = useTerminalDimensions()
   const width = createMemo(() => term().width)
   const responsive = createMemo(() => footerWidthPolicy(width()))
@@ -382,13 +385,13 @@ export function RunFooterView(props: RunFooterViewProps) {
   })
   const shell = createMemo(() => prompt() && composer.shell())
   const menu = createMemo(() => prompt() && composer.visible())
-  const stateStatus = createMemo(() => props.state().status.trim())
+  const stateStatus = createMemo(() => t(props.state().status.trim()))
   const modeLabel = createMemo(() => {
     if (exiting()) {
-      return "EXIT"
+      return t("EXIT")
     }
 
-    return shell() ? "SHELL" : "BUILD"
+    return shell() ? t("SHELL") : t("BUILD")
   })
   const modeColor = createMemo(() => {
     if (exiting()) {
@@ -403,18 +406,20 @@ export function RunFooterView(props: RunFooterViewProps) {
   })
   const statusText = createMemo(() => {
     if (exiting()) {
-      return `Press ${clearShortcut() || "ctrl+c"} again to exit`
+      return language() === "ru"
+        ? `Нажмите ${clearShortcut() || "ctrl+c"} ещё раз для выхода`
+        : `Press ${clearShortcut() || "ctrl+c"} again to exit`
     }
 
     if (busy()) {
-      return armed() ? "again to interrupt" : "interrupt"
+      return t(armed() ? "again to interrupt" : "interrupt")
     }
 
     if (stateStatus().length > 0) {
       return stateStatus()
     }
 
-    return shell() ? "Shell mode" : ""
+    return shell() ? t("Shell mode") : ""
   })
   const activityMeta = createMemo(() => {
     if (!responsive().statusline.showActivityMeta || usage().length === 0) {
@@ -461,13 +466,13 @@ export function RunFooterView(props: RunFooterViewProps) {
 
     const items: Array<{ kind: string; key: string; label: string }> = []
     if (foregroundSubagents() && backgroundShortcut()) {
-      items.push({ kind: "background", key: backgroundShortcut(), label: "background" })
+      items.push({ kind: "background", key: backgroundShortcut(), label: t("background") })
     }
     if (queuedPrompts().length > 0 && queuedShortcut()) {
-      items.push({ kind: "queued", key: queuedShortcut(), label: `${queue()} queued` })
+      items.push({ kind: "queued", key: queuedShortcut(), label: t(`${queue()} queued`) })
     }
     if (activeTabs().length > 0 && subagentShortcut()) {
-      items.push({ kind: "subagents", key: subagentShortcut(), label: "subagents" })
+      items.push({ kind: "subagents", key: subagentShortcut(), label: t("subagents") })
     }
 
     const limit = responsive().statusline.contextHintLimit
@@ -480,11 +485,11 @@ export function RunFooterView(props: RunFooterViewProps) {
     }
 
     if (shell()) {
-      return { key: "esc", label: "normal" }
+      return { key: "esc", label: t("normal") }
     }
 
     if (command()) {
-      return { key: command(), label: "cmd" }
+      return { key: command(), label: t("cmd") }
     }
   })
   const sectionSeparator = () => <span style={{ fg: theme().muted }}>· </span>
@@ -503,14 +508,14 @@ export function RunFooterView(props: RunFooterViewProps) {
     commands: [
       {
         name: "command.palette.show",
-        title: "Open command palette",
-        category: "Prompt",
+        title: t("Open command palette"),
+        category: t("Prompt"),
         run: openCommand,
       },
       {
         name: "variant.cycle",
-        title: "Cycle model variant",
-        category: "Model",
+        title: t("Cycle model variant"),
+        category: t("Model"),
         run: props.onCycle,
       },
     ],
@@ -527,8 +532,8 @@ export function RunFooterView(props: RunFooterViewProps) {
     commands: [
       {
         name: "session.background",
-        title: "Background subagents",
-        category: "Session",
+        title: t("Background subagents"),
+        category: t("Session"),
         run: () => props.onBackground?.(),
       },
     ],
@@ -541,8 +546,8 @@ export function RunFooterView(props: RunFooterViewProps) {
     commands: [
       {
         name: "session.child.first",
-        title: "View subagents",
-        category: "Session",
+        title: t("View subagents"),
+        category: t("Session"),
         run: openSubagentMenu,
       },
     ],
@@ -555,8 +560,8 @@ export function RunFooterView(props: RunFooterViewProps) {
     commands: [
       {
         name: "session.queued_prompts",
-        title: "Manage queued prompts",
-        category: "Session",
+        title: t("Manage queued prompts"),
+        category: t("Session"),
         run: openQueuedMenu,
       },
     ],
@@ -680,6 +685,7 @@ export function RunFooterView(props: RunFooterViewProps) {
                         </Match>
                         <Match when={selectingSubagent()}>
                           <RunSubagentSelectBody
+                            language={language()}
                             theme={theme}
                             tabs={tabs}
                             current={selected}
@@ -690,6 +696,7 @@ export function RunFooterView(props: RunFooterViewProps) {
                         </Match>
                         <Match when={selectingQueued()}>
                           <RunQueuedPromptSelectBody
+                            language={language()}
                             theme={theme}
                             prompts={queuedPrompts}
                             onClose={closePanel}
@@ -704,6 +711,7 @@ export function RunFooterView(props: RunFooterViewProps) {
                         </Match>
                         <Match when={commanding()}>
                           <RunCommandMenuBody
+                            language={language()}
                             theme={theme}
                             commands={props.commands}
                             subagents={tabs}
@@ -737,6 +745,7 @@ export function RunFooterView(props: RunFooterViewProps) {
                         </Match>
                         <Match when={skilling()}>
                           <RunSkillSelectBody
+                            language={language()}
                             theme={theme}
                             commands={props.commands}
                             onClose={closePanel}
@@ -755,6 +764,7 @@ export function RunFooterView(props: RunFooterViewProps) {
                         </Match>
                         <Match when={modeling()}>
                           <RunModelSelectBody
+                            language={language()}
                             theme={theme}
                             providers={props.providers}
                             current={props.currentModel}
@@ -767,6 +777,7 @@ export function RunFooterView(props: RunFooterViewProps) {
                         </Match>
                         <Match when={varianting()}>
                           <RunVariantSelectBody
+                            language={language()}
                             theme={theme}
                             variants={props.variants}
                             current={props.currentVariant}
@@ -779,6 +790,7 @@ export function RunFooterView(props: RunFooterViewProps) {
                         </Match>
                         <Match when={active().type === "permission"}>
                           <RunPermissionBody
+                            language={language()}
                             request={permission()!.request}
                             theme={theme()}
                             block={block()}
@@ -788,6 +800,7 @@ export function RunFooterView(props: RunFooterViewProps) {
                         </Match>
                         <Match when={active().type === "question"}>
                           <RunQuestionBody
+                            language={language()}
                             request={question()!.request}
                             theme={theme()}
                             onReply={props.onQuestionReply}
@@ -803,6 +816,7 @@ export function RunFooterView(props: RunFooterViewProps) {
 
             <Show when={!panel() && menu()}>
               <RunFooterMenu
+                language={language()}
                 theme={theme}
                 items={composer.options}
                 selected={composer.selected}
@@ -927,6 +941,7 @@ export function RunFooterView(props: RunFooterViewProps) {
           }}
         >
           <RunFooterSubagentBody
+            language={language()}
             active={inspecting}
             theme={runTheme}
             tab={selectedTab}

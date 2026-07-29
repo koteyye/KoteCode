@@ -93,6 +93,7 @@ describe("Config", () => {
         provider: {
           bedrock: {
             npm: "@ai-sdk/amazon-bedrock",
+            routing: "direct",
             options: {
               headers: { "x-test": "1" },
               body: { trace: true },
@@ -108,6 +109,7 @@ describe("Config", () => {
         package: "@ai-sdk/amazon-bedrock",
         settings: { region: "us-east-1", profile: "dev" },
       })
+      expect(migrated.providers?.bedrock?.routing).toBe("direct")
       expect(migrated.providers?.bedrock?.request).toEqual({
         headers: { "x-test": "1" },
         body: { trace: true },

@@ -149,6 +149,35 @@ describe("plugin.codex", () => {
     await enabled.dispose?.()
   })
 
+  test("routes ChatGPT device authorization through Kote Proxy", async () => {
+    const calls: Array<{ input: RequestInfo | URL; init?: BunFetchRequestInit }> = []
+    const runtimeFetch = Object.assign(
+      async (input: RequestInfo | URL, init?: BunFetchRequestInit) => {
+        calls.push({ input, init })
+        return Response.json({
+          device_auth_id: "device-1",
+          user_code: "KOTE-CODE",
+          interval: "5",
+        })
+      },
+      { preconnect() {} },
+    ) satisfies typeof globalThis.fetch
+    const hooks = await CodexAuthPlugin({} as never, {
+      fetch: runtimeFetch,
+      resolveProxy: async () => ({ source: "environment", url: "https://proxy.kotencode.test" }),
+    })
+
+    const method = hooks.auth?.methods[1]
+    expect(method?.type).toBe("oauth")
+    if (!method || method.type !== "oauth") throw new Error("ChatGPT device OAuth method is missing")
+    const authorization = await method.authorize({})
+
+    expect(authorization.url).toBe("https://auth.openai.com/codex/device")
+    expect(calls).toHaveLength(1)
+    expect(calls[0]?.input).toBe("https://auth.openai.com/api/accounts/deviceauth/usercode")
+    expect(calls[0]?.init?.proxy).toBe("https://proxy.kotencode.test")
+  })
+
   test("filters unsupported modes and uses Codex context limits for OAuth GPT models", async () => {
     const hooks = await CodexAuthPlugin({} as never)
     const limit = { context: 1_050_000, input: 922_000, output: 128_000 }
@@ -192,7 +221,7 @@ describe("plugin.codex", () => {
     )
   })
 
-  test("deduplicates concurrent Codex token refreshes", async () => {
+  test("isolates OpenAI OAuth from custom base URLs and deduplicates token refreshes", async () => {
     let auth = {
       type: "oauth" as const,
       refresh: "refresh-old",
@@ -236,6 +265,7 @@ describe("plugin.codex", () => {
         return new Response("unexpected request", { status: 500 })
       },
     })
+    const serverOrigin = `http://127.0.0.1:${server.port}`
 
     const hooks = await CodexAuthPlugin(
       {
@@ -263,14 +293,16 @@ describe("plugin.codex", () => {
         $: {} as never,
       },
       {
-        issuer: server.url.origin,
-        codexApiEndpoint: new URL("/backend-api/codex/responses", server.url).toString(),
+        issuer: serverOrigin,
+        codexApiEndpoint: `${serverOrigin}/backend-api/codex/responses`,
+        resolveProxy: async () => ({ source: "disabled" }),
       },
     )
     const loaded = await hooks.auth!.loader!(async () => auth as never, {} as never)
+    expect(loaded.baseURL).toBe("https://api.openai.com/v1")
 
-    const first = loaded.fetch!("https://api.openai.com/v1/responses")
-    const second = loaded.fetch!("https://api.openai.com/v1/responses")
+    const first = loaded.fetch!("https://api.llmops.example/responses")
+    const second = loaded.fetch!("https://api.llmops.example/responses")
 
     await waitFor(() => refreshRequests === 1)
     expect(apiRequests).toHaveLength(0)

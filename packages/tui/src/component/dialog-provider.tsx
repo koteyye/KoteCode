@@ -15,6 +15,8 @@ import { isConsoleManagedProvider } from "../util/provider-origin"
 import { useConnected } from "./use-connected"
 import { useBindings } from "../keymap"
 import { useClipboard } from "../context/clipboard"
+import { useTuiConfig } from "../config"
+import { Locale } from "../util/locale"
 
 const PROVIDER_PRIORITY: Record<string, number> = {
   opencode: 0,
@@ -89,6 +91,8 @@ export function createDialogProviderOptions() {
   const sdk = useSDK()
   const toast = useToast()
   const { theme } = useTheme()
+  const config = useTuiConfig()
+  const t = (input: string) => Locale.translate(input, config.language)
   const onboarded = useConnected()
 
   async function promptCustomProviderID(): Promise<string | undefined> {
@@ -96,7 +100,7 @@ export function createDialogProviderOptions() {
       placeholder: "Provider id",
       description: () => (
         <text fg={theme.textMuted}>
-          This only stores a credential. Configure the provider in opencode.json to use it.
+          {t("This only stores a credential. Configure the provider in opencode.json to use it.")}
         </text>
       ),
     })
@@ -107,8 +111,9 @@ export function createDialogProviderOptions() {
 
     toast.show({
       variant: "error",
-      message:
+      message: t(
         "Provider ids must start with a lowercase letter or number and only use lowercase letters, numbers, hyphens, and underscores",
+      ),
     })
     return promptCustomProviderID()
   }
@@ -243,6 +248,8 @@ function AutoMethod(props: AutoMethodProps) {
   const sync = useSync()
   const toast = useToast()
   const clipboard = useClipboard()
+  const config = useTuiConfig()
+  const t = (input: string) => Locale.translate(input, config.language)
 
   useBindings(() => ({
     bindings: [
@@ -255,7 +262,7 @@ function AutoMethod(props: AutoMethodProps) {
             props.authorization.instructions.match(/[A-Z0-9]{4}-[A-Z0-9]{4,5}/)?.[0] ?? props.authorization.url
           clipboard
             .write?.(code)
-            .then(() => toast.show({ message: "Copied to clipboard", variant: "info" }))
+            .then(() => toast.show({ message: t("Copied to clipboard"), variant: "info" }))
             .catch(toast.error)
         },
       },
@@ -272,7 +279,7 @@ function AutoMethod(props: AutoMethodProps) {
         variant: "error",
         message:
           "name" in result.error && result.error.name === "ProviderAuthOauthCallbackFailed"
-            ? "OAuth authorization failed. Try /connect again."
+            ? t("OAuth authorization failed. Try /connect again.")
             : JSON.stringify(result.error),
       })
       dialog.clear()
@@ -297,9 +304,9 @@ function AutoMethod(props: AutoMethodProps) {
         <Link href={props.authorization.url} fg={theme.primary} />
         <text fg={theme.textMuted}>{props.authorization.instructions}</text>
       </box>
-      <text fg={theme.textMuted}>Waiting for authorization...</text>
+      <text fg={theme.textMuted}>{t("Waiting for authorization...")}</text>
       <text fg={theme.text}>
-        c <span style={{ fg: theme.textMuted }}>copy</span>
+        c <span style={{ fg: theme.textMuted }}>{t("copy")}</span>
       </text>
     </box>
   )
@@ -317,6 +324,7 @@ function CodeMethod(props: CodeMethodProps) {
   const sync = useSync()
   const dialog = useDialog()
   const [error, setError] = createSignal(false)
+  const config = useTuiConfig()
 
   return (
     <DialogPrompt
@@ -341,7 +349,7 @@ function CodeMethod(props: CodeMethodProps) {
           <text fg={theme.textMuted}>{props.authorization.instructions}</text>
           <Link href={props.authorization.url} fg={theme.primary} />
           <Show when={error()}>
-            <text fg={theme.error}>Invalid code</text>
+            <text fg={theme.error}>{Locale.translate("Invalid code", config.language)}</text>
           </Show>
         </box>
       )}
@@ -361,6 +369,8 @@ function ApiMethod(props: ApiMethodProps) {
   const sync = useSync()
   const toast = useToast()
   const { theme } = useTheme()
+  const config = useTuiConfig()
+  const russian = config.language === "ru"
 
   return (
     <DialogPrompt
@@ -371,22 +381,28 @@ function ApiMethod(props: ApiMethodProps) {
           opencode: (
             <box gap={1}>
               <text fg={theme.textMuted}>
-                OpenCode Zen gives you access to all the best coding models at the cheapest prices with a single API
-                key.
+                {russian
+                  ? "OpenCode Zen даёт доступ к лучшим моделям для программирования по выгодной цене с единым API-ключом."
+                  : "OpenCode Zen gives you access to all the best coding models at the cheapest prices with a single API key."}
               </text>
               <text fg={theme.text}>
-                Go to <span style={{ fg: theme.primary }}>https://opencode.ai/zen</span> to get a key
+                {russian ? "Получите ключ на " : "Go to "}
+                <span style={{ fg: theme.primary }}>https://opencode.ai/zen</span>
+                {russian ? "" : " to get a key"}
               </text>
             </box>
           ),
           "opencode-go": (
             <box gap={1}>
               <text fg={theme.textMuted}>
-                OpenCode Go is a $10 per month subscription that provides reliable access to popular open coding models
-                with generous usage limits.
+                {russian
+                  ? "OpenCode Go — подписка за $10 в месяц с надёжным доступом к популярным открытым моделям и большими лимитами."
+                  : "OpenCode Go is a $10 per month subscription that provides reliable access to popular open coding models with generous usage limits."}
               </text>
               <text fg={theme.text}>
-                Go to <span style={{ fg: theme.primary }}>https://opencode.ai/go</span> and enable OpenCode Go
+                {russian ? "Подключите OpenCode Go на " : "Go to "}
+                <span style={{ fg: theme.primary }}>https://opencode.ai/go</span>
+                {russian ? "" : " and enable OpenCode Go"}
               </text>
             </box>
           ),
@@ -407,7 +423,9 @@ function ApiMethod(props: ApiMethodProps) {
         if (props.custom && !sync.data.provider_next.all.some((provider) => provider.id === props.providerID)) {
           toast.show({
             variant: "info",
-            message: `Saved credential for ${props.providerID}. Configure it in opencode.json to use it.`,
+            message: russian
+              ? `Учётные данные ${props.providerID} сохранены. Настройте провайдера в opencode.json.`
+              : `Saved credential for ${props.providerID}. Configure it in opencode.json to use it.`,
           })
           dialog.clear()
           return

@@ -1,19 +1,9 @@
 import { Popover as Kobalte } from "@kobalte/core/popover"
-import {
-  Component,
-  ComponentProps,
-  createEffect,
-  createMemo,
-  For,
-  JSX,
-  onCleanup,
-  Show,
-  ValidComponent,
-} from "solid-js"
+import { Component, ComponentProps, createEffect, createMemo, For, JSX, Show, ValidComponent } from "solid-js"
 import { createStore } from "solid-js/store"
 import { useLocal } from "@/context/local"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
-import { popularProviders } from "@/hooks/use-providers"
+import { popularProviders, useProviders } from "@/hooks/use-providers"
 import { Button } from "@opencode-ai/ui/button"
 import { IconButton } from "@opencode-ai/ui/icon-button"
 import { ScrollView } from "@opencode-ai/ui/scroll-view"
@@ -30,7 +20,9 @@ import { useLanguage } from "@/context/language"
 import { decode64 } from "@/utils/base64"
 import { handleDocumentSearchKeydown } from "@/utils/search-keydown"
 import { createEventListener } from "@solid-primitives/event-listener"
+import { filterConnectedModels } from "./dialog-select-model-filter"
 import { matchesModelSearch } from "./dialog-select-model-search"
+import { useProviderRouting } from "@/hooks/use-provider-routing"
 
 const isFree = (provider: string, cost: { input: number } | undefined) =>
   provider === "opencode" && (!cost || cost.input === 0)
@@ -60,14 +52,18 @@ const ModelList: Component<{
   action?: JSX.Element
   model?: ModelState
 }> = (props) => {
-  const model = props.model ?? useLocal().model
+  const local = useLocal()
+  const model = props.model ?? local.model
+  const providers = useProviders(() => decode64(local.slug()))
+  const routing = useProviderRouting()
   const language = useLanguage()
 
   const models = createMemo(() =>
-    model
-      .list()
-      .filter((m) => model.visible({ modelID: m.id, providerID: m.provider.id }))
-      .filter((m) => (props.provider ? m.provider.id === props.provider : true)),
+    filterConnectedModels(
+      model.list().filter((m) => model.visible({ modelID: m.id, providerID: m.provider.id })),
+      providers.connected().map((provider) => provider.id),
+      props.provider,
+    ),
   )
 
   return (
@@ -80,7 +76,7 @@ const ModelList: Component<{
       current={model.current()}
       filterKeys={["provider.name", "name", "id"]}
       sortBy={(a, b) => a.name.localeCompare(b.name)}
-      groupBy={(x) => x.provider.name}
+      groupBy={(x) => x.provider.id}
       sortGroupsBy={(a, b) => {
         const aProvider = a.items[0].provider.id
         const bProvider = b.items[0].provider.id
@@ -88,6 +84,18 @@ const ModelList: Component<{
         if (!popularProviders.includes(aProvider) && popularProviders.includes(bProvider)) return 1
         return popularProviders.indexOf(aProvider) - popularProviders.indexOf(bProvider)
       }}
+      groupHeader={(group) => (
+        <>
+          <span class="min-w-0 truncate">{group.items[0].provider.name}</span>
+          <Tag class="shrink-0">
+            {language.t(
+              routing.get(group.items[0].provider.id) === "proxy"
+                ? "provider.routing.proxy.short"
+                : "provider.routing.direct.short",
+            )}
+          </Tag>
+        </>
+      )}
       itemWrapper={(item, node) => (
         <Tooltip
           class="w-full"
@@ -242,7 +250,10 @@ export function ModelSelectorPopoverV2(props: {
   triggerProps?: ModelSelectorTriggerProps
   onClose?: () => void
 }) {
-  const model = props.model ?? useLocal().model
+  const local = useLocal()
+  const model = props.model ?? local.model
+  const providers = useProviders(() => decode64(local.slug()))
+  const routing = useProviderRouting()
   const language = useLanguage()
   const dialog = useDialog()
   const [store, setStore] = createStore({ open: false, search: "", active: "" })
@@ -251,10 +262,11 @@ export function ModelSelectorPopoverV2(props: {
   let restoreTrigger = true
 
   const allModels = createMemo(() =>
-    model
-      .list()
-      .filter((item) => model.visible({ modelID: item.id, providerID: item.provider.id }))
-      .filter((item) => (props.provider ? item.provider.id === props.provider : true)),
+    filterConnectedModels(
+      model.list().filter((item) => model.visible({ modelID: item.id, providerID: item.provider.id })),
+      providers.connected().map((provider) => provider.id),
+      props.provider,
+    ),
   )
   const models = createMemo(() => {
     const search = store.search.trim()
@@ -444,6 +456,13 @@ export function ModelSelectorPopoverV2(props: {
                     <MenuV2.Group>
                       <MenuV2.GroupLabel class="gap-2 px-3">
                         <span class="min-w-0 truncate">{group.items[0].provider.name}</span>
+                        <TagV2 class="shrink-0">
+                          {language.t(
+                            routing.get(group.items[0].provider.id) === "proxy"
+                              ? "provider.routing.proxy.short"
+                              : "provider.routing.direct.short",
+                          )}
+                        </TagV2>
                       </MenuV2.GroupLabel>
                       <MenuV2.RadioGroup value={current()}>
                         <For each={group.items}>

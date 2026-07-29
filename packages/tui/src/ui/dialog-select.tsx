@@ -85,6 +85,7 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
   const dialog = useDialog()
   const { theme } = useTheme()
   const tuiConfig = useTuiConfig()
+  const t = (input: string) => Locale.translate(input, tuiConfig.language)
   const scrollAcceleration = createMemo(() => getScrollAcceleration(tuiConfig))
 
   const [store, setStore] = createStore({
@@ -528,7 +529,7 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
       return (
         <text>
           <span style={{ fg: theme.text }}>
-            <b>{action.item.title}</b>{" "}
+            <b>{t(action.item.title)}</b>{" "}
           </span>
           <span style={{ fg: theme.textMuted }}>{action.item.label}</span>
         </text>
@@ -547,7 +548,7 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
           fg={disabled() ? theme.textMuted : active() ? fg : theme.text}
           attributes={active() ? TextAttributes.BOLD : undefined}
         >
-          {item.title}
+          {t(item.title)}
         </text>
         <text fg={disabled() ? theme.textMuted : active() ? fg : theme.textMuted}> {item.label}</text>
       </box>
@@ -560,7 +561,7 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
         <box flexDirection="row" justifyContent="space-between">
           {props.titleView ?? (
             <text fg={theme.text} attributes={TextAttributes.BOLD}>
-              {props.title}
+              {t(props.title)}
             </text>
           )}
           <text fg={theme.textMuted} onMouseUp={() => dialog.clear()}>
@@ -589,7 +590,7 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
                   input.focus()
                 }, 1)
               }}
-              placeholder={props.placeholder ?? "Search"}
+              placeholder={t(props.placeholder ?? "Search")}
               placeholderColor={theme.textMuted}
             />
           </box>
@@ -601,7 +602,7 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
           fallback={
             props.emptyView ?? (
               <box paddingLeft={4} paddingRight={4} paddingTop={1}>
-                <text fg={theme.textMuted}>No results found</text>
+                <text fg={theme.textMuted}>{t("No results found")}</text>
               </box>
             )
           }
@@ -623,7 +624,7 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
                         when={options[0]?.categoryView}
                         fallback={
                           <text fg={theme.accent} attributes={TextAttributes.BOLD}>
-                            {category}
+                            {t(category)}
                           </text>
                         }
                       >
@@ -682,12 +683,22 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
                               </box>
                             </Show>
                             <Option
-                              title={option.title}
+                              title={t(option.title)}
                               titleView={option.titleView}
-                              footer={flatten() ? (option.category ?? option.footer) : option.footer}
+                              footer={
+                                typeof (flatten() ? (option.category ?? option.footer) : option.footer) === "string"
+                                  ? t((flatten() ? (option.category ?? option.footer) : option.footer) as string)
+                                  : flatten()
+                                    ? (option.category ?? option.footer)
+                                    : option.footer
+                              }
                               titleWidth={option.titleWidth}
                               truncateTitle={option.truncateTitle}
-                              description={option.description !== category ? option.description : undefined}
+                              description={
+                                option.description !== category && option.description
+                                  ? t(option.description)
+                                  : undefined
+                              }
                               active={active()}
                               current={current()}
                               muted={actionFocused()}
@@ -698,7 +709,7 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
                             {(detail) => (
                               <box paddingLeft={3} paddingRight={3}>
                                 <text fg={theme.textMuted} wrapMode="none">
-                                  {Locale.truncateMiddle(detail, Math.max(1, Math.min(76, dimensions().width - 12)))}
+                                  {Locale.truncateMiddle(t(detail), Math.max(1, Math.min(76, dimensions().width - 12)))}
                                 </text>
                               </box>
                             )}

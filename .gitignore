@@ -30,6 +30,8 @@ target
 opencode-dev
 UPCOMING_CHANGELOG.md
 logs/
+*.log
+artifacts/
 *.bun-build
 tsconfig.tsbuildinfo
 

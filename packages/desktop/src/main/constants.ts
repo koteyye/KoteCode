@@ -15,11 +15,11 @@ export const APP_IDS = {
   prod: "ai.kotecode.desktop",
 } as const satisfies Record<Channel, string>
 
-// KoteCode alpha releases do not have a fork-owned desktop update pipeline yet.
+// KoteCode releases do not have a fork-owned desktop update pipeline yet.
 // Keep this disabled together with the CLI updater safety lock.
 export const UPDATER_ENABLED = false
 
 // Upstream's WSL integration installs and launches ~/.opencode/bin/opencode.
 // Keep it unreachable until KoteCode publishes and verifies its own Linux sidecar.
 export const WSL_ENABLED = false
-export const WSL_DISABLED_MESSAGE = "WSL integration is disabled in KoteCode alpha"
+export const WSL_DISABLED_MESSAGE = "WSL integration is not available in this KoteCode release"

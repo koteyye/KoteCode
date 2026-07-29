@@ -1,6 +1,7 @@
-import * as Locale from "@/util/locale"
+import { Locale } from "@/util/locale"
 import type { SessionMessages } from "./session.shared"
 import type { RunProvider, StreamCommit } from "./types"
+import type { Language } from "@opencode-ai/tui/util/locale"
 
 export function turnSummaryCommit(input: {
   agent: string
@@ -25,6 +26,7 @@ export function turnSummaryCommit(input: {
 export function messageTurnSummaryCommit(
   message: SessionMessages[number],
   providers?: RunProvider[],
+  language: Language = "en",
 ): StreamCommit | undefined {
   const info = message.info
   if (info.role !== "assistant") {
@@ -39,7 +41,7 @@ export function messageTurnSummaryCommit(
   const model = providers?.find((item) => item.id === info.providerID)?.models[info.modelID]?.name
 
   return turnSummaryCommit({
-    agent: Locale.titlecase(info.agent),
+    agent: Locale.agent(info.agent, language),
     model: model ?? info.modelID,
     duration: Locale.duration(completed - info.time.created),
     messageID: info.id,

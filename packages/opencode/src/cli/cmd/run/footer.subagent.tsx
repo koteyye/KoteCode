@@ -7,6 +7,8 @@ import { SPINNER_FRAMES } from "@opencode-ai/tui/component/spinner"
 import { RunEntryContent, separatorRows } from "./scrollback.writer"
 import type { FooterSubagentDetail, FooterSubagentTab, RunDiffStyle } from "./types"
 import type { RunFooterTheme, RunTheme } from "./theme"
+import type { Language } from "@opencode-ai/tui/util/locale"
+import { Locale } from "@/util/locale"
 
 registerOpencodeSpinner()
 
@@ -45,6 +47,7 @@ function statusIcon(status: FooterSubagentTab["status"]) {
 }
 
 export function RunFooterSubagentBody(props: {
+  language?: Language
   active: () => boolean
   theme: () => RunTheme
   tab: () => FooterSubagentTab | undefined
@@ -56,11 +59,12 @@ export function RunFooterSubagentBody(props: {
   onCycle: (dir: -1 | 1) => void
   onClose: () => void
 }) {
+  const language = () => props.language ?? "en"
   const theme = createMemo(() => props.theme())
   const footer = createMemo(() => theme().footer)
   const tab = createMemo(() => props.tab())
   const commits = createMemo(() => props.detail()?.commits ?? [])
-  const opts = createMemo(() => ({ diffStyle: props.diffStyle }))
+  const opts = createMemo(() => ({ diffStyle: props.diffStyle, language: language() }))
   const scrollbar = createMemo(() => ({
     trackOptions: {
       backgroundColor: footer().surface,
@@ -143,7 +147,7 @@ export function RunFooterSubagentBody(props: {
               </text>
               <Show when={props.total() > 1 && props.index() > 0}>
                 <text fg={footer().muted} wrapMode="none" truncate flexShrink={0}>
-                  {props.index()} of {props.total()}
+                  {Locale.translate(`${props.index()} of ${props.total()}`, language())}
                 </text>
               </Show>
             </box>
@@ -164,7 +168,7 @@ export function RunFooterSubagentBody(props: {
               rows()
             ) : (
               <text fg={footer().muted} wrapMode="word">
-                No subagent activity yet
+                {Locale.translate("No subagent activity yet", language())}
               </text>
             )}
           </box>

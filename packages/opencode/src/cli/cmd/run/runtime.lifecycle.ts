@@ -15,7 +15,7 @@ import { Global } from "@opencode-ai/core/global"
 import { openEditor } from "@opencode-ai/tui/editor"
 import { registerOpencodeKeymap } from "@opencode-ai/tui/keymap"
 import { Session as SessionApi } from "@/session/session"
-import * as Locale from "@/util/locale"
+import { Locale } from "@/util/locale"
 import { resolveInteractiveStdin } from "./runtime.stdin"
 import { entrySplash, exitSplash, splashMeta } from "./splash"
 import { resolveRunTheme } from "./theme"
@@ -121,13 +121,16 @@ function splashInfo(title: string | undefined, history: RunPrompt[]) {
   }
 }
 
-function footerLabels(input: Pick<RunInput, "agent" | "model" | "variant">): FooterLabels {
-  const agentLabel = Locale.titlecase(input.agent ?? "build")
+function footerLabels(
+  input: Pick<RunInput, "agent" | "model" | "variant">,
+  language: RunTuiConfig["language"],
+): FooterLabels {
+  const agentLabel = Locale.agent(input.agent ?? "build", language)
 
   if (!input.model) {
     return {
       agentLabel,
-      modelLabel: "Model default",
+      modelLabel: Locale.translate("Model default", language),
     }
   }
 
@@ -206,11 +209,14 @@ export async function createRuntimeLifecycle(input: LifecycleInput): Promise<Lif
       title: splash.title,
       session_id: input.sessionID,
     })
-    const labels = footerLabels({
-      agent: input.agent,
-      model: input.model,
-      variant: input.variant,
-    })
+    const labels = footerLabels(
+      {
+        agent: input.agent,
+        model: input.model,
+        variant: input.variant,
+      },
+      input.tuiConfig.language,
+    )
     const footerTask = import("./footer")
     const wrote = queueSplash(
       renderer,
@@ -218,6 +224,7 @@ export async function createRuntimeLifecycle(input: LifecycleInput): Promise<Lif
       "entry",
       entrySplash({
         ...meta,
+        language: input.tuiConfig.language,
         theme: theme.splash,
         showSession: splash.showSession,
         detail: directoryLabel(input.directory),
@@ -332,6 +339,7 @@ export async function createRuntimeLifecycle(input: LifecycleInput): Promise<Lif
                 title: splash.title,
                 session_id: sessionID,
               }),
+              language: input.tuiConfig.language,
               theme: footer.currentTheme().splash,
             }),
           )
@@ -389,6 +397,7 @@ export async function createRuntimeLifecycle(input: LifecycleInput): Promise<Lif
               title: splash.title,
               session_id: next.sessionID ?? input.getSessionID?.() ?? input.sessionID,
             }),
+            language: input.tuiConfig.language,
             theme: footer.currentTheme().splash,
             showSession: splash.showSession,
             detail: directoryLabel(input.directory),

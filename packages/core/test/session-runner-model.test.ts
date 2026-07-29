@@ -11,6 +11,7 @@ import { ProjectV2 } from "@opencode-ai/core/project"
 import { SessionRunnerModel } from "@opencode-ai/core/session/runner/model"
 import { SessionV2 } from "@opencode-ai/core/session"
 import { AbsolutePath } from "@opencode-ai/core/schema"
+import { ProviderRouting } from "@opencode-ai/core/kote/provider-routing"
 import { it } from "./lib/effect"
 
 type Api =
@@ -31,7 +32,11 @@ const model = (api: Api, variants: ModelV2.Info["variants"] = []) =>
     capabilities: { tools: true, input: ["text"], output: ["text"] },
     request: {
       headers: { "x-test": "header" },
-      body: { apiKey: "secret", custom_extension: { enabled: true } },
+      body: {
+        apiKey: "secret",
+        [ProviderRouting.RequestKey]: "direct",
+        custom_extension: { enabled: true },
+      },
     },
     variants,
     time: { released: 0 },
@@ -70,6 +75,7 @@ describe("SessionRunnerModel", () => {
 
       expect(JSON.stringify(prepared.body)).not.toContain("apiKey")
       expect(JSON.stringify(prepared.body)).not.toContain("secret")
+      expect(JSON.stringify(prepared.body)).not.toContain(ProviderRouting.RequestKey)
     }),
   )
 

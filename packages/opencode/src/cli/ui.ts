@@ -3,6 +3,7 @@ import { Schema } from "effect"
 import { logo as glyphs } from "./logo"
 
 const wordmark = [
+  `  /\\_/\\`,
   `█  █ █▀▀█ █▀▀█ █▀▀█ █▀▀▀ █▀▀█ █▀▀█ █▀▀█`,
   `█▀█  █  █  ██  █▀▀▀ █    █  █ █  █ █▀▀▀`,
   `█ ▀█ ▀▀▀▀  ▀▀  ▀▀▀▀ ▀▀▀▀ ▀▀▀▀ ▀▀▀▀ ▀▀▀▀`,
@@ -11,8 +12,8 @@ const wordmark = [
 export class CancelledError extends Schema.TaggedErrorClass<CancelledError>()("UICancelledError", {}) {}
 
 export const Style = {
-  TEXT_HIGHLIGHT: "\x1b[96m",
-  TEXT_HIGHLIGHT_BOLD: "\x1b[96m\x1b[1m",
+  TEXT_HIGHLIGHT: "\x1b[38;2;255;115;0m",
+  TEXT_HIGHLIGHT_BOLD: "\x1b[38;2;255;115;0m\x1b[1m",
   TEXT_DIM: "\x1b[90m",
   TEXT_DIM_BOLD: "\x1b[90m\x1b[1m",
   TEXT_NORMAL: "\x1b[0m",
@@ -58,9 +59,9 @@ export function logo(pad?: string) {
   const result: string[] = []
   const reset = "\x1b[0m"
   const left = {
-    fg: "\x1b[90m",
-    shadow: "\x1b[38;5;235m",
-    bg: "\x1b[48;5;235m",
+    fg: "\x1b[38;2;255;115;0m",
+    shadow: "\x1b[38;2;74;35;7m",
+    bg: "\x1b[48;2;74;35;7m",
   }
   const right = {
     fg: reset,
@@ -81,6 +82,10 @@ export function logo(pad?: string) {
       }
       if (char === "~") {
         parts.push(shadow, "▀", reset)
+        continue
+      }
+      if (char === ":") {
+        parts.push(fg, "_", reset)
         continue
       }
       if (char === " ") {

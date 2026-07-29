@@ -38,6 +38,13 @@ export function Logo() {
           </text>
         )
       }
+      if (char === ":") {
+        return (
+          <text fg={fg} attributes={attrs} selectable={false}>
+            _
+          </text>
+        )
+      }
       return (
         <text fg={fg} attributes={attrs} selectable={false}>
           {char}
@@ -51,7 +58,7 @@ export function Logo() {
       <For each={logo.left}>
         {(line, index) => (
           <box flexDirection="row" gap={1}>
-            <box flexDirection="row">{renderLine(line, theme.textMuted, false)}</box>
+            <box flexDirection="row">{renderLine(line, theme.primary, true)}</box>
             <box flexDirection="row">{renderLine(logo.right[index()], theme.text, true)}</box>
           </box>
         )}

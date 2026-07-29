@@ -4,7 +4,7 @@ import { define } from "../../plugin/internal"
 import { Effect } from "effect"
 import { Config } from "../../config"
 import { ModelV2 } from "../../model"
-import { ProviderV2 } from "../../provider"
+import { ProviderRouting } from "../../kote/provider-routing"
 
 export const Plugin = define({
   id: "config-provider",
@@ -53,6 +53,7 @@ export const Plugin = define({
             catalog.provider.update(providerID, (provider) => {
               if (item.name !== undefined) provider.name = item.name
               if (item.api !== undefined) provider.api = { ...item.api }
+              if (item.routing !== undefined) provider.request.body[ProviderRouting.RequestKey] = item.routing
               if (item.request !== undefined) {
                 Object.assign(provider.request.headers, item.request.headers)
                 Object.assign(provider.request.body, item.request.body)

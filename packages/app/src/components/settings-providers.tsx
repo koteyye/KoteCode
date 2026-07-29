@@ -12,6 +12,9 @@ import { DialogConnectProvider, useProviderConnectController } from "./dialog-co
 import { DialogCustomProvider } from "./dialog-custom-provider"
 import { SettingsList } from "./settings-list"
 import { SettingsServerPicker, SettingsServerScope } from "./settings-server-picker"
+import { ProviderRoutingSwitch } from "./provider-routing-switch"
+import { useProviderRouting } from "@/hooks/use-provider-routing"
+import type { ProviderRouting } from "@/utils/provider-routing"
 
 type ProviderSource = "env" | "api" | "config" | "custom"
 type ProviderItem = ReturnType<ReturnType<typeof useProviders>["connected"]>[number]
@@ -42,6 +45,7 @@ const SettingsProvidersContent: Component<{ onBack?: () => void }> = (props) => 
   const protocol = useServerProtocol()
   const serverSync = useServerSync()
   const providers = useProviders()
+  const routing = useProviderRouting()
   const providerConnect = useProviderConnectController({ onBack: props.onBack })
 
   const connect = (provider?: string) => {
@@ -145,6 +149,13 @@ const SettingsProvidersContent: Component<{ onBack?: () => void }> = (props) => 
       })
   }
 
+  const changeRouting = async (providerID: string, value: ProviderRouting) => {
+    await routing.update(providerID, value).catch((err: unknown) => {
+      const message = err instanceof Error ? err.message : String(err)
+      showToast({ title: language.t("common.requestFailed"), description: message })
+    })
+  }
+
   return (
     <div class="flex flex-col h-full overflow-y-auto no-scrollbar px-4 pb-10 sm:px-10 sm:pb-10">
       <div class="sticky top-0 z-10 bg-[linear-gradient(to_bottom,var(--surface-stronger-non-alpha)_calc(100%_-_24px),transparent)]">
@@ -174,18 +185,29 @@ const SettingsProvidersContent: Component<{ onBack?: () => void }> = (props) => 
                       <span class="text-14-medium text-text-strong truncate">{item.name}</span>
                       <Tag>{type(item)}</Tag>
                     </div>
-                    <Show
-                      when={canDisconnect(item)}
-                      fallback={
-                        <span class="text-14-regular text-text-base opacity-0 group-hover:opacity-100 transition-opacity duration-200 pr-3 cursor-default">
-                          {language.t("settings.providers.connected.environmentDescription")}
-                        </span>
-                      }
-                    >
-                      <Button size="large" variant="ghost" onClick={() => void disconnect(item.id, item.name)}>
-                        {language.t("common.disconnect")}
-                      </Button>
-                    </Show>
+                    <div class="flex items-center gap-2">
+                      <ProviderRoutingSwitch
+                        compact
+                        value={routing.get(item.id)}
+                        disabled={routing.pending(item.id)}
+                        onChange={(value) => void changeRouting(item.id, value)}
+                      />
+                      <Show
+                        when={canDisconnect(item)}
+                        fallback={
+                          <span
+                            class="text-12-regular text-text-weak pr-3 cursor-default"
+                            title={language.t("settings.providers.connected.environmentDescription")}
+                          >
+                            {language.t("settings.providers.tag.environment")}
+                          </span>
+                        }
+                      >
+                        <Button size="large" variant="ghost" onClick={() => void disconnect(item.id, item.name)}>
+                          {language.t("common.disconnect")}
+                        </Button>
+                      </Show>
+                    </div>
                   </div>
                 )}
               </For>

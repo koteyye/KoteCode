@@ -6,7 +6,7 @@ import { InstallationVersion } from "@opencode-ai/core/installation/version"
 
 export const UpgradeCommand = {
   command: "upgrade [target]",
-  describe: "KoteCode alpha updates are currently disabled",
+  describe: "KoteCode updates are currently disabled",
   builder: (yargs: Argv) => {
     return yargs
       .positional("target", {

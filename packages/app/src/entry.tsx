@@ -5,7 +5,7 @@ import { render } from "solid-js/web"
 import { AppBaseProviders, AppInterface } from "@/app"
 import { type Platform, PlatformProvider } from "@/context/platform"
 import { dict as en } from "@/i18n/en"
-import { dict as zh } from "@/i18n/zh"
+import { dict as ru } from "@/i18n/ru"
 import { handleNotificationClick } from "@/utils/notification-click"
 import { authFromToken } from "@/utils/server"
 import pkg from "../package.json"
@@ -18,7 +18,7 @@ const getLocale = () => {
   const languages = navigator.languages?.length ? navigator.languages : [navigator.language]
   for (const language of languages) {
     if (!language) continue
-    if (language.toLowerCase().startsWith("zh")) return "zh" as const
+    if (language.toLowerCase().startsWith("ru")) return "ru" as const
   }
   return "en" as const
 }
@@ -26,7 +26,7 @@ const getLocale = () => {
 const getRootNotFoundError = () => {
   const key = "error.dev.rootNotFound" as const
   const locale = getLocale()
-  return locale === "zh" ? (zh[key] ?? en[key]) : en[key]
+  return locale === "ru" ? (ru[key] ?? en[key]) : en[key]
 }
 
 const getStorage = (key: string) => {
@@ -69,7 +69,7 @@ const notify: Platform["notify"] = async (title, description, href) => {
 
   const notification = new Notification(title, {
     body: description ?? "",
-    icon: "https://opencode.ai/favicon-96x96-v3.png",
+    icon: "/favicon-96x96-v3.png",
   })
 
   notification.onclick = () => {

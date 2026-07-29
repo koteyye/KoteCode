@@ -2,6 +2,7 @@ import type { TuiPluginApi } from "@opencode-ai/plugin/tui"
 import { createMemo, For, type Accessor } from "solid-js"
 import { DEFAULT_THEMES, useTheme } from "../../context/theme"
 import { useCommandShortcut } from "../../keymap"
+import { useTuiConfig } from "../../config"
 
 const themeCount = Object.keys(DEFAULT_THEMES).length
 
@@ -69,6 +70,7 @@ function parse(tip: string): TipPart[] {
 }
 
 const NO_MODELS_TIP = "Run {highlight}/connect{/highlight} to add an AI provider and start coding"
+const NO_MODELS_TIP_RU = "Выполните {highlight}/connect{/highlight}, чтобы подключить AI-провайдера"
 const NO_MODELS_PARTS = parse(NO_MODELS_TIP)
 
 function shortcutText(value: string) {
@@ -96,6 +98,7 @@ function configShortcut(api: TuiPluginApi, command: string): TipShortcut {
 
 export function Tips(props: { api: TuiPluginApi; connected?: boolean }) {
   const theme = useTheme().theme
+  const russian = useTuiConfig().language === "ru"
   const tipOffset = Math.random()
   const shortcuts: Shortcuts = {
     agentCycle: useCommandShortcut("agent.cycle"),
@@ -132,25 +135,32 @@ export function Tips(props: { api: TuiPluginApi; connected?: boolean }) {
     terminalSuspend: useCommandShortcut("terminal.suspend"),
     themeList: useCommandShortcut("theme.switch"),
   }
-  const tip = createMemo(() => {
-    if (props.connected === false) return NO_MODELS_TIP
-    const tips = [...TIPS, process.platform !== "win32" ? TERMINAL_SUSPEND_TIP : INPUT_UNDO_TIP].flatMap((item) => {
-      const value = typeof item === "string" ? item : item(shortcuts)
-      return value ? [value] : []
-    })
-    return tips[Math.floor(tipOffset * tips.length)] ?? NO_MODELS_TIP
-  }, NO_MODELS_TIP)
+  const tip = createMemo(
+    () => {
+      if (props.connected === false) return russian ? NO_MODELS_TIP_RU : NO_MODELS_TIP
+      const source = russian ? RU_TIPS : [...TIPS, process.platform !== "win32" ? TERMINAL_SUSPEND_TIP : INPUT_UNDO_TIP]
+      const tips = source.flatMap((item) => {
+        const value = typeof item === "string" ? item : item(shortcuts)
+        return value ? [value] : []
+      })
+      return tips[Math.floor(tipOffset * tips.length)] ?? (russian ? NO_MODELS_TIP_RU : NO_MODELS_TIP)
+    },
+    russian ? NO_MODELS_TIP_RU : NO_MODELS_TIP,
+  )
   // Solid can expose a memo's initial value while a pure computation is pending.
-  const parts = createMemo(() => {
-    const value = tip()
-    if (typeof value === "string") return parse(value)
-    return NO_MODELS_PARTS
-  }, NO_MODELS_PARTS)
+  const parts = createMemo(
+    () => {
+      const value = tip()
+      if (typeof value === "string") return parse(value)
+      return parse(russian ? NO_MODELS_TIP_RU : NO_MODELS_TIP)
+    },
+    russian ? parse(NO_MODELS_TIP_RU) : NO_MODELS_PARTS,
+  )
 
   return (
     <box flexDirection="row" maxWidth="100%">
       <text flexShrink={0} style={{ fg: theme.warning }}>
-        ● Tip{" "}
+        ● {russian ? "Совет" : "Tip"}{" "}
       </text>
       <text flexShrink={1} wrapMode="word">
         <For each={parts()}>
@@ -160,6 +170,22 @@ export function Tips(props: { api: TuiPluginApi; connected?: boolean }) {
     </box>
   )
 }
+
+const RU_TIPS: Tip[] = [
+  "Введите {highlight}@{/highlight} и имя файла, чтобы найти и добавить его в контекст",
+  "Начните сообщение с {highlight}!{/highlight}, чтобы выполнить команду оболочки",
+  "Используйте {highlight}/undo{/highlight}, чтобы отменить последнее сообщение и изменения файлов",
+  "Используйте {highlight}/redo{/highlight}, чтобы вернуть отменённые изменения",
+  "Выполните {highlight}/connect{/highlight}, чтобы подключить API-ключ провайдера",
+  "Выполните {highlight}/models{/highlight}, чтобы сменить модель",
+  "Выполните {highlight}/themes{/highlight}, чтобы сменить тему",
+  "Выполните {highlight}/new{/highlight}, чтобы начать новую сессию",
+  "Выполните {highlight}/sessions{/highlight}, чтобы открыть список сессий",
+  "Используйте {highlight}/compact{/highlight}, чтобы сжать длинную сессию",
+  "Переключитесь на агента {highlight}План{/highlight}, чтобы получить предложения без изменения файлов",
+  "Используйте {highlight}kotencode run{/highlight} для неинтерактивного запуска",
+  "Используйте {highlight}/connect{/highlight} с OpenCode Zen для доступа к отобранным моделям",
+]
 
 const TIPS: Tip[] = [
   "Type {highlight}@{/highlight} followed by a filename to fuzzy search and attach files",
@@ -233,16 +259,16 @@ const TIPS: Tip[] = [
   "Tool definitions can invoke scripts written in Python, Go, etc",
   "Add {highlight}.ts{/highlight} files to {highlight}.opencode/plugins/{/highlight} for event hooks",
   "Use plugins to send OS notifications when sessions complete",
-  "Create a plugin to prevent OpenCode from reading sensitive files",
-  "Use {highlight}opencode run{/highlight} for non-interactive scripting",
-  "Use {highlight}opencode --continue{/highlight} to resume the last session",
-  "Use {highlight}opencode run -f file.ts{/highlight} to attach files via CLI",
+  "Create a plugin to prevent KoteCode from reading sensitive files",
+  "Use {highlight}kotencode run{/highlight} for non-interactive scripting",
+  "Use {highlight}kotencode --continue{/highlight} to resume the last session",
+  "Use {highlight}kotencode run -f file.ts{/highlight} to attach files via CLI",
   "Use {highlight}--format json{/highlight} for machine-readable output in scripts",
-  "Run {highlight}opencode serve{/highlight} for headless API access to OpenCode",
-  "Use {highlight}opencode run --attach{/highlight} to connect to a running server",
-  "Run {highlight}opencode upgrade{/highlight} to update to the latest version",
-  "Run {highlight}opencode auth list{/highlight} to see all configured providers",
-  "Run {highlight}opencode agent create{/highlight} for guided agent creation",
+  "Run {highlight}kotencode serve{/highlight} for headless API access to KoteCode",
+  "Use {highlight}kotencode run --attach{/highlight} to connect to a running server",
+  "Run {highlight}kotencode upgrade{/highlight} to update to the latest version",
+  "Run {highlight}kotencode auth list{/highlight} to see all configured providers",
+  "Run {highlight}kotencode agent create{/highlight} for guided agent creation",
   "Use {highlight}/opencode{/highlight} in GitHub issues/PRs to trigger AI actions",
   "Run {highlight}opencode github install{/highlight} to set up the GitHub workflow",
   "Comment {highlight}/opencode fix this{/highlight} on issues to auto-create PRs",
@@ -264,7 +290,7 @@ const TIPS: Tip[] = [
   "Run {highlight}/unshare{/highlight} to remove a session from public access",
   "Permission {highlight}doom_loop{/highlight} prevents infinite tool call loops",
   "Permission {highlight}external_directory{/highlight} protects files outside project",
-  "Run {highlight}opencode debug config{/highlight} to troubleshoot configuration",
+  "Run {highlight}kotencode debug config{/highlight} to troubleshoot configuration",
   "Use {highlight}--print-logs{/highlight} flag to see detailed logs in stderr",
   (shortcuts) => `Use ${commandText("/timeline", shortcuts.sessionTimeline())} to jump to specific messages`,
   (shortcuts) => press(shortcuts.messagesToggleConceal(), "to toggle code block visibility in messages"),

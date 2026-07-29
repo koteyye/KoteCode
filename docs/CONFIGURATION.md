@@ -71,11 +71,12 @@ or supported authorization flow.
 | `KOTECODE_BOOTSTRAP_URL`        | Override the bootstrap config URL (dev/testing)                           |
 | `KOTECODE_PROXY_URL`            | Force the HTTPS Proxy origin — **priority over bootstrap**                |
 | `KOTECODE_DISABLE_PROXY`        | Explicitly send provider requests directly                                |
-| `KOTECODE_DISABLE_UPDATE_CHECK` | Reserved update-check kill switch; alpha updates are already disabled     |
+| `KOTECODE_DISABLE_UPDATE_CHECK` | Reserved update-check kill switch; updates are currently disabled         |
 | `KOTECODE_BIN_PATH`             | Point the launcher at a specific binary (also honors `OPENCODE_BIN_PATH`) |
+| `KOTECODE_LANG`                 | Terminal UI language: `ru` or `en`                                       |
 
-KoteCode alpha does not perform automatic update checks and rejects manual/API
-upgrade requests. Install a newer alpha explicitly from the KoteCode GitHub Releases
+KoteCode does not perform automatic update checks and rejects manual/API
+upgrade requests. Install a newer build explicitly from the KoteCode GitHub Releases
 page. The dormant upstream updater must not be enabled until every source and install
 method has been replaced with KoteCode-owned release infrastructure.
 
@@ -86,6 +87,20 @@ All OpenCode environment variables continue to work (`OPENCODE_CONFIG`,
 `OPENCODE_CLIENT`, etc.). They are documented in the OpenCode base. KoteCode does not
 remove or rename any of them.
 
+## Terminal language
+
+The terminal UI supports Russian and English only. Russian is the default. Set the
+language in `tui.json` inside the KoteCode config directory:
+
+```json
+{
+  "language": "ru"
+}
+```
+
+`KOTECODE_LANG=ru|en` selects the language when `language` is not set in the file.
+An explicit `tui.json` value takes precedence over the environment variable.
+
 ## Provider transport
 
 Kote Proxy wraps existing providers; it does not add a provider ID or credential.
@@ -94,6 +109,29 @@ Kote Proxy wraps existing providers; it does not add a provider ID or credential
 | ------------------------ | ---------------------------- | ----------------------------------------------- |
 | **Kote Proxy** (default) | Unchanged                    | HTTPS `CONNECT` tunnel from signed Proxy origin |
 | **Direct**               | Unchanged                    | KoteCode connects directly to the provider      |
+
+The Desktop app lets you choose this mode while connecting each provider and change
+it later in **Settings → Providers**. The model selector shows the selected mode once
+in the provider group heading.
+
+The same choice can be configured manually per provider:
+
+```jsonc
+{
+  "provider": {
+    "openai": {
+      "routing": "proxy", // "proxy" (default) or "direct"
+    },
+    "anthropic": {
+      "routing": "direct",
+    },
+  },
+}
+```
+
+Providers without an explicit `routing` value use Kote Proxy. The
+`KOTECODE_DISABLE_PROXY=1` environment override still forces all providers to use
+direct transport.
 
 KoteCode does not silently fall back to direct HTTPS if Proxy resolution or connection
 fails. Local plain-HTTP providers remain direct.

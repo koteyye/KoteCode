@@ -13,6 +13,9 @@ import { useServerSDK } from "@/context/server-sdk"
 import { useServerSync } from "@/context/server-sync"
 import { useLanguage } from "@/context/language"
 import { type FormState, headerRow, modelRow, validateCustomProvider } from "./dialog-custom-provider-form"
+import { ProviderRoutingSwitch } from "./provider-routing-switch"
+import { withProviderRouting, type ProviderRouting } from "@/utils/provider-routing"
+import type { Config } from "@opencode-ai/sdk/v2/client"
 
 type Props = {
   onBack: () => void
@@ -55,6 +58,7 @@ export function CustomProviderForm(props: { autofocus?: boolean } = {}) {
     headers: [headerRow()],
     err: {},
   })
+  const [routing, setRouting] = createStore({ value: "proxy" as ProviderRouting })
 
   const addModel = () => {
     setForm(
@@ -145,10 +149,16 @@ export function CustomProviderForm(props: { autofocus?: boolean } = {}) {
         })
       }
 
-      await serverSync().updateConfig({
-        provider: { [result.providerID]: result.config },
-        disabled_providers: nextDisabled,
-      })
+      await serverSync().updateConfig(
+        withProviderRouting(
+          {
+            provider: { [result.providerID]: result.config },
+            disabled_providers: nextDisabled,
+          } as Config,
+          result.providerID,
+          routing.value,
+        ),
+      )
       return result
     },
     onSuccess: (result) => {
@@ -190,6 +200,12 @@ export function CustomProviderForm(props: { autofocus?: boolean } = {}) {
           </Link>
           {language.t("provider.custom.description.suffix")}
         </p>
+
+        <div class="flex flex-col gap-2">
+          <div class="text-14-medium text-text-strong">{language.t("provider.routing.title")}</div>
+          <div class="text-14-regular text-text-base">{language.t("provider.routing.description")}</div>
+          <ProviderRoutingSwitch value={routing.value} onChange={(value) => setRouting("value", value)} />
+        </div>
 
         <div class="flex flex-col gap-4">
           <TextField

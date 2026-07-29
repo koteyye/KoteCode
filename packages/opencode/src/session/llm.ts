@@ -98,7 +98,7 @@ const live: Layer.Layer<
           config.get(),
           provider.getProvider(input.model.providerID),
           auth.get(input.model.providerID),
-          provider.proxy(),
+          provider.proxy(input.model.providerID),
         ],
         { concurrency: "unbounded" },
       )

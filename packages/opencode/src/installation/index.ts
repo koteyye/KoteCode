@@ -22,7 +22,7 @@ export type ReleaseType = "patch" | "minor" | "major"
 export const Event = InstallationEvent
 export const UpdatesEnabled = false
 export const UpdatesDisabledMessage =
-  "KoteCode alpha updates are disabled. Install a newer build from https://github.com/koteyye/KoteCode/releases."
+  "KoteCode updates are not configured yet. Install a newer build from https://github.com/koteyye/KoteCode/releases."
 
 export function getReleaseType(current: string, latest: string): ReleaseType {
   const currMajor = semver.major(current)

@@ -15,9 +15,9 @@ describe("KoteCode desktop identity", () => {
     })
   })
 
-  test("keeps unsafe alpha integrations disabled", () => {
+  test("keeps unavailable integrations disabled", () => {
     expect(UPDATER_ENABLED).toBe(false)
     expect(WSL_ENABLED).toBe(false)
-    expect(WSL_DISABLED_MESSAGE).toContain("KoteCode alpha")
+    expect(WSL_DISABLED_MESSAGE).toContain("this KoteCode release")
   })
 })

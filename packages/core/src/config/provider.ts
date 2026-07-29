@@ -3,6 +3,7 @@ export * as ConfigProvider from "./provider"
 import { Schema } from "effect"
 import { ProviderV2 } from "../provider"
 import { ModelV2 } from "../model"
+import { ProviderRouting } from "../kote/provider-routing"
 
 export class Request extends Schema.Class<Request>("ConfigV2.Provider.Request")({
   headers: Schema.Record(Schema.String, Schema.String).pipe(Schema.optional),
@@ -64,6 +65,7 @@ class Model extends Schema.Class<Model>("ConfigV2.Model")({
 
 export class Info extends Schema.Class<Info>("ConfigV2.Provider")({
   name: Schema.String.pipe(Schema.optional),
+  routing: ProviderRouting.Mode.pipe(Schema.optional),
   env: Schema.String.pipe(Schema.Array, Schema.optional),
   api: ProviderV2.Api.pipe(Schema.optional),
   request: Request.pipe(Schema.optional),

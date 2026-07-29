@@ -32,7 +32,8 @@ import { ModelStatus } from "./model-status"
 import { RuntimeFlags } from "@/effect/runtime-flags"
 import { ProviderError } from "./error"
 import { resolveProxy, type ResolveProxyResult } from "@opencode-ai/core/kote/bootstrap"
-import { proxyRequestInit } from "./proxy"
+import { proxyFetch } from "./proxy"
+import { ProviderRouting } from "@opencode-ai/core/kote/provider-routing"
 
 const OPENAI_HEADER_TIMEOUT_DEFAULT = 300_000
 
@@ -1149,7 +1150,7 @@ export type Error = ModelNotFoundError | InitError | NoProvidersError | NoModels
 
 export interface Interface {
   readonly list: () => Effect.Effect<Record<ProviderV2.ID, Info>>
-  readonly proxy: () => Effect.Effect<ResolveProxyResult>
+  readonly proxy: (providerID?: ProviderV2.ID) => Effect.Effect<ResolveProxyResult>
   readonly getProvider: (providerID: ProviderV2.ID) => Effect.Effect<Info>
   readonly getModel: (providerID: ProviderV2.ID, modelID: ModelV2.ID) => Effect.Effect<Model, ModelNotFoundError>
   readonly getLanguage: (model: Model) => Effect.Effect<LanguageModelV3, ModelNotFoundError>
@@ -1169,6 +1170,7 @@ interface State {
   modelLoaders: Record<string, CustomModelLoader>
   varsLoaders: Record<string, CustomVarsLoader>
   proxy: ResolveProxyResult
+  routing: Record<string, ProviderRouting.Mode>
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/Provider") {}
@@ -1666,6 +1668,9 @@ const layer = Layer.effect(
           modelLoaders,
           varsLoaders,
           proxy,
+          routing: Object.fromEntries(
+            Object.entries(cfg.provider ?? {}).map(([id, provider]) => [id, ProviderRouting.read(provider.routing)]),
+          ),
         }
       }),
     )
@@ -1726,12 +1731,13 @@ const layer = Layer.effect(
             ...model.headers,
           }
 
+        const transport = ProviderRouting.transport(ProviderRouting.read(s.routing[model.providerID]), s.proxy)
         const key = Hash.fast(
           JSON.stringify({
             providerID: model.providerID,
             npm: model.api.npm,
             options,
-            proxy: s.proxy.source === "disabled" || s.proxy.source === "none" ? s.proxy.source : s.proxy.url,
+            proxy: transport.source === "disabled" || transport.source === "none" ? transport.source : transport.url,
           }),
         )
         const existing = s.sdk.get(key)
@@ -1742,9 +1748,9 @@ const layer = Layer.effect(
         const headerTimeout = options["headerTimeout"]
         delete options["chunkTimeout"]
         delete options["headerTimeout"]
+        const fetchFn = proxyFetch(customFetch ?? fetch, transport)
 
         options["fetch"] = async (input: any, init?: BunFetchRequestInit) => {
-          const fetchFn = customFetch ?? fetch
           const opts = init ?? {}
           const chunkAbortCtl = typeof chunkTimeout === "number" && chunkTimeout > 0 ? new AbortController() : undefined
           const headerTimeoutMs = headerTimeout === false ? undefined : headerTimeout
@@ -1761,7 +1767,7 @@ const layer = Layer.effect(
           if (combined) opts.signal = combined
 
           const res = await fetchFn(input, {
-            ...proxyRequestInit(input, opts, s.proxy),
+            ...opts,
             // @ts-ignore see here: https://github.com/oven-sh/bun/issues/16682
             timeout: false,
           }).finally(() => headerTimeoutCtl?.clear())
@@ -1811,7 +1817,11 @@ const layer = Layer.effect(
       InstanceState.use(state, (s) => s.providers[providerID]),
     )
 
-    const proxy = Effect.fn("Provider.proxy")(() => InstanceState.use(state, (s) => s.proxy))
+    const proxy = Effect.fn("Provider.proxy")((providerID?: ProviderV2.ID) =>
+      InstanceState.use(state, (s) =>
+        providerID ? ProviderRouting.transport(ProviderRouting.read(s.routing[providerID]), s.proxy) : s.proxy,
+      ),
+    )
 
     const getModel = Effect.fn("Provider.getModel")(function* (providerID: ProviderV2.ID, modelID: ModelV2.ID) {
       const s = yield* InstanceState.get(state)

@@ -1031,7 +1031,7 @@ export default function LegacyLayout(props: ParentProps) {
       commands.push({
         id: `project.${number}`,
         category: language.t("command.category.project"),
-        title: `Open Project {number}`,
+        title: language.t("command.project.openIndex", { number }),
         keybind: `mod+${number}`,
         disabled: layout.projects.list().length <= index,
         hidden: true,
@@ -2236,7 +2236,7 @@ export default function LegacyLayout(props: ParentProps) {
       settingsKeybind={() => command.keybind("settings.open")}
       onOpenSettings={openSettings}
       helpLabel={() => language.t("sidebar.help")}
-      onOpenHelp={() => platform.openLink("https://opencode.ai/desktop-feedback")}
+      onOpenHelp={() => platform.openLink("https://github.com/koteyye/KoteCode/issues")}
       renderPanel={() =>
         mobile ? <SidebarPanel project={currentProject} mobile /> : <SidebarPanel project={currentProject} merged />
       }

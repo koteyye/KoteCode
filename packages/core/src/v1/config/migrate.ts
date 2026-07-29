@@ -173,6 +173,7 @@ function migrateProvider(info: ConfigProviderV1.Info) {
   const url = info.api ?? options.url
   return {
     name: info.name,
+    routing: info.routing,
     env: info.env,
     api: info.npm
       ? {

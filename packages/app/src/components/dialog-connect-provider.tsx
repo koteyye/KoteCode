@@ -16,7 +16,6 @@ import { showToast } from "@/utils/toast"
 import {
   type Accessor,
   type Component,
-  createEffect,
   createMemo,
   createResource,
   createUniqueId,
@@ -39,6 +38,9 @@ import { popularProviders, useProviders } from "@/hooks/use-providers"
 import { CustomProviderForm } from "./dialog-custom-provider"
 import { decode64 } from "@/utils/base64"
 import { pathKey } from "@/utils/path-key"
+import type { ProviderRouting } from "@/utils/provider-routing"
+import { ProviderRoutingSwitch } from "./provider-routing-switch"
+import { useProviderRouting } from "@/hooks/use-provider-routing"
 
 const CUSTOM_ID = "_custom"
 type ConnectMethod = Extract<IntegrationMethod, { type: "key" | "oauth" }>
@@ -392,6 +394,7 @@ function ProviderConnection(props: {
   const settings = useSettings()
   const newLayout = settings.general.newLayoutDesigns
   const providers = useProviders(props.directory)
+  const routing = useProviderRouting()
   const directory = () => props.directory?.() ?? decode64(params.dir)
   const location = () => {
     const value = directory()
@@ -440,6 +443,9 @@ function ProviderConnection(props: {
     promptInputs: undefined as undefined | Record<string, string>,
     state: "pending" as undefined | "pending" | "complete" | "error" | "prompt",
     error: undefined as string | undefined,
+    routing: routing.get(props.provider),
+    routingConfirmed: false,
+    routingSaving: false,
   })
 
   type Action =
@@ -516,10 +522,15 @@ function ProviderConnection(props: {
     }
   }
 
+  const localizeError = (message: string) =>
+    message === "Unexpected server error. Check server logs for details."
+      ? language.t("common.unexpectedServerError")
+      : message
+
   function formatError(value: unknown, fallback: string): string {
     if (value && typeof value === "object" && "data" in value) {
       const data = (value as { data?: { message?: unknown } }).data
-      if (typeof data?.message === "string" && data.message) return data.message
+      if (typeof data?.message === "string" && data.message) return localizeError(data.message)
     }
     if (value && typeof value === "object" && "error" in value) {
       const nested = formatError((value as { error?: unknown }).error, "")
@@ -527,10 +538,10 @@ function ProviderConnection(props: {
     }
     if (value && typeof value === "object" && "message" in value) {
       const message = (value as { message?: unknown }).message
-      if (typeof message === "string" && message) return message
+      if (typeof message === "string" && message) return localizeError(message)
     }
-    if (value instanceof Error && value.message) return value.message
-    if (typeof value === "string" && value) return value
+    if (value instanceof Error && value.message) return localizeError(value.message)
+    if (typeof value === "string" && value) return localizeError(value)
     return fallback
   }
 
@@ -553,7 +564,10 @@ function ProviderConnection(props: {
         .api.integration.oauth.connect({
           integrationID: props.provider,
           methodID: method.id,
-          inputs: inputs ?? {},
+          inputs: {
+            ...inputs,
+            koteProviderRouting: store.routing,
+          },
           location: location(),
         })
         .then((x) => {
@@ -696,15 +710,71 @@ function ProviderConnection(props: {
     listRef?.onKeyDown(e)
   }
 
-  let auto = false
-  createEffect(() => {
-    if (auto) return
-    if (loading()) return
-    if (methods().length === 1) {
-      auto = true
-      void selectMethod(0)
-    }
-  })
+  async function confirmRouting() {
+    setStore({ routingSaving: true, error: undefined })
+    const saved = await routing
+      .update(props.provider, store.routing)
+      .then(() => true)
+      .catch((error: unknown) => {
+        setStore("error", formatError(error, language.t("common.requestFailed")))
+        return false
+      })
+    if (!alive.value) return
+    setStore("routingSaving", false)
+    if (!saved) return
+    setStore("routingConfirmed", true)
+    if (methods().length === 1) await selectMethod(0)
+  }
+
+  function RoutingSelection() {
+    const change = (value: ProviderRouting) => setStore({ routing: value, error: undefined })
+    if (newLayout())
+      return (
+        <div class="flex flex-col items-start gap-5 px-3 text-[13px] font-[440] leading-5 tracking-[-0.04px] text-v2-text-text-muted">
+          <div class="flex flex-col gap-1">
+            <div class="font-[530] text-v2-text-text-base">{language.t("provider.routing.title")}</div>
+            <div>{language.t("provider.routing.description")}</div>
+          </div>
+          <ProviderRoutingSwitch value={store.routing} disabled={store.routingSaving} v2 onChange={change} />
+          <Show when={store.error}>
+            {(error) => (
+              <div role="alert" class="text-xs text-v2-state-fg-danger">
+                {error()}
+              </div>
+            )}
+          </Show>
+          <ButtonV2 variant="contrast" disabled={store.routingSaving} onClick={() => void confirmRouting()}>
+            {language.t("common.continue")}
+          </ButtonV2>
+        </div>
+      )
+
+    return (
+      <div class="flex flex-col items-start gap-4">
+        <div class="flex flex-col gap-1">
+          <div class="text-14-medium text-text-strong">{language.t("provider.routing.title")}</div>
+          <div class="text-14-regular text-text-base">{language.t("provider.routing.description")}</div>
+        </div>
+        <ProviderRoutingSwitch value={store.routing} disabled={store.routingSaving} onChange={change} />
+        <Show when={store.error}>
+          {(error) => (
+            <div role="alert" class="text-12-regular text-icon-critical-base">
+              {error()}
+            </div>
+          )}
+        </Show>
+        <Button
+          class="w-auto"
+          size="large"
+          variant="primary"
+          disabled={store.routingSaving}
+          onClick={() => void confirmRouting()}
+        >
+          {language.t("common.continue")}
+        </Button>
+      </div>
+    )
+  }
 
   async function complete() {
     const value = directory()
@@ -723,6 +793,11 @@ function ProviderConnection(props: {
   function goBack() {
     if (methods().length > 1 && store.methodIndex !== undefined) {
       dispatch({ type: "method.reset" })
+      return
+    }
+    if (store.routingConfirmed) {
+      dispatch({ type: "method.reset" })
+      setStore("routingConfirmed", false)
       return
     }
     props.onBack()
@@ -1134,6 +1209,9 @@ function ProviderConnection(props: {
                   <span>{language.t("provider.connect.status.inProgress")}</span>
                 </div>
               </div>
+            </Match>
+            <Match when={!store.routingConfirmed}>
+              <RoutingSelection />
             </Match>
             <Match when={store.methodIndex === undefined}>
               <MethodSelection />

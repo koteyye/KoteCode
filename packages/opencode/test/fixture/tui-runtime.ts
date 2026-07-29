@@ -24,7 +24,7 @@ export function createTuiResolvedKeybinds(input: Partial<TuiKeybind.Keybinds> = 
 
 export function createTuiResolvedConfig(input: ResolvedInput = {}): HostResolved {
   return {
-    ...resolve(input, { terminalSuspend: process.platform !== "win32" }),
+    ...resolve({ language: "en", ...input }, { terminalSuspend: process.platform !== "win32" }),
     plugin_origins: input.plugin_origins,
   }
 }

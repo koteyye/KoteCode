@@ -6,6 +6,9 @@ import { Cause, Context, Effect, Layer, Schema, Scope } from "effect"
 import { ModelV2 } from "./model"
 import { ProviderV2 } from "./provider"
 import { State } from "./state"
+import { resolveProxy, type ResolveProxyResult } from "./kote/bootstrap"
+import { proxyFetch } from "./kote/proxy"
+import { ProviderRouting } from "./kote/provider-routing"
 
 type SDK = any
 
@@ -71,11 +74,14 @@ function wrapSSE(res: Response, ms: number, ctl: AbortController) {
   })
 }
 
-function prepareOptions(model: ModelV2.Info, pkg: string) {
+function prepareOptions(model: ModelV2.Info, pkg: string, proxy: ResolveProxyResult) {
+  const requestBody = Object.fromEntries(
+    Object.entries(model.request.body).filter(([key]) => key !== ProviderRouting.RequestKey),
+  )
   const options: Record<string, any> = {
     name: model.providerID,
     ...(model.api.type === "aisdk" ? (model.api.settings ?? {}) : {}),
-    ...model.request.body,
+    ...requestBody,
   }
   if (model.api.type === "aisdk" && model.api.url) options.baseURL = model.api.url
 
@@ -83,7 +89,7 @@ function prepareOptions(model: ModelV2.Info, pkg: string) {
   const chunkTimeout = options.chunkTimeout
   delete options.chunkTimeout
   options.fetch = async (input: Parameters<typeof fetch>[0], init?: RequestInit) => {
-    const opts = { ...(init ?? {}) }
+    const opts = { ...init }
     const signals = [
       opts.signal,
       typeof chunkTimeout === "number" && chunkTimeout > 0 ? new AbortController() : undefined,
@@ -110,10 +116,10 @@ function prepareOptions(model: ModelV2.Info, pkg: string) {
       }
     }
 
-    const res = await (typeof customFetch === "function" ? customFetch : fetch)(input, {
-      ...opts,
-      timeout: false,
-    })
+    const fetchFn = proxyFetch(typeof customFetch === "function" ? customFetch : fetch, proxy)
+    const requestInit = { ...opts } as RequestInit & { timeout?: boolean }
+    requestInit.timeout = false
+    const res = await fetchFn(input, requestInit)
     if (!chunkAbortCtl || typeof chunkTimeout !== "number") return res
     return wrapSSE(res, chunkTimeout, chunkAbortCtl)
   }
@@ -196,7 +202,8 @@ export const locationLayer = Layer.effect(
       runSDK: (event) => run(sdkHooks, event),
       runLanguage: (event) => run(languageHooks, event),
       language: Effect.fn("AISDK.language")(function* (model) {
-        const key = `${model.providerID}/${model.id}/${model.request.variant ?? "default"}`
+        const routing = ProviderRouting.read(model.request.body[ProviderRouting.RequestKey])
+        const key = `${model.providerID}/${model.id}/${model.request.variant ?? "default"}/${routing}`
         const existing = languages.get(key)
         if (existing) return existing
         if (model.api.type !== "aisdk")
@@ -205,7 +212,11 @@ export const locationLayer = Layer.effect(
             cause: new Error(`Unsupported api ${model.api.type}`),
           })
 
-        const options = prepareOptions(model, model.api.package)
+        const proxy =
+          routing === "direct"
+            ? ProviderRouting.transport(routing, { source: "disabled" })
+            : ProviderRouting.transport(routing, yield* Effect.promise(() => resolveProxy()))
+        const options = prepareOptions(model, model.api.package, proxy)
         const sdkKey = JSON.stringify({
           providerID: model.providerID,
           api: model.api,

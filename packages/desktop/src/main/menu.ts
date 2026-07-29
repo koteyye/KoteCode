@@ -1,7 +1,8 @@
-import { BrowserWindow, Menu, shell } from "electron"
+import { app, BrowserWindow, Menu, shell } from "electron"
 import type { MenuItemConstructorOptions } from "electron"
 import {
   DESKTOP_MENU,
+  desktopMenuLabel,
   desktopMenuVisible,
   type DesktopMenuEntry,
   type DesktopMenuRole,
@@ -22,7 +23,7 @@ export function createMenu(deps: Deps) {
   const template = DESKTOP_MENU.filter((menu) => desktopMenuVisible(menu, "macos")).map((menu) => {
     if (menu.role) return { role: nativeRole(menu.role) }
     return {
-      label: menu.label,
+      label: desktopMenuLabel(menu.label, app.getLocale()),
       submenu: menu.items
         ?.filter((entry) => desktopMenuVisible(entry, "macos"))
         .map((entry) => nativeItem(entry, deps)),
@@ -37,7 +38,7 @@ function nativeItem(entry: DesktopMenuEntry, deps: Deps): MenuItemConstructorOpt
   if (entry.role) return { role: nativeRole(entry.role) }
 
   const item: MenuItemConstructorOptions = {
-    label: entry.label,
+    label: entry.label ? desktopMenuLabel(entry.label, app.getLocale()) : undefined,
     accelerator: entry.accelerator?.macos,
     enabled: entry.enabled === "updater" ? UPDATER_ENABLED : undefined,
   }

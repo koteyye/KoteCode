@@ -9,6 +9,7 @@ import { PluginV2 } from "@opencode-ai/core/plugin"
 import { PluginHost } from "@opencode-ai/core/plugin/host"
 import { OpenAIPlugin } from "@opencode-ai/core/plugin/provider/openai"
 import { ProviderV2 } from "@opencode-ai/core/provider"
+import { Config } from "@opencode-ai/core/config"
 import { testEffect } from "../lib/effect"
 import { PluginTestLayer } from "./fixture"
 
@@ -19,7 +20,11 @@ const addPlugin = Effect.fn(function* () {
   const aisdk = yield* AISDK.Service
   const host = yield* PluginHost.make(plugin)
   const integrations = yield* Integration.Service
-  yield* OpenAIPlugin.effect(host).pipe(Effect.provideService(Integration.Service, integrations))
+  const config = Config.Service.of({ entries: () => Effect.succeed([]) })
+  yield* OpenAIPlugin.effect(host).pipe(
+    Effect.provideService(Integration.Service, integrations),
+    Effect.provideService(Config.Service, config),
+  )
 })
 
 function required<T>(value: T | undefined): T {

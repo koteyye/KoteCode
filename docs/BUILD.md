@@ -83,7 +83,7 @@ Run it:
 `--version` prints both the KoteCode version and the OpenCode base, e.g.:
 
 ```
-KoteCode 0.1.0-alpha.1
+KoteCode v1.0.0
 Based on OpenCode 1.18.5 (fork base 1.18.5 e5cc278)
 ```
 

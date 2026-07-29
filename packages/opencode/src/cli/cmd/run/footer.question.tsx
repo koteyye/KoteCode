@@ -43,13 +43,18 @@ import {
 import { footerWidthPolicy } from "./footer.width"
 import type { RunFooterTheme } from "./theme"
 import type { QuestionReject, QuestionReply } from "./types"
+import type { Language } from "@opencode-ai/tui/util/locale"
+import { Locale } from "@/util/locale"
 
 export function RunQuestionBody(props: {
+  language?: Language
   request: QuestionRequest
   theme: RunFooterTheme
   onReply: (input: QuestionReply) => void | Promise<void>
   onReject: (input: QuestionReject) => void | Promise<void>
 }) {
+  const language = () => props.language ?? "en"
+  const t = (input: string) => Locale.translate(input, language())
   const dims = useTerminalDimensions()
   const [state, setState] = createSignal(createQuestionBodyState(props.request.id))
   const single = createMemo(() => questionSingle(props.request))
@@ -62,18 +67,18 @@ export function RunQuestionBody(props: {
   const narrow = createMemo(() => footerWidthPolicy(dims().width).dialog.narrow)
   const verb = createMemo(() => {
     if (confirm()) {
-      return "submit"
+      return t("submit")
     }
 
     if (info()?.multiple) {
-      return "toggle"
+      return t("toggle")
     }
 
     if (single()) {
-      return "submit"
+      return t("submit")
     }
 
-    return "confirm"
+    return t("confirm")
   })
   let area: TextareaRenderable | undefined
 
@@ -309,7 +314,7 @@ export function RunQuestionBody(props: {
                 if (!disabled()) setTab(props.request.questions.length)
               }}
             >
-              <text fg={confirm() ? props.theme.surface : props.theme.muted}>Confirm</text>
+              <text fg={confirm() ? props.theme.surface : props.theme.muted}>{t("Confirm")}</text>
             </box>
           </box>
         </Show>
@@ -330,7 +335,7 @@ export function RunQuestionBody(props: {
               >
                 <box width="100%" flexDirection="column" gap={1}>
                   <box paddingLeft={1}>
-                    <text fg={props.theme.text}>Review</text>
+                    <text fg={props.theme.text}>{t("Review")}</text>
                   </box>
                   <For each={props.request.questions}>
                     {(item, index) => {
@@ -341,7 +346,7 @@ export function RunQuestionBody(props: {
                           <text wrapMode="word">
                             <span style={{ fg: props.theme.muted }}>{item.header}:</span>{" "}
                             <span style={{ fg: answered() ? props.theme.text : props.theme.error }}>
-                              {answered() ? value() : "(not answered)"}
+                              {answered() ? value() : t("(not answered)")}
                             </span>
                           </text>
                         </box>
@@ -357,7 +362,7 @@ export function RunQuestionBody(props: {
             <box>
               <text fg={props.theme.text} wrapMode="word">
                 {info()?.question}
-                {info()?.multiple ? " (select all that apply)" : ""}
+                {info()?.multiple ? t(" (select all that apply)") : ""}
               </text>
             </box>
 
@@ -453,8 +458,8 @@ export function RunQuestionBody(props: {
                             fg={other() ? props.theme.highlight : picked() ? props.theme.success : props.theme.text}
                           >
                             {info()?.multiple
-                              ? `[${picked() ? "✓" : " "}] Type your own answer`
-                              : "Type your own answer"}
+                              ? `[${picked() ? "✓" : " "}] ${t("Type your own answer")}`
+                              : t("Type your own answer")}
                           </text>
                         </box>
                         <Show when={!info()?.multiple}>
@@ -479,7 +484,7 @@ export function RunQuestionBody(props: {
                             minHeight={1}
                             maxHeight={4}
                             wrapMode="word"
-                            placeholder="Type your own answer"
+                            placeholder={t("Type your own answer")}
                             placeholderColor={props.theme.muted}
                             textColor={props.theme.text}
                             focusedTextColor={props.theme.text}
@@ -525,7 +530,7 @@ export function RunQuestionBody(props: {
           when={!disabled()}
           fallback={
             <text fg={props.theme.muted} wrapMode="word">
-              Waiting for question event...
+              {t("Waiting for question event...")}
             </text>
           }
         >
@@ -540,29 +545,29 @@ export function RunQuestionBody(props: {
               fallback={
                 <>
                   <text fg={props.theme.text}>
-                    enter <span style={{ fg: props.theme.muted }}>save</span>
+                    enter <span style={{ fg: props.theme.muted }}>{t("save")}</span>
                   </text>
                   <text fg={props.theme.text}>
-                    esc <span style={{ fg: props.theme.muted }}>cancel</span>
+                    esc <span style={{ fg: props.theme.muted }}>{t("cancel")}</span>
                   </text>
                 </>
               }
             >
               <Show when={!single()}>
                 <text fg={props.theme.text}>
-                  {"⇆"} <span style={{ fg: props.theme.muted }}>tab</span>
+                  {"⇆"} <span style={{ fg: props.theme.muted }}>{t("tab")}</span>
                 </text>
               </Show>
               <Show when={!confirm()}>
                 <text fg={props.theme.text}>
-                  {"↑↓"} <span style={{ fg: props.theme.muted }}>select</span>
+                  {"↑↓"} <span style={{ fg: props.theme.muted }}>{t("select")}</span>
                 </text>
               </Show>
               <text fg={props.theme.text}>
                 enter <span style={{ fg: props.theme.muted }}>{verb()}</span>
               </text>
               <text fg={props.theme.text}>
-                esc <span style={{ fg: props.theme.muted }}>dismiss</span>
+                esc <span style={{ fg: props.theme.muted }}>{t("dismiss")}</span>
               </text>
             </Show>
           </box>

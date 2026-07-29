@@ -3,7 +3,8 @@ import { TextAttributes, type ColorInput } from "@opentui/core"
 import { useTerminalDimensions } from "@opentui/solid"
 import { createEffect, createMemo, createSignal, type Accessor } from "solid-js"
 import { transparent, type RunFooterTheme } from "./theme"
-import * as Locale from "@/util/locale"
+import { Locale } from "@/util/locale"
+import type { Language } from "@opencode-ai/tui/util/locale"
 
 export const FOOTER_MENU_ROWS = 8
 
@@ -128,6 +129,7 @@ export function RunFooterMenu(props: {
   grouped?: boolean
   background?: boolean
   headerColor?: ColorInput
+  language?: Language
 }) {
   const term = useTerminalDimensions()
   const limit = () => props.limit ?? FOOTER_MENU_ROWS
@@ -196,7 +198,7 @@ export function RunFooterMenu(props: {
       ...props
         .items()
         .filter((item) => item.description)
-        .map((item) => Bun.stringWidth(item.display)),
+        .map((item) => Bun.stringWidth(Locale.translate(item.display, props.language ?? "en"))),
     )
     return width === 0 ? 0 : width + 2
   })
@@ -205,14 +207,16 @@ export function RunFooterMenu(props: {
       return ""
     }
 
-    return " ".repeat(Math.max(1, descriptionColumn() - Bun.stringWidth(item.display)))
+    return " ".repeat(
+      Math.max(1, descriptionColumn() - Bun.stringWidth(Locale.translate(item.display, props.language ?? "en"))),
+    )
   }
   const descriptionText = (item: RunFooterMenuItem) => {
     if (!item.description) {
       return
     }
 
-    const footerWidth = item.footer ? Bun.stringWidth(item.footer) + 1 : 0
+    const footerWidth = item.footer ? Bun.stringWidth(Locale.translate(item.footer, props.language ?? "en")) + 1 : 0
     const available =
       term().width -
       (border() ? 1 : 0) -
@@ -221,7 +225,7 @@ export function RunFooterMenu(props: {
       descriptionColumn() -
       footerWidth -
       4
-    return Locale.truncate(item.description, Math.max(12, available))
+    return Locale.truncate(Locale.translate(item.description, props.language ?? "en"), Math.max(12, available))
   }
   return (
     <box
@@ -249,7 +253,7 @@ export function RunFooterMenu(props: {
             backgroundColor={props.background ? props.theme().shade : transparent}
           >
             <text fg={props.theme().muted} wrapMode="none" truncate>
-              {props.empty ?? "No matching items"}
+              {Locale.translate(props.empty ?? "No matching items", props.language ?? "en")}
             </text>
           </box>
         </box>
@@ -268,7 +272,7 @@ export function RunFooterMenu(props: {
                   wrapMode="none"
                   truncate
                 >
-                  {row.label}
+                  {Locale.translate(row.label, props.language ?? "en")}
                 </text>
               </box>
             )
@@ -306,7 +310,7 @@ export function RunFooterMenu(props: {
                       truncate
                       flexShrink={0}
                     >
-                      {row.item.display}
+                      {Locale.translate(row.item.display, props.language ?? "en")}
                     </text>
                     {row.item.description ? (
                       <>
@@ -337,7 +341,7 @@ export function RunFooterMenu(props: {
                       truncate
                       flexShrink={0}
                     >
-                      {row.item.footer}
+                      {Locale.translate(row.item.footer, props.language ?? "en")}
                     </text>
                   ) : undefined}
                 </box>

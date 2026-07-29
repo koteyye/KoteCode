@@ -8,6 +8,7 @@ import { ModelV2 } from "@opencode-ai/core/model"
 import { PluginV2 } from "@opencode-ai/core/plugin"
 import { PluginHost } from "@opencode-ai/core/plugin/host"
 import { ProviderV2 } from "@opencode-ai/core/provider"
+import { ProviderRouting } from "@opencode-ai/core/kote/provider-routing"
 import { testEffect } from "../lib/effect"
 import { PluginTestLayer } from "../plugin/fixture"
 
@@ -168,6 +169,7 @@ describe("ConfigProviderPlugin.Plugin", () => {
                   providers: {
                     custom: {
                       name: "Configured",
+                      routing: "direct",
                       env: ["CUSTOM_API_KEY"],
                       api: { type: "native", settings: {} },
                       request: request({ first: "first", shared: "first" }),
@@ -249,6 +251,7 @@ describe("ConfigProviderPlugin.Plugin", () => {
         expect(provider.disabled).toBeUndefined()
         expect(provider.api).toEqual({ type: "aisdk", package: "custom-sdk", url: "https://example.test" })
         expect(provider.request.headers).toEqual({ first: "first", shared: "last", last: "last" })
+        expect(provider.request.body[ProviderRouting.RequestKey]).toBe("direct")
         expect(model.api.id).toBe(ModelV2.ID.make("api-chat"))
         expect(model.name).toBe("Last")
         expect(model.capabilities).toEqual({ tools: true, input: ["text"], output: ["text"] })

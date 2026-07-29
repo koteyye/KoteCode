@@ -39,6 +39,10 @@ import { MAX_STEPS_PROMPT } from "./max-steps"
 import { Snapshot } from "../../snapshot"
 import { makeLocationNode } from "../../effect/app-node"
 import { llmClient } from "../../effect/app-node-platform"
+import { resolveProxy } from "../../kote/bootstrap"
+import { proxyFetch } from "../../kote/proxy"
+import { ProviderRouting } from "../../kote/provider-routing"
+import { FetchHttpClient } from "effect/unstable/http"
 
 /**
  * Runs one durable coding-agent Session until it settles.
@@ -197,6 +201,18 @@ const layer = Layer.effect(
       const system =
         initialized ?? (yield* SessionContextEpoch.prepare(db, events, loadSystemContext(agent), session.id))
       const model = yield* models.resolve(session)
+      const routing = ProviderRouting.read(
+        (yield* config.entries())
+          .filter((entry): entry is Config.Document => entry.type === "document")
+          .flatMap((entry) => {
+            const provider = entry.info.providers?.[model.provider]
+            return provider ? [provider] : []
+          })
+          .findLast((provider) => provider.routing !== undefined)?.routing,
+      )
+      const transport =
+        routing === "direct" ? { source: "disabled" as const } : yield* Effect.promise(() => resolveProxy())
+      const fetch = proxyFetch(globalThis.fetch, transport)
       const entries = yield* SessionHistory.entriesForRunner(db, session.id, system.baselineSeq)
       const context = entries.map((entry) => entry.message)
       const isLastStep = agent.info?.steps !== undefined && currentStep >= agent.info.steps
@@ -230,6 +246,7 @@ const layer = Layer.effect(
         withPublication(publisher.publish(event, outputPaths))
       let overflowFailure: ProviderErrorEvent | undefined
       const providerStream = llm.stream(request).pipe(
+        Stream.provideService(FetchHttpClient.Fetch, fetch),
         Stream.runForEach((event) =>
           Effect.gen(function* () {
             if (overflowFailure || publisher.hasProviderError()) return

@@ -3,6 +3,7 @@ import { bootstrapSessionData, createSessionData, reduceSessionData, type Sessio
 import { messagePrompt, type SessionMessages } from "./session.shared"
 import { messageTurnSummaryCommit } from "./turn-summary"
 import type { FooterPatch, LocalReplayRow, RunProvider, StreamCommit } from "./types"
+import type { Language } from "@opencode-ai/tui/util/locale"
 
 type ReplayInput = {
   messages: SessionMessages
@@ -11,11 +12,13 @@ type ReplayInput = {
   thinking: boolean
   limits: Record<string, number>
   providers?: RunProvider[]
+  language?: Language
 }
 
 type ReplayConfig = {
   limits: Record<string, number>
   providers?: RunProvider[]
+  language?: Language
   summaries: ReadonlySet<string>
 }
 
@@ -218,7 +221,7 @@ function replayMessage(
   }
 
   const summary = config.summaries.has(message.info.id)
-    ? messageTurnSummaryCommit(message, config.providers)
+    ? messageTurnSummaryCommit(message, config.providers, config.language)
     : undefined
   if (summary) {
     commits.push(summary)
@@ -247,6 +250,7 @@ export function replaySession(input: ReplayInput): SessionReplay {
     const next = replayMessage(data, message, input.thinking, {
       limits: input.limits,
       providers: input.providers,
+      language: input.language,
       summaries,
     })
     commits.push(...next.commits)

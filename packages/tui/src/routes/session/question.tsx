@@ -8,6 +8,7 @@ import { useSDK } from "../../context/sdk"
 import { SplitBorder } from "../../ui/border"
 import { useTuiConfig } from "../../config"
 import { useBindings, useOpencodeModeStack } from "../../keymap"
+import { Locale } from "../../util/locale"
 
 const QUESTION_MODE = "question"
 
@@ -16,6 +17,7 @@ export function QuestionPrompt(props: { request: QuestionRequest; directory?: st
   const { theme } = useTheme()
   const renderer = useRenderer()
   const tuiConfig = useTuiConfig()
+  const t = (input: string) => Locale.translate(input, tuiConfig.language)
   const modeStack = useOpencodeModeStack()
 
   const questions = createMemo(() => props.request.questions)
@@ -136,7 +138,7 @@ export function QuestionPrompt(props: { request: QuestionRequest; directory?: st
     commands: [
       {
         name: "prompt.clear",
-        title: "Clear answer edit",
+        title: t("Clear answer edit"),
         category: "Question",
         run() {
           const text = textarea?.plainText ?? ""
@@ -217,7 +219,7 @@ export function QuestionPrompt(props: { request: QuestionRequest; directory?: st
       commands: [
         {
           name: "app.exit",
-          title: "Reject question",
+          title: t("Reject question"),
           category: "Question",
           run() {
             reject()
@@ -347,7 +349,7 @@ export function QuestionPrompt(props: { request: QuestionRequest; directory?: st
                 selectTab(questions().length)
               }}
             >
-              <text fg={confirm() ? selectedForeground(theme, theme.accent) : theme.textMuted}>Confirm</text>
+              <text fg={confirm() ? selectedForeground(theme, theme.accent) : theme.textMuted}>{t("Confirm")}</text>
             </box>
           </box>
         </Show>
@@ -357,7 +359,7 @@ export function QuestionPrompt(props: { request: QuestionRequest; directory?: st
             <box>
               <text fg={theme.text}>
                 {question()?.question}
-                {multi() ? " (select all that apply)" : ""}
+                {multi() ? t(" (select all that apply)") : ""}
               </text>
             </box>
             <box>
@@ -414,7 +416,9 @@ export function QuestionPrompt(props: { request: QuestionRequest; directory?: st
                     </box>
                     <box backgroundColor={other() ? theme.backgroundElement : undefined}>
                       <text fg={other() ? theme.secondary : customPicked() ? theme.success : theme.text}>
-                        {multi() ? `[${customPicked() ? "✓" : " "}] Type your own answer` : "Type your own answer"}
+                        {multi()
+                          ? `[${customPicked() ? "✓" : " "}] ${t("Type your own answer")}`
+                          : t("Type your own answer")}
                       </text>
                     </box>
 
@@ -434,7 +438,7 @@ export function QuestionPrompt(props: { request: QuestionRequest; directory?: st
                           })
                         }}
                         initialValue={input()}
-                        placeholder="Type your own answer"
+                        placeholder={t("Type your own answer")}
                         placeholderColor={theme.textMuted}
                         minHeight={1}
                         maxHeight={6}
@@ -457,7 +461,7 @@ export function QuestionPrompt(props: { request: QuestionRequest; directory?: st
 
         <Show when={confirm() && !single()}>
           <box paddingLeft={1}>
-            <text fg={theme.text}>Review</text>
+            <text fg={theme.text}>{t("Review")}</text>
           </box>
           <For each={questions()}>
             {(q, index) => {
@@ -468,7 +472,7 @@ export function QuestionPrompt(props: { request: QuestionRequest; directory?: st
                   <text>
                     <span style={{ fg: theme.textMuted }}>{q.header}:</span>{" "}
                     <span style={{ fg: answered() ? theme.text : theme.error }}>
-                      {answered() ? value() : "(not answered)"}
+                      {answered() ? value() : t("(not answered)")}
                     </span>
                   </text>
                 </box>
@@ -489,23 +493,23 @@ export function QuestionPrompt(props: { request: QuestionRequest; directory?: st
         <box flexDirection="row" gap={2}>
           <Show when={!single()}>
             <text fg={theme.text}>
-              {"⇆"} <span style={{ fg: theme.textMuted }}>tab</span>
+              {"⇆"} <span style={{ fg: theme.textMuted }}>{t("tab")}</span>
             </text>
           </Show>
           <Show when={!confirm()}>
             <text fg={theme.text}>
-              {"↑↓"} <span style={{ fg: theme.textMuted }}>select</span>
+              {"↑↓"} <span style={{ fg: theme.textMuted }}>{t("select")}</span>
             </text>
           </Show>
           <text fg={theme.text}>
             enter{" "}
             <span style={{ fg: theme.textMuted }}>
-              {confirm() ? "submit" : multi() ? "toggle" : single() ? "submit" : "confirm"}
+              {t(confirm() ? "submit" : multi() ? "toggle" : single() ? "submit" : "confirm")}
             </span>
           </text>
 
           <text fg={theme.text}>
-            esc <span style={{ fg: theme.textMuted }}>dismiss</span>
+            esc <span style={{ fg: theme.textMuted }}>{t("dismiss")}</span>
           </text>
         </box>
       </box>

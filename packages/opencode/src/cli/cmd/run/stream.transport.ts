@@ -59,6 +59,7 @@ import type {
   RunProvider,
   StreamCommit,
 } from "./types"
+import type { Language } from "@opencode-ai/tui/util/locale"
 
 type Trace = {
   write(type: string, data?: unknown): void
@@ -75,6 +76,7 @@ type StreamInput = {
   replayLimit?: number
   limits: () => Record<string, number>
   providers?: () => RunProvider[]
+  language?: Language
   footer: FooterApi
   trace?: Trace
   signal?: AbortSignal
@@ -716,6 +718,7 @@ function createLayer(input: StreamInput) {
                 thinking: input.thinking,
                 limits: input.limits(),
                 providers: input.providers?.(),
+                language: input.language,
               })
             : undefined
           const replay =
@@ -727,6 +730,7 @@ function createLayer(input: StreamInput) {
                   thinking: input.thinking,
                   limits: input.limits(),
                   providers: input.providers?.(),
+                  language: input.language,
                 })
               : history
 
@@ -1029,6 +1033,7 @@ function createLayer(input: StreamInput) {
                 thinking: input.thinking,
                 limits: input.limits(),
                 providers: input.providers?.(),
+                language: input.language,
               })
               const activeCommits = replayActiveText(history.data, state.data)
               return {
@@ -1047,6 +1052,7 @@ function createLayer(input: StreamInput) {
                         thinking: input.thinking,
                         limits: input.limits(),
                         providers: input.providers?.(),
+                        language: input.language,
                       })
                     : history,
               }

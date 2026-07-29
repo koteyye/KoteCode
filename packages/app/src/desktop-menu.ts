@@ -72,7 +72,7 @@ export type DesktopMenu = {
 export const DESKTOP_MENU: DesktopMenu[] = [
   {
     id: "app",
-    label: "OpenCode",
+    label: "KoteCode",
     platforms: ["macos"],
     items: [
       { type: "item", role: "about" },
@@ -200,23 +200,74 @@ export const DESKTOP_MENU: DesktopMenu[] = [
     id: "help",
     label: "Help",
     items: [
-      { type: "item", label: "OpenCode Documentation", href: "https://opencode.ai/docs" },
-      { type: "item", label: "Support Forum", href: "https://discord.com/invite/opencode" },
+      { type: "item", label: "KoteCode Documentation", href: "https://github.com/koteyye/KoteCode#readme" },
+      { type: "item", label: "Support", href: "https://github.com/koteyye/KoteCode/issues" },
       { type: "item", label: "Export Logs...", command: "logs.export" },
       { type: "separator" },
       {
         type: "item",
         label: "Share Feedback",
-        href: "https://github.com/anomalyco/opencode/issues/new?template=feature_request.yml",
+        href: "https://github.com/koteyye/KoteCode/issues/new",
       },
       {
         type: "item",
         label: "Report a Bug",
-        href: "https://github.com/anomalyco/opencode/issues/new?template=bug_report.yml",
+        href: "https://github.com/koteyye/KoteCode/issues/new",
       },
     ],
   },
 ]
+
+const RU_LABELS: Record<string, string> = {
+  "Check for Updates...": "Проверить обновления…",
+  Settings: "Настройки",
+  "Reload Webview": "Перезагрузить интерфейс",
+  Restart: "Перезапустить",
+  "Export Logs...": "Экспортировать журналы…",
+  File: "Файл",
+  "New Session": "Новая сессия",
+  "Open Project...": "Открыть проект…",
+  "New Window": "Новое окно",
+  "Close Window": "Закрыть окно",
+  Edit: "Правка",
+  Undo: "Отменить",
+  Redo: "Повторить",
+  Cut: "Вырезать",
+  Copy: "Копировать",
+  Paste: "Вставить",
+  Delete: "Удалить",
+  "Select All": "Выбрать всё",
+  View: "Вид",
+  "Toggle Sidebar": "Показать или скрыть боковую панель",
+  "Toggle Terminal": "Показать или скрыть терминал",
+  "Toggle File Tree": "Показать или скрыть дерево файлов",
+  Reload: "Перезагрузить",
+  "Toggle Developer Tools": "Показать или скрыть инструменты разработчика",
+  "Actual Size": "Фактический размер",
+  "Zoom In": "Увеличить",
+  "Zoom Out": "Уменьшить",
+  "Toggle Full Screen": "Полноэкранный режим",
+  Go: "Переход",
+  Back: "Назад",
+  Forward: "Вперёд",
+  "Previous Session": "Предыдущая сессия",
+  "Next Session": "Следующая сессия",
+  "Previous Project": "Предыдущий проект",
+  "Next Project": "Следующий проект",
+  Window: "Окно",
+  Minimize: "Свернуть",
+  Maximize: "Развернуть",
+  Help: "Справка",
+  "KoteCode Documentation": "Документация KoteCode",
+  Support: "Поддержка",
+  "Share Feedback": "Оставить отзыв",
+  "Report a Bug": "Сообщить об ошибке",
+}
+
+export function desktopMenuLabel(label: string, locale: string) {
+  if (!locale.toLowerCase().startsWith("ru")) return label
+  return RU_LABELS[label] ?? label
+}
 
 export function desktopMenuVisible(item: { platforms?: DesktopMenuPlatform[] }, platform: DesktopMenuPlatform) {
   return !item.platforms || item.platforms.includes(platform)

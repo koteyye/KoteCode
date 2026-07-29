@@ -27,13 +27,14 @@ test("validates config constraints", () => {
   expect(
     decodeInfo({
       leader_timeout: 250,
+      language: "ru",
       attention: { volume: 1, sounds: { done: "done.wav" } },
       prompt: { max_height: 10, max_width: "auto" },
       scroll_speed: 0.001,
       diff_style: "stacked",
       plugin: ["example-plugin"],
     }),
-  ).toMatchObject({ leader_timeout: 250, attention: { volume: 1 }, diff_style: "stacked" })
+  ).toMatchObject({ leader_timeout: 250, language: "ru", attention: { volume: 1 }, diff_style: "stacked" })
   expect(() => decodeInfo({ leader_timeout: 0 })).toThrow()
   expect(() => decodeInfo({ attention: { volume: 1.1 } })).toThrow()
   expect(() => decodeInfo({ prompt: { max_width: 0 } })).toThrow()
@@ -53,6 +54,7 @@ test("resolves host-neutral defaults", () => {
     sounds: {},
   })
   expect(config.leader_timeout).toBe(LeaderTimeoutDefault)
+  expect(config.language).toBe("ru")
   expect(config.mouse).toBe(true)
   expect(config.keybinds.has("terminal.suspend")).toBe(true)
   expect(config.keybinds.has("session.list")).toBe(true)
@@ -61,6 +63,7 @@ test("resolves host-neutral defaults", () => {
 test("resolves overrides without mutating input", () => {
   const input: TuiConfigInfo = {
     theme: "custom",
+    language: "en",
     mouse: false,
     leader_timeout: 750,
     attention: {
@@ -75,7 +78,13 @@ test("resolves overrides without mutating input", () => {
   }
   const config = resolve(input, { terminalSuspend: true })
 
-  expect(config).toMatchObject({ theme: "custom", mouse: false, leader_timeout: 750, attention: input.attention })
+  expect(config).toMatchObject({
+    theme: "custom",
+    language: "en",
+    mouse: false,
+    leader_timeout: 750,
+    attention: input.attention,
+  })
   expect(config.keybinds.get("session.list")).toHaveLength(1)
   expect(input.keybinds).toEqual({ session_list: "ctrl+l" })
 })

@@ -4,6 +4,7 @@ import { createBindingLookup } from "@opentui/keymap/extras"
 import { Schema } from "effect"
 import { createContext, type JSX, useContext } from "solid-js"
 import { TuiKeybind } from "./keybind"
+import { resolveLanguage } from "../util/locale"
 
 export const AttentionSoundName = Schema.Literals([
   "default",
@@ -30,6 +31,8 @@ export const ScrollAcceleration = Schema.Struct({
 export const DiffStyle = Schema.Literals(["auto", "stacked"]).annotate({
   description: "Control diff rendering style: 'auto' adapts to terminal width, 'stacked' always shows single column",
 })
+export const Language = Schema.Literals(["ru", "en"])
+export type Language = Schema.Schema.Type<typeof Language>
 
 export const AttentionSounds = Schema.Record(AttentionSoundName, Schema.optionalKey(Schema.String))
 export type AttentionSoundPaths = Schema.Schema.Type<typeof AttentionSounds>
@@ -52,6 +55,7 @@ export const Prompt = Schema.Struct({
 
 export const Info = Schema.Struct({
   $schema: Schema.optional(Schema.String),
+  language: Schema.optional(Language),
   theme: Schema.optional(Schema.String),
   keybinds: Schema.optional(TuiKeybind.KeybindOverrides),
   plugin: Schema.optional(Schema.Array(PluginSpec)),
@@ -66,7 +70,7 @@ export const Info = Schema.Struct({
 })
 export type Info = Schema.Schema.Type<typeof Info>
 
-export type Resolved = Omit<Info, "attention" | "keybinds" | "leader_timeout" | "mouse"> & {
+export type Resolved = Omit<Info, "attention" | "keybinds" | "language" | "leader_timeout" | "mouse"> & {
   attention: {
     enabled: boolean
     notifications: boolean
@@ -76,6 +80,7 @@ export type Resolved = Omit<Info, "attention" | "keybinds" | "leader_timeout" | 
     sounds: AttentionSoundPaths
   }
   keybinds: TuiKeybind.BindingLookupView
+  language: Language
   leader_timeout: number
   mouse: boolean
 }
@@ -99,6 +104,7 @@ export function resolve(input: Info, options: ResolveOptions): Resolved {
 
   return {
     ...input,
+    language: input.language ?? resolveLanguage(process.env.KOTECODE_LANG),
     attention: {
       enabled: input.attention?.enabled ?? false,
       notifications: input.attention?.notifications ?? true,

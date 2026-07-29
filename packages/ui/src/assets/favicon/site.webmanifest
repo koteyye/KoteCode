@@ -1,6 +1,6 @@
 {
-  "name": "OpenCode",
-  "short_name": "OpenCode",
+  "name": "KoteCode",
+  "short_name": "KoteCode",
   "id": "/",
   "start_url": "/",
   "scope": "/",
@@ -18,7 +18,7 @@
       "purpose": "maskable"
     }
   ],
-  "theme_color": "#080808",
-  "background_color": "#080808",
+  "theme_color": "#090909",
+  "background_color": "#090909",
   "display": "standalone"
 }

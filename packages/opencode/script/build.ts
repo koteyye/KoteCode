@@ -222,7 +222,7 @@ for (const item of targets) {
     JSON.stringify(
       {
         name,
-        version: Script.version,
+        version: koteCodeVersion,
         preferUnplugged: true,
         os: [item.os],
         cpu: [item.arch],

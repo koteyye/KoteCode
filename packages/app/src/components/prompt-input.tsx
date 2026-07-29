@@ -1493,6 +1493,7 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
           }
           onRemove={removeAttachment}
           removeLabel={language.t("prompt.attachment.remove")}
+          fileLabel={language.t("ui.file.type")}
           newLayoutDesigns={false}
         />
         <div

@@ -1411,7 +1411,9 @@ function UserMessage(props: {
                     return (
                       <text fg={theme.text}>
                         <span style={{ bg: theme.secondary, fg: theme.background }}>
-                          {directory ? " Directory " : " File "}
+                          {directory
+                            ? ` ${Locale.translate("Directory", ctx.tui.language)} `
+                            : ` ${Locale.translate("File", ctx.tui.language)} `}
                         </span>
                         <span style={{ bg: theme.backgroundElement, fg: theme.textMuted }}> {file.filename} </span>
                       </text>
@@ -1433,7 +1435,9 @@ function UserMessage(props: {
               }
             >
               <text fg={theme.textMuted}>
-                <span style={{ bg: color(), fg: queuedFg(), bold: true }}> QUEUED </span>
+                <span style={{ bg: color(), fg: queuedFg(), bold: true }}>
+                  {" " + Locale.translate("QUEUED", ctx.tui.language) + " "}
+                </span>
               </text>
             </Show>
           </box>
@@ -1443,7 +1447,7 @@ function UserMessage(props: {
         <box
           marginTop={1}
           border={["top"]}
-          title=" Compaction "
+          title={` ${Locale.translate("Compaction", ctx.tui.language)} `}
           titleAlignment="center"
           borderColor={theme.borderActive}
         />
@@ -1496,7 +1500,7 @@ function AssistantMessage(props: { message: AssistantMessage; parts: Part[]; las
         <box paddingTop={1} paddingLeft={3}>
           <text fg={theme.text}>
             {childShortcut()}
-            <span style={{ fg: theme.textMuted }}> view subagents</span>
+            <span style={{ fg: theme.textMuted }}> {Locale.translate("view subagents", ctx.tui.language)}</span>
             <Show
               when={
                 sync.data.capabilities.experimentalBackgroundSubagents &&
@@ -1511,7 +1515,7 @@ function AssistantMessage(props: { message: AssistantMessage; parts: Part[]; las
             >
               <span style={{ fg: theme.textMuted }}> · </span>
               {backgroundShortcut()}
-              <span style={{ fg: theme.textMuted }}> background</span>
+              <span style={{ fg: theme.textMuted }}> {Locale.translate("background", ctx.tui.language)}</span>
             </Show>
           </text>
         </box>
@@ -1545,13 +1549,13 @@ function AssistantMessage(props: { message: AssistantMessage; parts: Part[]; las
               >
                 ▣{" "}
               </span>{" "}
-              <span style={{ fg: theme.text }}>{Locale.titlecase(props.message.mode)}</span>
+              <span style={{ fg: theme.text }}>{Locale.agent(props.message.mode, ctx.tui.language)}</span>
               <span style={{ fg: theme.textMuted }}> · {model()}</span>
               <Show when={duration()}>
                 <span style={{ fg: theme.textMuted }}> · {Locale.duration(duration())}</span>
               </Show>
               <Show when={props.message.error?.name === "MessageAbortedError"}>
-                <span style={{ fg: theme.textMuted }}> · interrupted</span>
+                <span style={{ fg: theme.textMuted }}> · {Locale.translate("interrupted", ctx.tui.language)}</span>
               </Show>
             </text>
           </box>
@@ -1640,6 +1644,7 @@ function ReasoningHeader(props: {
   duration?: string
 }) {
   const { theme } = useTheme()
+  const ctx = use()
   const fg = () =>
     props.open
       ? RGBA.fromValues(theme.warning.r, theme.warning.g, theme.warning.b, theme.thinkingOpacity)
@@ -1649,7 +1654,11 @@ function ReasoningHeader(props: {
     <Switch>
       <Match when={!props.done}>
         <box flexDirection="row">
-          <Spinner color={fg()}>{props.title ? "Thinking: " + props.title : "Thinking"}</Spinner>
+          <Spinner color={fg()}>
+            {props.title
+              ? Locale.translate("Thinking", ctx.tui.language) + ": " + props.title
+              : Locale.translate("Thinking", ctx.tui.language)}
+          </Spinner>
         </box>
       </Match>
       <Match when={true}>
@@ -1657,7 +1666,7 @@ function ReasoningHeader(props: {
           <Show when={props.toggleable}>
             <span>{props.open ? "- " : "+ "}</span>
           </Show>
-          <span>Thought</span>
+          <span>{Locale.translate("Thought", ctx.tui.language)}</span>
           <Show when={props.title || props.duration}>
             <span>: </span>
           </Show>

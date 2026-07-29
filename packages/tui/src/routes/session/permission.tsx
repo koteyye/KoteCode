@@ -80,7 +80,7 @@ function EditBody(props: { request: PermissionRequest }) {
       </Show>
       <Show when={!diff()}>
         <box paddingLeft={1}>
-          <text fg={theme.textMuted}>No diff provided</text>
+          <text fg={theme.textMuted}>{Locale.translate("No diff provided", config.language)}</text>
         </box>
       </Show>
     </box>
@@ -89,6 +89,7 @@ function EditBody(props: { request: PermissionRequest }) {
 
 function TextBody(props: { title: string; description?: string; icon?: string }) {
   const { theme } = useTheme()
+  const config = useTuiConfig()
   return (
     <>
       <box flexDirection="row" gap={1} paddingLeft={1}>
@@ -97,11 +98,11 @@ function TextBody(props: { title: string; description?: string; icon?: string })
             {props.icon}
           </text>
         </Show>
-        <text fg={theme.textMuted}>{props.title}</text>
+        <text fg={theme.textMuted}>{Locale.translate(props.title, config.language)}</text>
       </box>
       <Show when={props.description}>
         <box paddingLeft={1}>
-          <text fg={theme.text}>{props.description}</text>
+          <text fg={theme.text}>{Locale.translate(props.description!, config.language)}</text>
         </box>
       </Show>
     </>
@@ -116,6 +117,8 @@ export function PermissionPrompt(props: { request: PermissionRequest; directory?
     stage: "permission" as PermissionStage,
   })
   const pathFormatter = usePathFormatter()
+  const config = useTuiConfig()
+  const t = (input: string) => Locale.translate(input, config.language)
 
   const session = createMemo(() => sync.data.session.find((s) => s.id === props.request.sessionID))
 
@@ -137,15 +140,17 @@ export function PermissionPrompt(props: { request: PermissionRequest; directory?
     <Switch>
       <Match when={store.stage === "always"}>
         <Prompt
-          title="Always allow"
+          title={t("Always allow")}
           body={
             <Switch>
               <Match when={props.request.always.length === 1 && props.request.always[0] === "*"}>
-                <TextBody title={"This will allow " + props.request.permission + " until OpenCode is restarted."} />
+                <TextBody title={"This will allow " + props.request.permission + " until KoteCode is restarted."} />
               </Match>
               <Match when={true}>
                 <box paddingLeft={1} gap={1}>
-                  <text fg={theme.textMuted}>This will allow the following patterns until OpenCode is restarted</text>
+                  <text fg={theme.textMuted}>
+                    {t("This will allow the following patterns until KoteCode is restarted.")}
+                  </text>
                   <box>
                     <For each={props.request.always}>
                       {(pattern) => (
@@ -160,7 +165,7 @@ export function PermissionPrompt(props: { request: PermissionRequest; directory?
               </Match>
             </Switch>
           }
-          options={{ confirm: "Confirm", cancel: "Cancel" }}
+          options={{ confirm: t("Confirm"), cancel: t("Cancel") }}
           escapeKey="cancel"
           onSelect={(option) => {
             setStore("stage", "permission")
@@ -347,7 +352,7 @@ export function PermissionPrompt(props: { request: PermissionRequest; directory?
                 body: (
                   <Show when={patterns.length > 0}>
                     <box paddingLeft={1} gap={1}>
-                      <text fg={theme.textMuted}>Patterns</text>
+                      <text fg={theme.textMuted}>{t("Patterns")}</text>
                       <box>
                         <For each={patterns}>{(p) => <text fg={theme.text}>{"- " + p}</text>}</For>
                       </box>
@@ -363,7 +368,7 @@ export function PermissionPrompt(props: { request: PermissionRequest; directory?
                 title: "Continue after repeated failures",
                 body: (
                   <box paddingLeft={1}>
-                    <text fg={theme.textMuted}>This keeps the session running despite repeated failures.</text>
+                    <text fg={theme.textMuted}>{t("This keeps the session running despite repeated failures.")}</text>
                   </box>
                 ),
               }
@@ -386,23 +391,23 @@ export function PermissionPrompt(props: { request: PermissionRequest; directory?
             <box flexDirection="column" gap={0}>
               <box flexDirection="row" gap={1} flexShrink={0}>
                 <text fg={theme.warning}>{"△"}</text>
-                <text fg={theme.text}>Permission required</text>
+                <text fg={theme.text}>{t("Permission required")}</text>
               </box>
               <box flexDirection="row" gap={1} paddingLeft={2} flexShrink={0}>
                 <text fg={theme.textMuted} flexShrink={0}>
                   {current.icon}
                 </text>
-                <text fg={theme.text}>{current.title}</text>
+                <text fg={theme.text}>{t(current.title)}</text>
               </box>
             </box>
           )
 
           const body = (
             <Prompt
-              title="Permission required"
+              title={t("Permission required")}
               header={header()}
               body={current.body}
-              options={{ once: "Allow once", always: "Allow always", reject: "Reject" }}
+              options={{ once: t("Allow once"), always: t("Allow always"), reject: t("Reject") }}
               escapeKey="reject"
               fullscreen
               onSelect={(option) => {
@@ -444,6 +449,7 @@ function RejectPrompt(props: { onConfirm: (message: string) => void; onCancel: (
   let input: TextareaRenderable
   const { theme } = useTheme()
   const tuiConfig = useTuiConfig()
+  const t = (input: string) => Locale.translate(input, tuiConfig.language)
   const dimensions = useTerminalDimensions()
   const narrow = createMemo(() => dimensions().width < 80)
   useBindings(() => ({
@@ -480,10 +486,10 @@ function RejectPrompt(props: { onConfirm: (message: string) => void; onCancel: (
       <box gap={1} paddingLeft={1} paddingRight={3} paddingTop={1} paddingBottom={1}>
         <box flexDirection="row" gap={1} paddingLeft={1}>
           <text fg={theme.error}>{"△"}</text>
-          <text fg={theme.text}>Reject permission</text>
+          <text fg={theme.text}>{t("Reject permission")}</text>
         </box>
         <box paddingLeft={1}>
-          <text fg={theme.textMuted}>Tell OpenCode what to do differently</text>
+          <text fg={theme.textMuted}>{t("Tell KoteCode what to do differently")}</text>
         </box>
       </box>
       <box
@@ -510,10 +516,10 @@ function RejectPrompt(props: { onConfirm: (message: string) => void; onCancel: (
         />
         <box flexDirection="row" gap={2} flexShrink={0}>
           <text fg={theme.text}>
-            enter <span style={{ fg: theme.textMuted }}>confirm</span>
+            enter <span style={{ fg: theme.textMuted }}>{t("confirm")}</span>
           </text>
           <text fg={theme.text}>
-            esc <span style={{ fg: theme.textMuted }}>cancel</span>
+            esc <span style={{ fg: theme.textMuted }}>{t("cancel")}</span>
           </text>
         </box>
       </box>
@@ -532,6 +538,7 @@ function Prompt<const T extends Record<string, string>>(props: {
 }) {
   const { theme } = useTheme()
   const tuiConfig = useTuiConfig()
+  const t = (input: string) => Locale.translate(input, tuiConfig.language)
   const dimensions = useTerminalDimensions()
   const keys = Object.keys(props.options) as (keyof T)[]
   const [store, setStore] = createStore({
@@ -651,7 +658,7 @@ function Prompt<const T extends Record<string, string>>(props: {
           fallback={
             <box flexDirection="row" gap={1} paddingLeft={1} flexShrink={0}>
               <text fg={theme.warning}>{"△"}</text>
-              <text fg={theme.text}>{props.title}</text>
+              <text fg={theme.text}>{t(props.title)}</text>
             </box>
           }
         >
@@ -687,7 +694,7 @@ function Prompt<const T extends Record<string, string>>(props: {
                 }}
               >
                 <text fg={option === store.selected ? selectedForeground(theme, theme.warning) : theme.textMuted}>
-                  {props.options[option]}
+                  {t(props.options[option])}
                 </text>
               </box>
             )}
@@ -696,14 +703,14 @@ function Prompt<const T extends Record<string, string>>(props: {
         <box flexDirection="row" gap={2} flexShrink={0}>
           <Show when={props.fullscreen}>
             <text fg={theme.text}>
-              {fullscreenHint()} <span style={{ fg: theme.textMuted }}>{hint()}</span>
+              {fullscreenHint()} <span style={{ fg: theme.textMuted }}>{t(hint())}</span>
             </text>
           </Show>
           <text fg={theme.text}>
-            {"⇆"} <span style={{ fg: theme.textMuted }}>select</span>
+            {"⇆"} <span style={{ fg: theme.textMuted }}>{t("select")}</span>
           </text>
           <text fg={theme.text}>
-            enter <span style={{ fg: theme.textMuted }}>confirm</span>
+            enter <span style={{ fg: theme.textMuted }}>{t("confirm")}</span>
           </text>
         </box>
       </box>

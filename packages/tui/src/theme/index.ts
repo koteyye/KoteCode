@@ -33,6 +33,8 @@ import vercel from "./assets/vercel.json" with { type: "json" }
 import vesper from "./assets/vesper.json" with { type: "json" }
 import zenburn from "./assets/zenburn.json" with { type: "json" }
 
+export const DEFAULT_THEME = "kotecode"
+
 export type Theme = {
   readonly primary: RGBA
   readonly secondary: RGBA
@@ -127,7 +129,15 @@ export type ThemeJson = {
   }
 }
 
+const kotecode = JSON.parse(
+  JSON.stringify(orng)
+    .replaceAll("#EC5B2B", "#ff7300")
+    .replaceAll("#EE7948", "#ff8a1d")
+    .replaceAll("#c94d24", "#b84b00"),
+) as ThemeJson
+
 export const DEFAULT_THEMES: Record<string, ThemeJson> = {
+  kotecode,
   aura,
   ayu,
   catppuccin,

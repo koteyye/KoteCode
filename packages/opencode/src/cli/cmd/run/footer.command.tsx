@@ -6,6 +6,8 @@ import { createEffect, createMemo, createSignal, type Accessor } from "solid-js"
 import { RunFooterMenu, createFooterMenuState, type RunFooterMenuItem } from "./footer.menu"
 import type { RunFooterTheme } from "./theme"
 import type { FooterQueuedPrompt, FooterSubagentTab, RunCommand, RunInput, RunProvider } from "./types"
+import type { Language } from "@opencode-ai/tui/util/locale"
+import { Locale } from "@/util/locale"
 
 type PanelEntry = RunFooterMenuItem & {
   category: string
@@ -202,6 +204,7 @@ function match<T extends PanelEntry>(query: string, entries: T[]) {
 }
 
 function PanelShell(props: {
+  language?: Language
   title: string
   countVisible?: boolean
   query: string
@@ -215,6 +218,7 @@ function PanelShell(props: {
   dark?: boolean
   chrome?: "default" | "minimal"
 }) {
+  const t = (input: string) => Locale.translate(input, props.language ?? "en")
   const background = () => (props.dark ? props.theme().shade : props.theme().surface)
   const minimal = () => props.chrome === "minimal"
   const content = (
@@ -231,7 +235,7 @@ function PanelShell(props: {
         backgroundColor={background()}
       >
         <text fg={props.theme().text} attributes={TextAttributes.BOLD} wrapMode="none" flexShrink={0}>
-          {props.title}
+          {t(props.title)}
         </text>
         {props.countVisible !== false ? (
           <text fg={props.theme().muted} wrapMode="none" flexShrink={0}>
@@ -256,7 +260,7 @@ function PanelShell(props: {
           width="100%"
           focusedBackgroundColor={background()}
           focusedTextColor={props.theme().text}
-          placeholder={props.placeholder}
+          placeholder={t(props.placeholder)}
           placeholderColor={props.theme().muted}
           cursorColor={props.theme().highlight}
           onInput={props.onQuery}
@@ -332,6 +336,7 @@ function PanelShell(props: {
 }
 
 export function RunCommandMenuBody(props: {
+  language?: Language
   theme: Accessor<RunFooterTheme>
   commands: Accessor<RunCommand[] | undefined>
   subagents: Accessor<FooterSubagentTab[]>
@@ -540,6 +545,7 @@ export function RunCommandMenuBody(props: {
 
   return (
     <PanelShell
+      language={props.language}
       title="Commands"
       countVisible={false}
       query={query()}
@@ -555,6 +561,7 @@ export function RunCommandMenuBody(props: {
       chrome="minimal"
     >
       <RunFooterMenu
+        language={props.language}
         theme={props.theme}
         items={items}
         selected={menu.selected}
@@ -574,6 +581,7 @@ export function RunCommandMenuBody(props: {
 }
 
 export function RunSubagentSelectBody(props: {
+  language?: Language
   theme: Accessor<RunFooterTheme>
   tabs: Accessor<FooterSubagentTab[]>
   current: Accessor<string | undefined>
@@ -644,6 +652,7 @@ export function RunSubagentSelectBody(props: {
 
   return (
     <PanelShell
+      language={props.language}
       title="Select subagent"
       query={query()}
       count={items().length}
@@ -658,6 +667,7 @@ export function RunSubagentSelectBody(props: {
       chrome="minimal"
     >
       <RunFooterMenu
+        language={props.language}
         theme={props.theme}
         items={items}
         selected={menu.selected}
@@ -676,6 +686,7 @@ export function RunSubagentSelectBody(props: {
 }
 
 export function RunQueuedPromptSelectBody(props: {
+  language?: Language
   theme: Accessor<RunFooterTheme>
   prompts: Accessor<FooterQueuedPrompt[]>
   onClose: () => void
@@ -741,6 +752,7 @@ export function RunQueuedPromptSelectBody(props: {
 
   return (
     <PanelShell
+      language={props.language}
       title="Queued prompts"
       query={query()}
       count={items().length}
@@ -755,6 +767,7 @@ export function RunQueuedPromptSelectBody(props: {
       chrome="minimal"
     >
       <RunFooterMenu
+        language={props.language}
         theme={props.theme}
         items={items}
         selected={menu.selected}
@@ -773,6 +786,7 @@ export function RunQueuedPromptSelectBody(props: {
 }
 
 export function RunSkillSelectBody(props: {
+  language?: Language
   theme: Accessor<RunFooterTheme>
   commands: Accessor<RunCommand[] | undefined>
   onClose: () => void
@@ -818,6 +832,7 @@ export function RunSkillSelectBody(props: {
 
   return (
     <PanelShell
+      language={props.language}
       title="Skills"
       query={query()}
       count={items().length}
@@ -832,6 +847,7 @@ export function RunSkillSelectBody(props: {
       chrome="minimal"
     >
       <RunFooterMenu
+        language={props.language}
         theme={props.theme}
         items={items}
         selected={menu.selected}
@@ -850,6 +866,7 @@ export function RunSkillSelectBody(props: {
 }
 
 export function RunVariantSelectBody(props: {
+  language?: Language
   theme: Accessor<RunFooterTheme>
   variants: Accessor<string[]>
   current: Accessor<string | undefined>
@@ -916,6 +933,7 @@ export function RunVariantSelectBody(props: {
 
   return (
     <PanelShell
+      language={props.language}
       title="Select variant"
       query={query()}
       count={items().length}
@@ -930,6 +948,7 @@ export function RunVariantSelectBody(props: {
       chrome="minimal"
     >
       <RunFooterMenu
+        language={props.language}
         theme={props.theme}
         items={items}
         selected={menu.selected}
@@ -948,6 +967,7 @@ export function RunVariantSelectBody(props: {
 }
 
 export function RunModelSelectBody(props: {
+  language?: Language
   theme: Accessor<RunFooterTheme>
   providers: Accessor<RunProvider[] | undefined>
   current: Accessor<RunInput["model"]>
@@ -1037,6 +1057,7 @@ export function RunModelSelectBody(props: {
 
   return (
     <PanelShell
+      language={props.language}
       title="Select model"
       query={query()}
       count={items().length}
@@ -1051,6 +1072,7 @@ export function RunModelSelectBody(props: {
       chrome="minimal"
     >
       <RunFooterMenu
+        language={props.language}
         theme={props.theme}
         items={items}
         selected={menu.selected}

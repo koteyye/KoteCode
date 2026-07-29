@@ -1,7 +1,7 @@
 {
   "name": "@opencode-ai/desktop",
   "private": true,
-  "version": "1.18.5",
+  "version": "1.0.0",
   "type": "module",
   "license": "MIT",
   "homepage": "https://github.com/koteyye/KoteCode",
@@ -20,6 +20,7 @@
     "package:mac": "electron-builder --mac --config electron-builder.config.ts",
     "package:win": "electron-builder --win --config electron-builder.config.ts",
     "package:linux": "electron-builder --linux --config electron-builder.config.ts",
+    "generate:icons": "bun ./scripts/generate-brand-icons.ts",
     "native:build": "bun install --cwd native"
   },
   "main": "./out/main/index.js",

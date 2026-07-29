@@ -13,6 +13,7 @@ import { Credential } from "../../credential"
 import { Integration } from "../../integration"
 import { ModelV2 } from "../../model"
 import { ProviderV2 } from "../../provider"
+import { ProviderRouting } from "../../kote/provider-routing"
 import { SessionSchema } from "../schema"
 
 export class ModelNotSelectedError extends Schema.TaggedErrorClass<ModelNotSelectedError>()(
@@ -89,9 +90,9 @@ const apiKey = (model: ModelV2.Info, credential?: Credential.Value) => {
 
 const withDefaults = (model: ModelV2.Info, route: AnyRoute) => {
   const body = model.request.body
-  const httpBody = Object.hasOwn(body, "apiKey")
-    ? Object.fromEntries(Object.entries(body).filter(([key]) => key !== "apiKey"))
-    : body
+  const httpBody = Object.fromEntries(
+    Object.entries(body).filter(([key]) => key !== "apiKey" && key !== ProviderRouting.RequestKey),
+  )
   return route.with({
     provider: model.providerID,
     endpoint: model.api.url === undefined ? undefined : { baseURL: model.api.url },

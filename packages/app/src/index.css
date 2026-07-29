@@ -25,6 +25,39 @@
 }
 
 @layer components {
+  [data-component="session-new-design"]::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background-image:
+      linear-gradient(color-mix(in srgb, var(--v2-border-border-base) 48%, transparent) 1px, transparent 1px),
+      linear-gradient(90deg, color-mix(in srgb, var(--v2-border-border-base) 48%, transparent) 1px, transparent 1px),
+      radial-gradient(
+        circle at 50% 24%,
+        color-mix(in srgb, var(--v2-background-bg-accent) 8%, transparent),
+        transparent 34%
+      );
+    background-size:
+      42px 42px,
+      42px 42px,
+      100% 100%;
+    mask-image: linear-gradient(to bottom, black 0%, black 68%, transparent 100%);
+  }
+
+  [data-component="session-new-design"] > div {
+    z-index: 1;
+  }
+
+  :root[data-theme="oc-2"] [data-component="session-timeline"] {
+    background-image:
+      linear-gradient(color-mix(in srgb, var(--v2-border-border-base) 36%, transparent) 1px, transparent 1px),
+      linear-gradient(90deg, color-mix(in srgb, var(--v2-border-border-base) 36%, transparent) 1px, transparent 1px);
+    background-position: -1px -1px;
+    background-size: 42px 42px;
+  }
+
   [data-component="getting-started"] {
     container-type: inline-size;
     container-name: getting-started;

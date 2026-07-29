@@ -9,6 +9,10 @@ import { Integration } from "../../integration"
 import { ModelV2 } from "../../model"
 import { OauthCallbackPage } from "../../oauth/page"
 import { ProviderV2 } from "../../provider"
+import { resolveProxy } from "../../kote/bootstrap"
+import { proxyFetch } from "../../kote/proxy"
+import { ProviderRouting } from "../../kote/provider-routing"
+import { Config } from "../../config"
 import type { PluginInternal } from "../internal"
 
 const clientID = "app_EMoamEEZ73f0CkXaXp7hrann"
@@ -36,127 +40,151 @@ type Claims = {
   "https://api.openai.com/auth"?: { chatgpt_account_id?: string }
 }
 
-const browser = {
-  integrationID: Integration.ID.make("openai"),
-  method: {
-    id: browserMethodID,
-    type: "oauth",
-    label: "ChatGPT Pro/Plus (browser)",
-  },
-  authorize: () =>
-    Effect.gen(function* () {
-      const pkce = yield* Effect.promise(generatePKCE)
-      const state = base64UrlEncode(crypto.getRandomValues(new Uint8Array(32)).buffer)
-      const code = yield* Deferred.make<string, Error>()
-      const redirect = `http://localhost:${callbackPort}/auth/callback`
-      const server = createServer((request, response) => {
-        const url = new URL(request.url ?? "/", `http://localhost:${callbackPort}`)
-        if (url.pathname !== "/auth/callback") {
-          response.writeHead(404).end("Not found")
-          return
-        }
-        const error = url.searchParams.get("error_description") ?? url.searchParams.get("error")
-        const value = url.searchParams.get("code")
-        if (error) {
-          Effect.runFork(Deferred.fail(code, new Error(error)))
-          response
-            .writeHead(400, { "Content-Type": "text/html" })
-            .end(OauthCallbackPage.error(error, { provider: "ChatGPT" }))
-          return
-        }
-        if (!value || url.searchParams.get("state") !== state) {
-          const message = value ? "Invalid OAuth state" : "Missing authorization code"
-          Effect.runFork(Deferred.fail(code, new Error(message)))
-          response
-            .writeHead(400, { "Content-Type": "text/html" })
-            .end(OauthCallbackPage.error(message, { provider: "ChatGPT" }))
-          return
-        }
-        Effect.runFork(Deferred.succeed(code, value))
-        response.writeHead(200, { "Content-Type": "text/html" }).end(OauthCallbackPage.success({ provider: "ChatGPT" }))
-      })
-      yield* Effect.callback<void, Error>((resume) => {
-        server.once("error", (error) => resume(Effect.fail(error)))
-        server.listen(callbackPort, "localhost", () => resume(Effect.void))
-      })
-      yield* Effect.addFinalizer(() => Effect.sync(() => server.close()))
-      return {
-        mode: "auto" as const,
-        url: authorizeURL(redirect, pkce, state),
-        instructions: "Complete authorization in your browser. This window will close automatically.",
-        callback: Deferred.await(code).pipe(
-          Effect.flatMap((value) => exchange(value, redirect, pkce)),
-          Effect.map((tokens) => credential(browserMethodID, tokens)),
-        ),
-      }
-    }),
-  refresh: (value) => refresh(browserMethodID, value),
-} satisfies IntegrationOAuthMethodRegistration
-
-const headless = {
-  integrationID: Integration.ID.make("openai"),
-  method: {
-    id: headlessMethodID,
-    type: "oauth",
-    label: "ChatGPT Pro/Plus (headless)",
-  },
-  authorize: () =>
-    Effect.gen(function* () {
-      const device = yield* request<{ device_auth_id: string; user_code: string; interval: string }>(
-        `${issuer}/api/accounts/deviceauth/usercode`,
-        {
-          method: "POST",
-          headers: headers("application/json"),
-          body: JSON.stringify({ client_id: clientID }),
-        },
-      )
-      const interval = Math.max(Number.parseInt(device.interval) || 5, 1) * 1000
-      return {
-        mode: "auto" as const,
-        url: `${issuer}/codex/device`,
-        instructions: `Enter code: ${device.user_code}`,
-        callback: Effect.gen(function* () {
-          while (true) {
-            const response = yield* Effect.tryPromise({
-              try: (signal) =>
-                fetch(`${issuer}/api/accounts/deviceauth/token`, {
-                  method: "POST",
-                  headers: headers("application/json"),
-                  body: JSON.stringify({ device_auth_id: device.device_auth_id, user_code: device.user_code }),
-                  signal,
-                }),
-              catch: (cause) => cause,
-            })
-            if (response.ok) {
-              const data = (yield* Effect.promise(() => response.json())) as {
-                authorization_code: string
-                code_verifier: string
-              }
-              return credential(
-                headlessMethodID,
-                yield* exchange(data.authorization_code, `${issuer}/deviceauth/callback`, {
-                  verifier: data.code_verifier,
-                  challenge: "",
-                }),
-              )
-            }
-            if (response.status !== 403 && response.status !== 404) {
-              return yield* Effect.fail(new Error(`Device authorization failed: ${response.status}`))
-            }
-            yield* Effect.sleep(interval + pollingSafetyMargin)
+function browser(routing: ProviderRouting.Mode) {
+  return {
+    integrationID: Integration.ID.make("openai"),
+    method: {
+      id: browserMethodID,
+      type: "oauth",
+      label: "ChatGPT Pro/Plus (browser)",
+    },
+    authorize: (inputs) =>
+      Effect.gen(function* () {
+        const selectedRouting = ProviderRouting.read(inputs[ProviderRouting.RequestKey] ?? routing)
+        const pkce = yield* Effect.promise(generatePKCE)
+        const state = base64UrlEncode(crypto.getRandomValues(new Uint8Array(32)).buffer)
+        const code = yield* Deferred.make<string, Error>()
+        const fetch = yield* Effect.promise(() => oauthFetch(selectedRouting))
+        const redirect = `http://localhost:${callbackPort}/auth/callback`
+        const server = createServer((request, response) => {
+          const url = new URL(request.url ?? "/", `http://localhost:${callbackPort}`)
+          if (url.pathname !== "/auth/callback") {
+            response.writeHead(404).end("Not found")
+            return
           }
-        }),
-      }
-    }),
-  refresh: (value) => refresh(headlessMethodID, value),
-} satisfies IntegrationOAuthMethodRegistration
+          const error = url.searchParams.get("error_description") ?? url.searchParams.get("error")
+          const value = url.searchParams.get("code")
+          if (error) {
+            Effect.runFork(Deferred.fail(code, new Error(error)))
+            response
+              .writeHead(400, { "Content-Type": "text/html" })
+              .end(OauthCallbackPage.error(error, { provider: "ChatGPT" }))
+            return
+          }
+          if (!value || url.searchParams.get("state") !== state) {
+            const message = value ? "Invalid OAuth state" : "Missing authorization code"
+            Effect.runFork(Deferred.fail(code, new Error(message)))
+            response
+              .writeHead(400, { "Content-Type": "text/html" })
+              .end(OauthCallbackPage.error(message, { provider: "ChatGPT" }))
+            return
+          }
+          Effect.runFork(Deferred.succeed(code, value))
+          response
+            .writeHead(200, { "Content-Type": "text/html" })
+            .end(OauthCallbackPage.success({ provider: "ChatGPT" }))
+        })
+        yield* Effect.callback<void, Error>((resume) => {
+          server.once("error", (error) => resume(Effect.fail(error)))
+          server.listen(callbackPort, "localhost", () => resume(Effect.void))
+        })
+        yield* Effect.addFinalizer(() => Effect.sync(() => server.close()))
+        return {
+          mode: "auto" as const,
+          url: authorizeURL(redirect, pkce, state),
+          instructions: "Complete authorization in your browser. This window will close automatically.",
+          callback: Deferred.await(code).pipe(
+            Effect.flatMap((value) => exchange(value, redirect, pkce, fetch)),
+            Effect.map((tokens) => credential(browserMethodID, tokens, selectedRouting)),
+          ),
+        }
+      }),
+    refresh: (value) => refresh(browserMethodID, value, routing),
+  } satisfies IntegrationOAuthMethodRegistration
+}
+
+function headless(routing: ProviderRouting.Mode) {
+  return {
+    integrationID: Integration.ID.make("openai"),
+    method: {
+      id: headlessMethodID,
+      type: "oauth",
+      label: "ChatGPT Pro/Plus (headless)",
+    },
+    authorize: (inputs) =>
+      Effect.gen(function* () {
+        const selectedRouting = ProviderRouting.read(inputs[ProviderRouting.RequestKey] ?? routing)
+        const fetch = yield* Effect.promise(() => oauthFetch(selectedRouting))
+        const device = yield* request<{ device_auth_id: string; user_code: string; interval: string }>(
+          `${issuer}/api/accounts/deviceauth/usercode`,
+          {
+            method: "POST",
+            headers: headers("application/json"),
+            body: JSON.stringify({ client_id: clientID }),
+          },
+          fetch,
+        )
+        const interval = Math.max(Number.parseInt(device.interval) || 5, 1) * 1000
+        return {
+          mode: "auto" as const,
+          url: `${issuer}/codex/device`,
+          instructions: `Enter code: ${device.user_code}`,
+          callback: Effect.gen(function* () {
+            while (true) {
+              const response = yield* Effect.tryPromise({
+                try: (signal) =>
+                  fetch(`${issuer}/api/accounts/deviceauth/token`, {
+                    method: "POST",
+                    headers: headers("application/json"),
+                    body: JSON.stringify({ device_auth_id: device.device_auth_id, user_code: device.user_code }),
+                    signal,
+                  }),
+                catch: (cause) => cause,
+              })
+              if (response.ok) {
+                const data = (yield* Effect.promise(() => response.json())) as {
+                  authorization_code: string
+                  code_verifier: string
+                }
+                return credential(
+                  headlessMethodID,
+                  yield* exchange(
+                    data.authorization_code,
+                    `${issuer}/deviceauth/callback`,
+                    {
+                      verifier: data.code_verifier,
+                      challenge: "",
+                    },
+                    fetch,
+                  ),
+                  selectedRouting,
+                )
+              }
+              if (response.status !== 403 && response.status !== 404) {
+                return yield* Effect.fail(new Error(`Device authorization failed: ${response.status}`))
+              }
+              yield* Effect.sleep(interval + pollingSafetyMargin)
+            }
+          }),
+        }
+      }),
+    refresh: (value) => refresh(headlessMethodID, value, routing),
+  } satisfies IntegrationOAuthMethodRegistration
+}
 
 export const OpenAIPlugin = define({
   id: "openai",
   effect: Effect.fn(function* (ctx) {
+    const config = yield* Config.Service
+    const routing = ProviderRouting.read(
+      (yield* config.entries())
+        .filter((entry): entry is Config.Document => entry.type === "document")
+        .flatMap((entry) => (entry.info.providers?.openai ? [entry.info.providers.openai] : []))
+        .findLast((provider) => provider.routing !== undefined)?.routing,
+    )
     yield* ctx.integration.transform((draft) => {
-      draft.method.update(browser)
-      draft.method.update(headless)
+      draft.method.update(browser(routing))
+      draft.method.update(headless(routing))
     })
     yield* ctx.catalog.transform(
       Effect.fn(function* (evt) {
@@ -192,38 +220,53 @@ function headers(contentType: string) {
   return { "Content-Type": contentType, "User-Agent": `opencode/${InstallationVersion}` }
 }
 
-function exchange(code: string, redirect: string, pkce: Pkce) {
-  return request<TokenResponse>(`${issuer}/oauth/token`, {
-    method: "POST",
-    headers: headers("application/x-www-form-urlencoded"),
-    body: new URLSearchParams({
-      grant_type: "authorization_code",
-      code,
-      redirect_uri: redirect,
-      client_id: clientID,
-      code_verifier: pkce.verifier,
-    }).toString(),
-  })
+function exchange(code: string, redirect: string, pkce: Pkce, fetch: typeof globalThis.fetch) {
+  return request<TokenResponse>(
+    `${issuer}/oauth/token`,
+    {
+      method: "POST",
+      headers: headers("application/x-www-form-urlencoded"),
+      body: new URLSearchParams({
+        grant_type: "authorization_code",
+        code,
+        redirect_uri: redirect,
+        client_id: clientID,
+        code_verifier: pkce.verifier,
+      }).toString(),
+    },
+    fetch,
+  )
 }
 
-function refresh(methodID: Integration.MethodID, value: Pick<Credential.OAuth, "refresh" | "metadata">) {
-  return request<TokenResponse>(`${issuer}/oauth/token`, {
-    method: "POST",
-    headers: headers("application/x-www-form-urlencoded"),
-    body: new URLSearchParams({
-      grant_type: "refresh_token",
-      refresh_token: value.refresh,
-      client_id: clientID,
-    }).toString(),
-  }).pipe(
+function refresh(
+  methodID: Integration.MethodID,
+  value: Pick<Credential.OAuth, "refresh" | "metadata">,
+  routing: ProviderRouting.Mode,
+) {
+  return Effect.promise(() => oauthFetch(routing)).pipe(
+    Effect.flatMap((fetch) =>
+      request<TokenResponse>(
+        `${issuer}/oauth/token`,
+        {
+          method: "POST",
+          headers: headers("application/x-www-form-urlencoded"),
+          body: new URLSearchParams({
+            grant_type: "refresh_token",
+            refresh_token: value.refresh,
+            client_id: clientID,
+          }).toString(),
+        },
+        fetch,
+      ),
+    ),
     Effect.map((tokens) => {
-      const next = credential(methodID, tokens)
+      const next = credential(methodID, tokens, routing)
       return Credential.OAuth.make({ ...next, metadata: next.metadata ?? value.metadata })
     }),
   )
 }
 
-function request<A>(url: string, init: RequestInit) {
+function request<A>(url: string, init: RequestInit, fetch: typeof globalThis.fetch) {
   return Effect.tryPromise({
     try: async (signal) => {
       const response = await fetch(url, { ...init, signal })
@@ -234,7 +277,12 @@ function request<A>(url: string, init: RequestInit) {
   })
 }
 
-function credential(methodID: Integration.MethodID, tokens: TokenResponse) {
+async function oauthFetch(routing: ProviderRouting.Mode) {
+  if (routing === "direct") return proxyFetch(globalThis.fetch, { source: "disabled" })
+  return proxyFetch(globalThis.fetch, ProviderRouting.transport(routing, await resolveProxy()))
+}
+
+function credential(methodID: Integration.MethodID, tokens: TokenResponse, routing: ProviderRouting.Mode) {
   const accountID = extractAccountID(tokens)
   return Credential.OAuth.make({
     type: "oauth",
@@ -242,7 +290,10 @@ function credential(methodID: Integration.MethodID, tokens: TokenResponse) {
     refresh: tokens.refresh_token,
     access: tokens.access_token,
     expires: Date.now() + (tokens.expires_in ?? 3600) * 1000,
-    metadata: accountID ? { accountID } : undefined,
+    metadata: {
+      ...(accountID ? { accountID } : {}),
+      [ProviderRouting.RequestKey]: routing,
+    },
   })
 }
 

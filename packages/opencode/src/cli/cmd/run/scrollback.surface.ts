@@ -19,6 +19,7 @@ import { turnSummaryCommit } from "./turn-summary"
 import { entryWriter, sameEntryGroup, separatorRows, spacerWriter, turnSummaryWriter } from "./scrollback.writer"
 import { type RunTheme } from "./theme"
 import type { RunDiffStyle, RunEntryBody, StreamCommit } from "./types"
+import type { Language } from "@opencode-ai/tui/util/locale"
 
 type ActiveBody = Exclude<RunEntryBody, { type: "none" | "structured" }>
 
@@ -87,6 +88,7 @@ export class RunScrollbackStream {
   private rendered: StreamCommit | undefined
   private active: ActiveEntry | undefined
   private diffStyle: RunDiffStyle | undefined
+  private language: Language | undefined
   private sessionID?: () => string | undefined
   private treeSitterClient: TreeSitterClient | undefined
   private wrote: boolean
@@ -98,12 +100,14 @@ export class RunScrollbackStream {
     options: {
       wrote?: boolean
       diffStyle?: RunDiffStyle
+      language?: Language
       sessionID?: () => string | undefined
       treeSitterClient?: TreeSitterClient
       onThemeRelease?: (theme: RunTheme) => void
     } = {},
   ) {
     this.diffStyle = options.diffStyle
+    this.language = options.language
     this.sessionID = options.sessionID
     this.treeSitterClient = options.treeSitterClient ?? getTreeSitterClient()
     this.wrote = options.wrote ?? false
@@ -396,6 +400,7 @@ export class RunScrollbackStream {
         theme: this.theme,
         opts: {
           diffStyle: this.diffStyle,
+          language: this.language,
         },
       }),
     )

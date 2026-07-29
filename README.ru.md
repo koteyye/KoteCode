@@ -1,129 +1,167 @@
-<p align="center">
-  <a href="https://opencode.ai">
-    <picture>
-      <source srcset="packages/console/app/src/asset/logo-ornate-dark.svg" media="(prefers-color-scheme: dark)">
-      <source srcset="packages/console/app/src/asset/logo-ornate-light.svg" media="(prefers-color-scheme: light)">
-      <img src="packages/console/app/src/asset/logo-ornate-light.svg" alt="OpenCode logo">
-    </picture>
-  </a>
-</p>
-<p align="center">Открытый AI-агент для программирования.</p>
-<p align="center">
-  <a href="https://opencode.ai/discord"><img alt="Discord" src="https://img.shields.io/discord/1391832426048651334?style=flat-square&label=discord" /></a>
-  <a href="https://www.npmjs.com/package/opencode-ai"><img alt="npm" src="https://img.shields.io/npm/v/opencode-ai?style=flat-square" /></a>
-  <a href="https://github.com/anomalyco/opencode/actions/workflows/publish.yml"><img alt="Build status" src="https://img.shields.io/github/actions/workflow/status/anomalyco/opencode/publish.yml?style=flat-square&branch=dev" /></a>
-</p>
-
-<p align="center">
-  <a href="README.md">English</a> |
-  <a href="README.zh.md">简体中文</a> |
-  <a href="README.zht.md">繁體中文</a> |
-  <a href="README.ko.md">한국어</a> |
-  <a href="README.de.md">Deutsch</a> |
-  <a href="README.es.md">Español</a> |
-  <a href="README.fr.md">Français</a> |
-  <a href="README.it.md">Italiano</a> |
-  <a href="README.da.md">Dansk</a> |
-  <a href="README.ja.md">日本語</a> |
-  <a href="README.pl.md">Polski</a> |
-  <a href="README.ru.md">Русский</a> |
-  <a href="README.bs.md">Bosanski</a> |
-  <a href="README.ar.md">العربية</a> |
-  <a href="README.no.md">Norsk</a> |
-  <a href="README.br.md">Português (Brasil)</a> |
-  <a href="README.th.md">ไทย</a> |
-  <a href="README.tr.md">Türkçe</a> |
-  <a href="README.uk.md">Українська</a> |
-  <a href="README.bn.md">বাংলা</a> |
-  <a href="README.gr.md">Ελληνικά</a> |
-  <a href="README.vi.md">Tiếng Việt</a>
-</p>
-
-[![OpenCode Terminal UI](packages/web/src/assets/lander/screenshot.png)](https://opencode.ai)
-
----
-
-### Установка
-
-```bash
-# YOLO
-curl -fsSL https://opencode.ai/install | bash
-
-# Менеджеры пакетов
-npm i -g opencode-ai@latest        # или bun/pnpm/yarn
-scoop install opencode             # Windows
-choco install opencode             # Windows
-brew install anomalyco/tap/opencode # macOS и Linux (рекомендуем, всегда актуально)
-brew install opencode              # macOS и Linux (официальная формула brew, обновляется реже)
-sudo pacman -S opencode            # Arch Linux (Stable)
-paru -S opencode-bin               # Arch Linux (Latest from AUR)
-mise use -g opencode               # любая ОС
-nix run nixpkgs#opencode           # или github:anomalyco/opencode для самой свежей ветки dev
+```
+█  █ █▀▀█ █▀▀█ █▀▀█  █▀▀▀ █▀▀█ █▀▀█ █▀▀█
+█▀█  █  █  ██  █▀▀▀  █    █  █ █  █ █▀▀▀
+█ ▀█ ▀▀▀▀  ▀▀  ▀▀▀▀  ▀▀▀▀ ▀▀▀▀ ▀▀▀▀ ▀▀▀▀
 ```
 
-> [!TIP]
-> Перед установкой удалите версии старше 0.1.x.
+[English](README.md) | [Русский](README.ru.md)
 
-### Десктопное приложение (BETA)
+# KoteCode
 
-OpenCode также доступен как десктопное приложение. Скачайте его со [страницы релизов](https://github.com/anomalyco/opencode/releases) или с [opencode.ai/download](https://opencode.ai/download).
+**KoteCode — AI-агент для программирования на базе OpenCode.**
 
-| Платформа             | Загрузка                           |
-| --------------------- | ---------------------------------- |
-| macOS (Apple Silicon) | `opencode-desktop-mac-arm64.dmg`   |
-| macOS (Intel)         | `opencode-desktop-mac-x64.dmg`     |
-| Windows               | `opencode-desktop-windows-x64.exe` |
-| Linux                 | `.deb`, `.rpm` или AppImage        |
+KoteCode — независимый форк [OpenCode](https://github.com/anomalyco/opencode). Проект не связан
+с командой OpenCode, не одобрен ею и не является её официальным продуктом. KoteCode развивается
+отдельно на основе исходного кода OpenCode под лицензией MIT.
 
-```bash
-# macOS (Homebrew)
-brew install --cask opencode-desktop
-# Windows (Scoop)
-scoop bucket add extras; scoop install extras/opencode-desktop
+> **Статус:** `v1.0.0` — первая самостоятельная версия KoteCode. Основан на OpenCode `1.18.5`.
+
+## Возможности
+
+KoteCode работает в терминале (TUI) и как десктопное приложение. Он сохраняет основные
+возможности OpenCode: работу с разными провайдерами, вызов инструментов, сессии и агентов
+`build` и `plan`. Дополнительно форк включает:
+
+- **Kote Proxy** — прозрачный HTTPS `CONNECT`-транспорт для существующих провайдеров;
+- отдельные каталоги конфигурации и переменные окружения `KOTECODE_*`;
+- команду `kotencode` и собственный бренд KoteCode.
+
+Полный аудит изменений: [`docs/FORK_AUDIT.md`](./docs/FORK_AUDIT.md).
+
+## Важно: стоимость и передача данных
+
+KoteCode отправляет запросы, код и содержимое выбранных файлов тому AI-провайдеру, которого
+вы подключили.
+
+- Большинство провайдеров тарифицируют использование моделей по токенам. Сам KoteCode
+  бесплатен, но запросы к моделям могут быть платными.
+- При включённом Kote Proxy трафик до провайдера остаётся защищён сквозным TLS. Прокси видит
+  имя целевого хоста и транспортные метаданные, но не API-ключ, запросы, код и ответы.
+
+## Транспорт провайдеров
+
+OpenAI, Anthropic, OpenRouter и другие провайдеры подключаются обычным способом — через
+собственный API-ключ или поддерживаемую провайдером авторизацию. KoteCode и Kote Proxy
+не предоставляют кредиты на модели.
+
+```text
+KoteCode ── CONNECT через Kote Proxy ── сквозной TLS ── выбранный провайдер
 ```
 
-#### Каталог установки
+Исходный URL провайдера, авторизация, SDK, каталог моделей, потоковая передача, инструменты
+и мультимодальность не меняются. Локальные HTTP-провайдеры, например Ollama, работают напрямую.
+В Desktop-приложении маршрут выбирается отдельно для каждого провайдера при подключении
+и затем меняется в разделе **Настройки → Провайдеры**.
 
-Скрипт установки выбирает путь установки в следующем порядке приоритета:
+### Получение адреса Kote Proxy
 
-1. `$OPENCODE_INSTALL_DIR` - Пользовательский каталог установки
-2. `$XDG_BIN_DIR` - Путь, совместимый со спецификацией XDG Base Directory
-3. `$HOME/bin` - Стандартный каталог пользовательских бинарников (если существует или можно создать)
-4. `$HOME/.opencode/bin` - Fallback по умолчанию
+Адрес прокси не зашит в KoteCode. При запуске приложение:
+
+1. загружает небольшую конфигурацию bootstrap с подписью Ed25519;
+2. проверяет подпись встроенным публичным ключом;
+3. проверяет `config_version`, `issued_at` и `expires_at`;
+4. использует подписанный `proxy.url` для HTTPS-запросов к провайдерам.
+
+Формат и процесс подписи описаны в [`docs/BOOTSTRAP.md`](./docs/BOOTSTRAP.md).
+
+Для локальной разработки адрес можно задать вручную:
 
 ```bash
-# Примеры
-OPENCODE_INSTALL_DIR=/usr/local/bin curl -fsSL https://opencode.ai/install | bash
-XDG_BIN_DIR=$HOME/.local/bin curl -fsSL https://opencode.ai/install | bash
+KOTECODE_PROXY_URL=https://kote-proxy.kotey-ye.ru kotencode
 ```
 
-### Agents
+Для явного прямого подключения к провайдерам:
 
-В OpenCode есть два встроенных агента, между которыми можно переключаться клавишей `Tab`.
+```bash
+KOTECODE_DISABLE_PROXY=1 kotencode
+```
 
-- **build** - По умолчанию, агент с полным доступом для разработки
-- **plan** - Агент только для чтения для анализа и изучения кода
-  - По умолчанию запрещает редактирование файлов
-  - Запрашивает разрешение перед выполнением bash-команд
-  - Идеален для изучения незнакомых кодовых баз или планирования изменений
+Если настроенный Kote Proxy недоступен, KoteCode не переключается на прямое соединение скрытно.
 
-Также включен сабагент **general** для сложных поисков и многошаговых задач.
-Он используется внутренне и может быть вызван в сообщениях через `@general`.
+## Установка
 
-Подробнее об [agents](https://opencode.ai/docs/agents).
+> Сборки выпускаются черновым release workflow. Сборка из исходников описана в
+> [`docs/BUILD.md`](./docs/BUILD.md).
 
-### Документация
+```bash
+# Из GitHub Release после публикации
+curl -fsSL https://github.com/koteyye/KoteCode/raw/main/install | bash
+```
 
-Больше информации о том, как настроить OpenCode: [**наши docs**](https://opencode.ai/docs).
+Для сборки из исходников требуется [Bun](https://bun.sh) версии 1.3 или новее:
 
-### Вклад
+```bash
+git clone https://github.com/koteyye/KoteCode.git
+cd KoteCode
+bun install
+bun run packages/opencode/script/build.ts --single
+```
 
-Если вы хотите внести вклад в OpenCode, прочитайте [contributing docs](./CONTRIBUTING.md) перед тем, как отправлять pull request.
+Готовый бинарник появится по пути `dist/kotencode-*/bin/kotencode`.
 
-### Разработка на базе OpenCode
+## Конфигурация
 
-Если вы делаете проект, связанный с OpenCode, и используете "opencode" как часть имени (например, "opencode-dashboard" или "opencode-mobile"), добавьте примечание в README, чтобы уточнить, что проект не создан командой OpenCode и не аффилирован с нами.
+KoteCode хранит настройки отдельно от OpenCode:
 
----
+| ОС      | Каталог конфигурации                      |
+| ------- | ----------------------------------------- |
+| Linux   | `~/.config/kotencode`                     |
+| macOS   | `~/Library/Application Support/kotencode` |
+| Windows | `%APPDATA%\kotencode`                     |
 
-**Присоединяйтесь к нашему сообществу** [Discord](https://discord.gg/opencode) | [X.com](https://x.com/opencode)
+Для миграции существующих настроек:
+
+```bash
+kotencode migrate-from-opencode
+kotencode migrate-from-opencode --with-secrets
+```
+
+Первая команда копирует только несекретные настройки. Вторая также импортирует ключи по явному
+запросу. Исходные файлы OpenCode не изменяются.
+
+Основные переменные окружения:
+
+| Переменная                      | Назначение                             |
+| ------------------------------- | -------------------------------------- |
+| `KOTECODE_CONFIG`               | Путь к файлу конфигурации              |
+| `KOTECODE_CONFIG_DIR`           | Другой каталог конфигурации            |
+| `KOTECODE_DATA_DIR`             | Другой каталог данных                  |
+| `KOTECODE_CACHE_DIR`            | Другой каталог кеша                    |
+| `KOTECODE_BOOTSTRAP_URL`        | Другой URL bootstrap для разработки    |
+| `KOTECODE_PROXY_URL`            | Принудительный адрес Kote Proxy        |
+| `KOTECODE_DISABLE_PROXY`        | Явное прямое подключение к провайдерам |
+| `KOTECODE_DISABLE_UPDATE_CHECK` | Отключение проверки обновлений         |
+| `KOTECODE_LANG`                 | Язык терминального UI: `ru` или `en`   |
+
+Язык терминального интерфейса по умолчанию — русский. Его можно переключить только между
+русским и английским в файле `tui.json` внутри каталога конфигурации:
+
+```json
+{
+  "language": "ru"
+}
+```
+
+Для разового запуска на английском:
+
+```bash
+KOTECODE_LANG=en kotencode
+```
+
+Полное описание: [`docs/CONFIGURATION.md`](./docs/CONFIGURATION.md).
+
+## Документация
+
+- [`docs/FORK_AUDIT.md`](./docs/FORK_AUDIT.md) — аудит исходной кодовой базы
+- [`docs/UPSTREAM.md`](./docs/UPSTREAM.md) — синхронизация с upstream OpenCode
+- [`docs/BOOTSTRAP.md`](./docs/BOOTSTRAP.md) — формат подписанной bootstrap-конфигурации
+- [`docs/NETWORK.md`](./docs/NETWORK.md) — сетевые обращения KoteCode
+- [`docs/PROXY_COMPATIBILITY.md`](./docs/PROXY_COMPATIBILITY.md) — совместимость провайдеров
+- [`docs/CONFIGURATION.md`](./docs/CONFIGURATION.md) — каталоги, переменные и режимы
+- [`docs/BUILD.md`](./docs/BUILD.md) — сборка из исходников
+- [`docs/TZ-2-KOTE-PROXY.md`](./docs/TZ-2-KOTE-PROXY.md) — контракт и модель угроз Kote Proxy
+
+## Лицензия
+
+MIT — см. [`LICENSE`](./LICENSE). KoteCode основан на OpenCode (© 2025 opencode, MIT);
+атрибуция приведена в [`THIRD_PARTY_NOTICES.md`](./THIRD_PARTY_NOTICES.md).

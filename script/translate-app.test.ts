@@ -15,8 +15,8 @@ import {
 
 describe("translate app", () => {
   test("parses one locale with the public model defaults", () => {
-    expect(parseTranslationArgs(["fr"])).toEqual({
-      target: "fr",
+    expect(parseTranslationArgs(["ru"])).toEqual({
+      target: "ru",
       concurrency: 1,
       model: "opencode/gpt-5.5",
       variant: "xhigh",
@@ -51,27 +51,24 @@ describe("translate app", () => {
 
   test("rejects unsupported targets and invalid concurrency", () => {
     expect(() => parseTranslationArgs(["en"])).toThrow("Unknown locale")
-    expect(() => parseTranslationArgs(["fr", "de"])).toThrow("one locale")
+    expect(() => parseTranslationArgs(["ru", "ru"])).toThrow("one locale")
     expect(() => parseTranslationArgs(["all", "--concurrency", "0"])).toThrow("positive integer")
   })
 
   test("parses fresh-process parity checks without requesting translation", () => {
-    expect(parseTranslationArgs(["fr", "--check"]).check).toBe(true)
+    expect(parseTranslationArgs(["ru", "--check"]).check).toBe(true)
   })
 
   test("limits each locale to its app surfaces", () => {
-    expect(targetFiles("fr")).toEqual([
-      "packages/app/src/i18n/fr.ts",
-      "packages/ui/src/i18n/fr.ts",
-      "packages/desktop/src/renderer/i18n/fr.ts",
+    expect(targetFiles("ru")).toEqual([
+      "packages/app/src/i18n/ru.ts",
+      "packages/ui/src/i18n/ru.ts",
+      "packages/desktop/src/renderer/i18n/ru.ts",
     ])
-    expect(targetFiles("tr")).toEqual(["packages/app/src/i18n/tr.ts", "packages/ui/src/i18n/tr.ts"])
   })
 
   test("maps product locale codes to their glossaries", () => {
-    expect(glossaryFile("fr")).toBe(".opencode/glossary/fr.md")
-    expect(glossaryFile("zh")).toBe(".opencode/glossary/zh-cn.md")
-    expect(glossaryFile("zht")).toBe(".opencode/glossary/zh-tw.md")
+    expect(glossaryFile("ru")).toBe(".opencode/glossary/ru.md")
   })
 
   test("finds key and placeholder drift", () => {
@@ -139,13 +136,13 @@ opencode/next
   })
 
   test("disables side effects and scopes edits for the translation agent", () => {
-    const config = translationConfig("translate-app-fr", "opencode/gpt-5.5", ["packages/app/src/i18n/fr.ts"])
+    const config = translationConfig("translate-app-ru", "opencode/gpt-5.5", ["packages/app/src/i18n/ru.ts"])
     expect(config.share).toBe("disabled")
     expect(config.formatter).toBe(false)
     expect(config.lsp).toBe(false)
-    expect(config.agent["translate-app-fr"].permission.edit).toEqual({
+    expect(config.agent["translate-app-ru"].permission.edit).toEqual({
       "*": "deny",
-      "packages/app/src/i18n/fr.ts": "allow",
+      "packages/app/src/i18n/ru.ts": "allow",
     })
   })
 
@@ -155,10 +152,10 @@ opencode/next
         { "script/translate-app.ts": "before" },
         {
           "script/translate-app.ts": "before",
-          "packages/app/src/i18n/fr.ts": "translated",
+          "packages/app/src/i18n/ru.ts": "translated",
           "packages/app/src/app.tsx": "unexpected",
         },
-        ["packages/app/src/i18n/fr.ts"],
+        ["packages/app/src/i18n/ru.ts"],
       ),
     ).toEqual(["packages/app/src/app.tsx"])
     expect(unexpectedChanges({ "already-dirty.ts": "before" }, { "already-dirty.ts": "after" }, [])).toEqual([

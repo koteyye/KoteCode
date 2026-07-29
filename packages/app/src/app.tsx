@@ -327,7 +327,7 @@ function DesktopCommands() {
     if (platform.platform === "desktop" && platform.exportDebugLogs) {
       commands.push({
         id: "logs.export",
-        title: "Export logs",
+        title: language.t("command.logs.export"),
         category: language.t("command.category.settings"),
         onSelect: () => {
           void platform.exportDebugLogs?.()
