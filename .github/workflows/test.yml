@@ -65,9 +65,14 @@ jobs:
 
       - name: Run unit tests
         timeout-minutes: 20
-        run: GITHUB_ACTIONS=false bun turbo test
+        run: GITHUB_ACTIONS=false bun turbo test --filter='!kotecode'
         env:
           OPENCODE_EXPERIMENTAL_DISABLE_FILEWATCHER: ${{ runner.os == 'Windows' && 'true' || 'false' }}
+
+      - name: Run KoteCode tests
+        if: runner.os == 'Linux'
+        timeout-minutes: 15
+        run: GITHUB_ACTIONS=false bun turbo test --filter=kotecode --concurrency=1
 
       - name: Check generated client
         if: runner.os == 'Linux'
