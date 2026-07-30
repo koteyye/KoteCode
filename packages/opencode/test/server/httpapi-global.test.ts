@@ -43,14 +43,14 @@ const apiLayer = HttpRouter.serve(
 const it = testEffect(apiLayer)
 
 describe("global HttpApi", () => {
-  it.live("rejects upgrade requests while alpha updates are disabled", () =>
+  it.live("upgrades to the latest available version", () =>
     Effect.gen(function* () {
       const response = yield* HttpClient.post(GlobalPaths.upgrade)
 
-      expect(response.status).toBe(400)
+      expect(response.status).toBe(200)
       expect(yield* response.json).toEqual({
-        success: false,
-        error: Installation.UpdatesDisabledMessage,
+        success: true,
+        version: "9.9.9",
       })
     }),
   )

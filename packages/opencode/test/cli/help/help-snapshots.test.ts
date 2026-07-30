@@ -34,6 +34,8 @@ function normalize(text: string): string {
       // hood). A `[a-z0-9]+` regex would leave uppercase chars trailing.
       [new RegExp(`<TMPDIR>${PATH_SEP}oc-cli-[A-Za-z0-9]+`, "g"), "<HOME>"],
       [/\s+\[string\] \[default: "<HOME>"\]/g, ' [string] [default: "<HOME>"]'],
+      // yargs shifts alias annotations by one column across platforms.
+      [/[^\S\r\n]+(?=\[aliases:)/g, " "],
     ],
   })
 }
