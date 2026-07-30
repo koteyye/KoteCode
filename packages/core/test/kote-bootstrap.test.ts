@@ -315,7 +315,7 @@ describe("kote bootstrap resolution", () => {
   })
 
   it("keeps the production cache below the KoteCode cache directory", () => {
-    expect(cachePath()).toContain(path.join("kotencode", "kote", "bootstrap.json"))
+    expect(cachePath()).toContain(path.join("kotecode", "kote", "bootstrap.json"))
   })
 })
 

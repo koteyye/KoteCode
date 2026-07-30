@@ -6,7 +6,7 @@ import { Global } from "@opencode-ai/core/global"
 
 describe("global paths", () => {
   test("tmp path is under the system temp directory", () => {
-    expect(Global.Path.tmp).toBe(path.join(os.tmpdir(), "kotencode"))
+    expect(Global.Path.tmp).toBe(path.join(os.tmpdir(), "kotecode"))
     expect(Global.make().tmp).toBe(Global.Path.tmp)
   })
 
@@ -15,7 +15,7 @@ describe("global paths", () => {
   })
 
   test("KOTECODE directory overrides drive direct and derived paths", async () => {
-    const root = await fs.mkdtemp(path.join(os.tmpdir(), "kotencode-global-test-"))
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), "kotecode-global-test-"))
     const data = path.join(root, "data")
     const cache = path.join(root, "cache")
     const config = path.join(root, "config")

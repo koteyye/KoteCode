@@ -1,7 +1,7 @@
 // Bun Snapshot v1, https://bun.sh/docs/test/snapshots
 
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode acp --help 1`] = `
-"kotencode acp
+"kotecode acp
 
 start ACP (Agent Client Protocol) server
 
@@ -22,16 +22,16 @@ Options:
 `;
 
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode mcp --help 1`] = `
-"kotencode mcp
+"kotecode mcp
 
 manage MCP (Model Context Protocol) servers
 
 Commands:
-  kotencode mcp add [name]     add an MCP server
-  kotencode mcp list           list MCP servers and their status                       [aliases: ls]
-  kotencode mcp auth [name]    authenticate with an OAuth-enabled MCP server
-  kotencode mcp logout [name]  remove OAuth credentials for an MCP server
-  kotencode mcp debug <name>   debug OAuth connection for an MCP server
+  kotecode mcp add [name]     add an MCP server
+  kotecode mcp list           list MCP servers and their status                       [aliases: ls]
+  kotecode mcp auth [name]    authenticate with an OAuth-enabled MCP server
+  kotecode mcp logout [name]  remove OAuth credentials for an MCP server
+  kotecode mcp debug <name>   debug OAuth connection for an MCP server
 
 Options:
   -h, --help        show help                                                              [boolean]
@@ -42,7 +42,7 @@ Options:
 `;
 
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode attach --help 1`] = `
-"kotencode attach <url>
+"kotecode attach <url>
 
 attach to a running KoteCode server
 
@@ -68,7 +68,7 @@ Options:
 `;
 
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode run --help 1`] = `
-"kotencode run [message..]
+"kotecode run [message..]
 
 run KoteCode with a message
 
@@ -108,25 +108,25 @@ Options:
 `;
 
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode debug --help 1`] = `
-"kotencode debug
+"kotecode debug
 
 debugging and troubleshooting tools
 
 Commands:
-  kotencode debug config        show resolved configuration
-  kotencode debug lsp           LSP debugging utilities
-  kotencode debug rg            ripgrep debugging utilities
-  kotencode debug file          file system debugging utilities
-  kotencode debug scrap         list all known projects
-  kotencode debug skill         list all available skills
-  kotencode debug snapshot      snapshot debugging utilities
-  kotencode debug startup       print startup timing
-  kotencode debug agent <name>  show agent configuration details
-  kotencode debug v2            debug v2 catalog and built-in plugins
-  kotencode debug proxy         show Kote Gateway transport diagnostics
-  kotencode debug info          show debug information
-  kotencode debug paths         show global paths (data, config, cache, state)
-  kotencode debug wait          wait indefinitely (for debugging)
+  kotecode debug config        show resolved configuration
+  kotecode debug lsp           LSP debugging utilities
+  kotecode debug rg            ripgrep debugging utilities
+  kotecode debug file          file system debugging utilities
+  kotecode debug scrap         list all known projects
+  kotecode debug skill         list all available skills
+  kotecode debug snapshot      snapshot debugging utilities
+  kotecode debug startup       print startup timing
+  kotecode debug agent <name>  show agent configuration details
+  kotecode debug v2            debug v2 catalog and built-in plugins
+  kotecode debug proxy         show Kote Gateway transport diagnostics
+  kotecode debug info          show debug information
+  kotecode debug paths         show global paths (data, config, cache, state)
+  kotecode debug wait          wait indefinitely (for debugging)
 
 Options:
   -h, --help        show help                                                              [boolean]
@@ -137,15 +137,15 @@ Options:
 `;
 
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode providers --help 1`] = `
-"kotencode providers
+"kotecode providers
 
 manage AI providers and credentials
 
 Commands:
-  kotencode providers list                       list providers and credentials        [aliases: ls]
-  kotencode providers login [url]                log in to a provider
-  kotencode providers logout [provider]          log out from a configured provider
-  kotencode providers routing [provider] [mode]  configure Kote Gateway routing for a provider
+  kotecode providers list                       list providers and credentials        [aliases: ls]
+  kotecode providers login [url]                log in to a provider
+  kotecode providers logout [provider]          log out from a configured provider
+  kotecode providers routing [provider] [mode]  configure Kote Gateway routing for a provider
                                                                                     [aliases: route]
 
 Options:
@@ -157,13 +157,13 @@ Options:
 `;
 
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode agent --help 1`] = `
-"kotencode agent
+"kotecode agent
 
 manage agents
 
 Commands:
-  kotencode agent create  create a new agent
-  kotencode agent list    list all available agents
+  kotecode agent create  create a new agent
+  kotecode agent list    list all available agents
 
 Options:
   -h, --help        show help                                                              [boolean]
@@ -174,7 +174,7 @@ Options:
 `;
 
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode upgrade --help 1`] = `
-"kotencode upgrade [target]
+"kotecode upgrade [target]
 
 KoteCode updates are currently disabled
 
@@ -192,7 +192,7 @@ Options:
 `;
 
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode uninstall --help 1`] = `
-"kotencode uninstall
+"kotecode uninstall
 
 uninstall opencode and remove all related files
 
@@ -209,7 +209,7 @@ Options:
 `;
 
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode serve --help 1`] = `
-"kotencode serve
+"kotecode serve
 
 starts a headless opencode server
 
@@ -229,7 +229,7 @@ Options:
 `;
 
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode web --help 1`] = `
-"kotencode web
+"kotecode web
 
 start KoteCode server and open web interface
 
@@ -249,7 +249,7 @@ Options:
 `;
 
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode models --help 1`] = `
-"kotencode models [provider]
+"kotecode models [provider]
 
 list all available models
 
@@ -267,7 +267,7 @@ Options:
 `;
 
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode stats --help 1`] = `
-"kotencode stats
+"kotecode stats
 
 show token usage and cost statistics
 
@@ -285,7 +285,7 @@ Options:
 `;
 
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode export --help 1`] = `
-"kotencode export [sessionID]
+"kotecode export [sessionID]
 
 export session data as JSON
 
@@ -302,7 +302,7 @@ Options:
 `;
 
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode import --help 1`] = `
-"kotencode import <file>
+"kotecode import <file>
 
 import session data from JSON file or URL
 
@@ -318,13 +318,13 @@ Options:
 `;
 
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode github --help 1`] = `
-"kotencode github
+"kotecode github
 
 manage GitHub agent
 
 Commands:
-  kotencode github install  install the GitHub agent
-  kotencode github run      run the GitHub agent
+  kotecode github install  install the GitHub agent
+  kotecode github run      run the GitHub agent
 
 Options:
   -h, --help        show help                                                              [boolean]
@@ -335,7 +335,7 @@ Options:
 `;
 
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode pr --help 1`] = `
-"kotencode pr <number>
+"kotecode pr <number>
 
 fetch and checkout a GitHub PR branch, then run KoteCode
 
@@ -351,13 +351,13 @@ Options:
 `;
 
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode session --help 1`] = `
-"kotencode session
+"kotecode session
 
 manage sessions
 
 Commands:
-  kotencode session list                list sessions
-  kotencode session delete <sessionID>  delete a session
+  kotecode session list                list sessions
+  kotecode session delete <sessionID>  delete a session
 
 Options:
   -h, --help        show help                                                              [boolean]
@@ -368,7 +368,7 @@ Options:
 `;
 
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode plugin --help 1`] = `
-"kotencode plugin <module>
+"kotecode plugin <module>
 
 install plugin and update config
 
@@ -386,13 +386,13 @@ Options:
 `;
 
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode db --help 1`] = `
-"kotencode db
+"kotecode db
 
 database tools
 
 Commands:
-  kotencode db [query]     open an interactive sqlite3 shell or run a query                [default]
-  kotencode db path        print the database path
+  kotecode db [query]     open an interactive sqlite3 shell or run a query                [default]
+  kotecode db path        print the database path
 
 Positionals:
   query  SQL query to execute                                                               [string]
@@ -407,7 +407,7 @@ Options:
 `;
 
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode mcp list --help 1`] = `
-"kotencode mcp list
+"kotecode mcp list
 
 list MCP servers and their status
 
@@ -420,7 +420,7 @@ Options:
 `;
 
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode mcp add --help 1`] = `
-"kotencode mcp add [name]
+"kotecode mcp add [name]
 
 add an MCP server
 
@@ -439,12 +439,12 @@ Options:
 `;
 
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode mcp auth --help 1`] = `
-"kotencode mcp auth [name]
+"kotecode mcp auth [name]
 
 authenticate with an OAuth-enabled MCP server
 
 Commands:
-  kotencode mcp auth list  list OAuth-capable MCP servers and their auth status        [aliases: ls]
+  kotecode mcp auth list  list OAuth-capable MCP servers and their auth status        [aliases: ls]
 
 Positionals:
   name  name of the MCP server                                                              [string]
@@ -458,7 +458,7 @@ Options:
 `;
 
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode mcp logout --help 1`] = `
-"kotencode mcp logout [name]
+"kotecode mcp logout [name]
 
 remove OAuth credentials for an MCP server
 
@@ -474,7 +474,7 @@ Options:
 `;
 
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode providers list --help 1`] = `
-"kotencode providers list
+"kotecode providers list
 
 list providers and credentials
 
@@ -487,7 +487,7 @@ Options:
 `;
 
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode providers login --help 1`] = `
-"kotencode providers login [url]
+"kotecode providers login [url]
 
 log in to a provider
 
@@ -505,7 +505,7 @@ Options:
 `;
 
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode providers logout --help 1`] = `
-"kotencode providers logout [provider]
+"kotecode providers logout [provider]
 
 log out from a configured provider
 
@@ -521,7 +521,7 @@ Options:
 `;
 
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode providers routing --help 1`] = `
-"kotencode providers routing [provider] [mode]
+"kotecode providers routing [provider] [mode]
 
 configure Kote Gateway routing for a provider
 
@@ -538,7 +538,7 @@ Options:
 `;
 
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode agent create --help 1`] = `
-"kotencode agent create
+"kotecode agent create
 
 create a new agent
 
@@ -558,7 +558,7 @@ Options:
 `;
 
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode agent list --help 1`] = `
-"kotencode agent list
+"kotecode agent list
 
 list all available agents
 
@@ -571,7 +571,7 @@ Options:
 `;
 
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode session list --help 1`] = `
-"kotencode session list
+"kotecode session list
 
 list sessions
 
@@ -586,7 +586,7 @@ Options:
 `;
 
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode session delete --help 1`] = `
-"kotencode session delete <sessionID>
+"kotecode session delete <sessionID>
 
 delete a session
 
@@ -602,7 +602,7 @@ Options:
 `;
 
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode github install --help 1`] = `
-"kotencode github install
+"kotecode github install
 
 install the GitHub agent
 
@@ -615,7 +615,7 @@ Options:
 `;
 
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode github run --help 1`] = `
-"kotencode github run
+"kotecode github run
 
 run the GitHub agent
 
@@ -630,7 +630,7 @@ Options:
 `;
 
 exports[`opencode CLI help-text snapshots every documented command emits stable help text: opencode db path --help 1`] = `
-"kotencode db path
+"kotecode db path
 
 print the database path
 

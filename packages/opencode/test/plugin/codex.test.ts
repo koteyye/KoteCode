@@ -139,7 +139,7 @@ describe("plugin.codex", () => {
     })
     const proxied = await CodexAuthPlugin({} as never, {
       experimentalWebSockets: true,
-      resolveProxy: async () => ({ source: "environment", url: "https://proxy.kotencode.test" }),
+      resolveProxy: async () => ({ source: "environment", url: "https://proxy.kotecode.test" }),
     })
 
     const disabledOptions = await disabled.auth!.loader!(
@@ -176,7 +176,7 @@ describe("plugin.codex", () => {
     ) satisfies typeof globalThis.fetch
     const hooks = await CodexAuthPlugin({} as never, {
       fetch: runtimeFetch,
-      resolveProxy: async () => ({ source: "environment", url: "https://proxy.kotencode.test" }),
+      resolveProxy: async () => ({ source: "environment", url: "https://proxy.kotecode.test" }),
     })
 
     const method = hooks.auth?.methods[1]
@@ -187,7 +187,7 @@ describe("plugin.codex", () => {
     expect(authorization.url).toBe("https://auth.openai.com/codex/device")
     expect(calls).toHaveLength(1)
     expect(calls[0]?.input).toBe("https://auth.openai.com/api/accounts/deviceauth/usercode")
-    expect(calls[0]?.init?.proxy).toBe("https://proxy.kotencode.test")
+    expect(calls[0]?.init?.proxy).toBe("https://proxy.kotecode.test")
   })
 
   test("filters unsupported modes and uses Codex context limits for OAuth GPT models", async () => {

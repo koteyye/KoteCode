@@ -137,8 +137,8 @@ export class Service extends Context.Service<Service, Interface>()("@opencode/Co
 export const use = serviceUse(Service)
 
 function globalConfigFile() {
-  const candidates = ["kotencode.jsonc", "kotencode.json", "opencode.jsonc", "opencode.json", "config.json"].map(
-    (file) => path.join(Global.Path.config, file),
+  const candidates = ["kotecode.jsonc", "kotecode.json", "opencode.jsonc", "opencode.json", "config.json"].map((file) =>
+    path.join(Global.Path.config, file),
   )
   for (const file of candidates) {
     if (existsSync(file)) return file
@@ -264,8 +264,8 @@ const layer = Layer.effect(
       result = mergeConfig(result, yield* loadFile(path.join(Global.Path.config, "config.json"), env))
       result = mergeConfig(result, yield* loadFile(path.join(Global.Path.config, "opencode.json"), env))
       result = mergeConfig(result, yield* loadFile(path.join(Global.Path.config, "opencode.jsonc"), env))
-      result = mergeConfig(result, yield* loadFile(path.join(Global.Path.config, "kotencode.json"), env))
-      result = mergeConfig(result, yield* loadFile(path.join(Global.Path.config, "kotencode.jsonc"), env))
+      result = mergeConfig(result, yield* loadFile(path.join(Global.Path.config, "kotecode.json"), env))
+      result = mergeConfig(result, yield* loadFile(path.join(Global.Path.config, "kotecode.jsonc"), env))
 
       const legacy = path.join(Global.Path.config, "config")
       if (existsSync(legacy)) {
@@ -438,7 +438,7 @@ const layer = Layer.effect(
 
         for (const dir of directories) {
           if (dir.endsWith(".opencode") || dir === Flag.OPENCODE_CONFIG_DIR || dir === Flag.KOTECODE_CONFIG_DIR) {
-            for (const file of ["opencode.json", "opencode.jsonc", "kotencode.json", "kotencode.jsonc"]) {
+            for (const file of ["opencode.json", "opencode.jsonc", "kotecode.json", "kotecode.jsonc"]) {
               const source = path.join(dir, file)
               yield* Effect.logDebug(`loading config from ${source}`)
               yield* merge(source, yield* loadFile(source, authEnv))

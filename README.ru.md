@@ -14,7 +14,7 @@ KoteCode — независимый форк [OpenCode](https://github.com/anoma
 с командой OpenCode, не одобрен ею и не является её официальным продуктом. KoteCode развивается
 отдельно на основе исходного кода OpenCode под лицензией MIT.
 
-> **Статус:** `v1.0.0` — первая самостоятельная версия KoteCode. Основан на OpenCode `1.18.5`.
+> **Статус:** подготовка `v0.1.0`, первого публичного релиза KoteCode. Основан на OpenCode `1.18.5`.
 
 ## Возможности
 
@@ -24,7 +24,7 @@ KoteCode работает в терминале (TUI) и как десктопн
 
 - **Kote Gateway** — сетевой шлюз для стабильного подключения к API-провайдерам;
 - отдельные каталоги конфигурации и переменные окружения `KOTECODE_*`;
-- команду `kotencode` и собственный бренд KoteCode.
+- команду `kotecode` и собственный бренд KoteCode.
 
 Полный аудит изменений: [`docs/FORK_AUDIT.md`](./docs/FORK_AUDIT.md).
 
@@ -67,25 +67,40 @@ KoteCode ── CONNECT через Kote Gateway ── сквозной TLS ─�
 Для локальной разработки адрес можно задать вручную:
 
 ```bash
-KOTECODE_PROXY_URL=https://kote-proxy.kotey-ye.ru kotencode
+KOTECODE_PROXY_URL=https://kote-proxy.kotey-ye.ru kotecode
 ```
 
 Для явного прямого подключения к провайдерам:
 
 ```bash
-KOTECODE_DISABLE_PROXY=1 kotencode
+KOTECODE_DISABLE_PROXY=1 kotecode
 ```
 
 Если настроенный Kote Gateway недоступен, KoteCode не переключается на прямое соединение скрытно.
 
 ## Установка
 
-> Сборки выпускаются черновым release workflow. Сборка из исходников описана в
-> [`docs/BUILD.md`](./docs/BUILD.md).
+Основной способ установки CLI:
 
 ```bash
-# Из GitHub Release после публикации
-curl -fsSL https://github.com/koteyye/KoteCode/raw/main/install | bash
+npm install -g kotecode
+kotecode --version
+```
+
+Или через собственный Homebrew tap:
+
+```bash
+brew install koteyye/tap/kotecode
+```
+
+Install-скрипты проверяют скачанный архив по `SHA256SUMS`:
+
+```bash
+# Linux или macOS
+curl -fsSL https://raw.githubusercontent.com/koteyye/KoteCode/dev/install | bash
+
+# Windows PowerShell
+irm https://raw.githubusercontent.com/koteyye/KoteCode/dev/install.ps1 | iex
 ```
 
 Для сборки из исходников требуется [Bun](https://bun.sh) версии 1.3 или новее:
@@ -97,23 +112,62 @@ bun install
 bun run packages/opencode/script/build.ts --single
 ```
 
-Готовый бинарник появится по пути `dist/kotencode-*/bin/kotencode`.
+Готовый бинарник появится по пути `dist/kotecode-*/bin/kotecode`.
+
+### Поддерживаемые платформы
+
+| Компонент | Платформы                                               |
+| --------- | ------------------------------------------------------- |
+| CLI       | Windows x64; Linux x64/ARM64; macOS Intel/Apple Silicon |
+| Desktop   | Windows x64; Linux x64 (`AppImage`, `.deb`, `.rpm`)     |
+
+macOS Desktop и ARM64-сборки Desktop в `v0.1.0` не входят.
+
+> **Windows-сборки не подписаны:** издатель отображается как неизвестный, а SmartScreen может
+> показать предупреждение. Smart App Control и корпоративные политики могут полностью
+> заблокировать запуск. MSIX и Microsoft Store не поддерживаются. Проверяйте SHA-256 по
+> файлу `SHA256SUMS`.
+
+### Обновление и удаление
+
+```bash
+kotecode upgrade
+
+npm uninstall -g kotecode
+# или
+brew uninstall koteyye/tap/kotecode
+# установка через install-скрипт
+rm ~/.local/bin/kotecode
+```
+
+Windows Desktop удаляется через «Установленные приложения». Для Linux используйте
+`sudo apt remove kotecode`, `sudo dnf remove kotecode` или удалите переносимый AppImage.
+Настройки пользователя при обновлении и переустановке сохраняются.
+
+Проверка скачанного файла:
+
+```bash
+sha256sum -c SHA256SUMS --ignore-missing
+```
+
+В Windows сравните `(Get-FileHash <файл> -Algorithm SHA256).Hash` с `SHA256SUMS`.
+Процесс релиза и подтверждения описан в [`RELEASING.md`](./RELEASING.md).
 
 ## Конфигурация
 
 KoteCode хранит настройки отдельно от OpenCode:
 
-| ОС      | Каталог конфигурации                      |
-| ------- | ----------------------------------------- |
-| Linux   | `~/.config/kotencode`                     |
-| macOS   | `~/Library/Application Support/kotencode` |
-| Windows | `%APPDATA%\kotencode`                     |
+| ОС      | Каталог конфигурации                     |
+| ------- | ---------------------------------------- |
+| Linux   | `~/.config/kotecode`                     |
+| macOS   | `~/Library/Application Support/kotecode` |
+| Windows | `%APPDATA%\kotecode`                     |
 
 Для миграции существующих настроек:
 
 ```bash
-kotencode migrate-from-opencode
-kotencode migrate-from-opencode --with-secrets
+kotecode migrate-from-opencode
+kotecode migrate-from-opencode --with-secrets
 ```
 
 Первая команда копирует только несекретные настройки. Вторая также импортирует ключи по явному
@@ -128,7 +182,7 @@ kotencode migrate-from-opencode --with-secrets
 | `KOTECODE_DATA_DIR`             | Другой каталог данных                  |
 | `KOTECODE_CACHE_DIR`            | Другой каталог кеша                    |
 | `KOTECODE_BOOTSTRAP_URL`        | Другой URL bootstrap для разработки    |
-| `KOTECODE_PROXY_URL`            | Принудительный адрес Kote Gateway        |
+| `KOTECODE_PROXY_URL`            | Принудительный адрес Kote Gateway      |
 | `KOTECODE_DISABLE_PROXY`        | Явное прямое подключение к провайдерам |
 | `KOTECODE_DISABLE_UPDATE_CHECK` | Отключение проверки обновлений         |
 | `KOTECODE_LANG`                 | Язык терминального UI: `ru` или `en`   |
@@ -145,7 +199,7 @@ kotencode migrate-from-opencode --with-secrets
 Для разового запуска на английском:
 
 ```bash
-KOTECODE_LANG=en kotencode
+KOTECODE_LANG=en kotecode
 ```
 
 Полное описание: [`docs/CONFIGURATION.md`](./docs/CONFIGURATION.md).
@@ -159,6 +213,7 @@ KOTECODE_LANG=en kotencode
 - [`docs/PROXY_COMPATIBILITY.md`](./docs/PROXY_COMPATIBILITY.md) — совместимость провайдеров
 - [`docs/CONFIGURATION.md`](./docs/CONFIGURATION.md) — каталоги, переменные и режимы
 - [`docs/BUILD.md`](./docs/BUILD.md) — сборка из исходников
+- [`RELEASING.md`](./RELEASING.md) — релиз, npm, Homebrew и будущая подпись
 - [`docs/TZ-2-KOTE-PROXY.md`](./docs/TZ-2-KOTE-PROXY.md) — контракт и модель угроз Kote Gateway
 
 ## Лицензия

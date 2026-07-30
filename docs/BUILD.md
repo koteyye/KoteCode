@@ -71,19 +71,19 @@ cd packages/opencode && bun test test/provider/proxy.test.ts
 `--single` builds only the target matching the current OS/arch. Output:
 
 ```
-packages/opencode/dist/kotencode-<os>-<arch>/bin/kotencode
+packages/opencode/dist/kotecode-<os>-<arch>/bin/kotecode
 ```
 
 Run it:
 
 ```bash
-./packages/opencode/dist/kotencode-<os>-<arch>/bin/kotencode --version
+./packages/opencode/dist/kotecode-<os>-<arch>/bin/kotecode --version
 ```
 
 `--version` prints both the KoteCode version and the OpenCode base, e.g.:
 
 ```
-KoteCode v1.0.0
+KoteCode v0.1.0
 Based on OpenCode 1.18.5 (fork base 1.18.5 e5cc278)
 ```
 
@@ -93,25 +93,21 @@ Based on OpenCode 1.18.5 (fork base 1.18.5 e5cc278)
 ./packages/opencode/script/build.ts
 ```
 
-This builds all 12 targets (darwin/linux/win32 × arm64/x64 + `-baseline` + `-musl`)
-and, when `KOTE_BUILD_RELEASE=1` / running in CI release mode, archives them
-(`kotencode-*.tar.gz` for Linux, `kotencode-*.zip` otherwise).
+This builds all inherited targets (darwin/linux/win32 × arm64/x64 plus baseline and
+musl variants). `--npm` selects the five published npm platform targets. The release
+workflow builds each supported native target on its matching GitHub-hosted runner.
 
 ## Release artifacts (CI)
 
-The draft release workflow `.github/workflows/kotecode-release.yml` builds the
-three primary targets on `workflow_dispatch`:
-
-| Target      | Artifact                     |
-| ----------- | ---------------------------- |
-| Windows x64 | `kotencode-windows-x64.zip`  |
-| Linux x64   | `kotencode-linux-x64.tar.gz` |
-| macOS arm64 | `kotencode-darwin-arm64.zip` |
+The draft release workflow `.github/workflows/kotecode-release.yml` builds five
+CLI targets plus Windows/Linux Desktop. Manual dispatch is a dry run; a pushed
+SemVer tag additionally creates a draft GitHub Release. See
+[`../RELEASING.md`](../RELEASING.md) for the exact artifact list and approval flow.
 
 > **Signing:** these artifacts are **unsigned**. Upstream OpenCode uses Azure
 > Trusted Signing (Windows) and Apple codesigning, which are not available to
 > this fork. Operating systems may show a "unverified publisher" warning. Signing
-> keys are intentionally out of scope for the alpha (ТЗ §11.3).
+> signing keys are intentionally out of scope for `v0.1.0`.
 
 ## Signing a bootstrap config (project owner only)
 

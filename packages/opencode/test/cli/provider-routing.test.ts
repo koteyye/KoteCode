@@ -21,7 +21,7 @@ describe("opencode providers routing", () => {
         const direct = yield* opencode.spawn(["providers", "routing", "openai", "direct"])
         opencode.expectExit(direct, 0)
 
-        const file = path.join(home, ".config", "kotencode", "kotencode.jsonc")
+        const file = path.join(home, ".config", "kotecode", "kotecode.jsonc")
         expect((yield* Effect.promise(() => Bun.file(file).json())).provider.openai.routing).toBe("direct")
 
         const proxy = yield* opencode.spawn(["providers", "routing", "openai", "gateway"])

@@ -55,7 +55,7 @@ When upstream changes a file that KoteCode has rebranded:
 3. Do **not** reintroduce `opencode` strings in user-visible surfaces.
 
 Example: if upstream edits `packages/core/src/global.ts`, keep the upstream logic but ensure
-`const app = "kotencode"` and the `KOTECODE_CONFIG_DIR` override remain.
+`const app = "kotecode"` and the `KOTECODE_CONFIG_DIR` override remain.
 
 ### Pushing
 
@@ -69,17 +69,17 @@ and expected. The merge procedure is "take upstream logic, keep KoteCode brand."
 
 **Branding (single-constant touchpoints):**
 
-- `packages/core/src/global.ts` — app dir name `kotencode`, `KOTECODE_CONFIG_DIR` override
-- `packages/opencode/src/index.ts` — `scriptName("kotencode")`, `--help` prefix, version display
+- `packages/core/src/global.ts` — app dir name `kotecode`, `KOTECODE_CONFIG_DIR` override
+- `packages/opencode/src/index.ts` — `scriptName("kotecode")`, `--help` prefix, version display
 - `packages/tui/src/logo.ts` — KoteCode ASCII logo glyphs
 - `packages/opencode/src/cli/ui.ts` — KoteCode non-TTY wordmark
 - `packages/core/src/installation/version.ts` — KoteCode version composition
-- `packages/core/src/models-dev.ts` — `kotencode` User-Agent
+- `packages/core/src/models-dev.ts` — `kotecode` User-Agent
 - `packages/opencode/src/provider/provider.ts` — KoteCode provider attribution headers + Proxy transport injection
 - `packages/opencode/src/provider/proxy.ts` — fail-closed HTTPS provider Proxy selection
-- `packages/opencode/package.json` — `name: "kotencode"`, `bin`, `version`
-- `packages/opencode/bin/kotencode` — launcher and `kotencode-*` package names
-- `packages/opencode/script/build.ts` — outfile `kotencode`, KoteCode User-Agent in `execArgv`
+- `packages/opencode/package.json` — `name: "kotecode"`, `bin`, `version`
+- `packages/opencode/bin/kotecode` — launcher and `kotecode-*` package names
+- `packages/opencode/script/build.ts` — outfile `kotecode`, KoteCode User-Agent in `execArgv`
 - `package.json` (root) — name/description/repository
 - `packages/desktop/package.json`, `packages/desktop/electron-builder.config.ts`,
   `packages/desktop/src/main/{constants,index,logging,server,windows}.ts`, and
@@ -92,7 +92,7 @@ and expected. The merge procedure is "take upstream logic, keep KoteCode brand."
 
 - `packages/core/src/kote/` — bootstrap resolver, signature verification, last-known-good cache
 - `packages/core/src/flag/flag.ts` — `KOTECODE_*` entries (additive; should not conflict unless upstream rewrites the file)
-- `packages/opencode/src/cli/cmd/migrate.ts` — `kotencode migrate-from-opencode`
+- `packages/opencode/src/cli/cmd/migrate.ts` — `kotecode migrate-from-opencode`
 - `scripts/sign-bootstrap.ts`, `.github/workflows/kotecode-release.yml`
 - `docs/*` (this directory), `UPSTREAM_STATE.md`, `THIRD_PARTY_NOTICES.md`
 
@@ -112,7 +112,7 @@ OpenCode names so that upstream merges stay trivial and the MIT attribution is p
 - **Effect service identifiers:** e.g. `"@opencode/Global"`, `"@opencode/Provider"`.
 - **Internal types and symbols:** `ProviderV2`, `ModelV2`, `ConfigV1`, `ModelsDev`, etc.
 - **Config file names:** `opencode.json`/`opencode.jsonc` and the `.opencode/` project dir are
-  read as-is for OpenCode compatibility (KoteCode also accepts `kotencode.*`).
+  read as-is for OpenCode compatibility (KoteCode also accepts `kotecode.*`).
 - **Copyright notice in `LICENSE`:** `Copyright (c) 2025 opencode` stays verbatim (MIT requirement).
 
 Renaming any of the above would balloon the diff, break upstream merges, and — for the license

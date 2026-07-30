@@ -4,7 +4,7 @@
 // the OpenCode build-time defines (OPENCODE_VERSION / OPENCODE_CHANNEL) so the internal
 // compatibility layer and upstream merge process stay intact. See docs/UPSTREAM.md.
 //
-// `kotencode --version` prints BOTH versions:
+// `kotecode --version` prints BOTH versions:
 //   KoteCode <kotecode-version>
 //   Based on OpenCode <upstream-version>
 
@@ -20,10 +20,9 @@ export const UpstreamVersion = typeof OPENCODE_VERSION === "string" ? OPENCODE_V
 export const InstallationChannel = typeof OPENCODE_CHANNEL === "string" ? OPENCODE_CHANNEL : "local"
 export const InstallationLocal = InstallationChannel === "local"
 
-// KoteCode's own version. Bump here for each KoteCode release.
-// The public KoteCode version line starts at 1.0.0 and remains independent
-// from the upstream compatibility version below.
-export const KoteCodeVersion = typeof KOTECODE_VERSION === "string" ? KOTECODE_VERSION : "1.0.0"
+// Release builds inject this value from the Git tag. The fallback is only used
+// by source checkouts and must never act as the release version source.
+export const KoteCodeVersion = typeof KOTECODE_VERSION === "string" ? KOTECODE_VERSION : "0.1.0-dev"
 
 // Upstream OpenCode version this KoteCode was forked from (see UPSTREAM_STATE.md).
 export const UpstreamBaseVersion = "1.18.5"
@@ -35,7 +34,7 @@ export const UpstreamBaseCommit = "e5cc278"
 // the composed `versionString` below.
 export const InstallationVersion = UpstreamVersion
 
-// Human-readable version shown by `kotencode --version` and the TUI.
+// Human-readable version shown by `kotecode --version` and the TUI.
 export function versionString(): string {
   return `KoteCode v${KoteCodeVersion}
 Based on OpenCode ${UpstreamVersion} (fork base ${UpstreamBaseVersion} ${UpstreamBaseCommit})`

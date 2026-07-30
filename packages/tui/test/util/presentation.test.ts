@@ -11,5 +11,5 @@ test("keeps the KoteCode wordmark aligned and gives it cat ears", () => {
 test("formats session continuation summary", () => {
   const epilogue = sessionEpilogue({ title: "A session", sessionID: "ses_123" })
   expect(epilogue).toContain("A session")
-  expect(epilogue).toContain("kotencode -s ses_123")
+  expect(epilogue).toContain("kotecode -s ses_123")
 })

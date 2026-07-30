@@ -14,22 +14,30 @@ process.chdir(dir)
 const generated = await import("./generate.ts")
 
 import { Script } from "@opencode-ai/script"
-import { KoteCodeVersion as DefaultKoteCodeVersion } from "@opencode-ai/core/installation/version"
+import { KoteCodeVersion as DefaultKoteCodeVersion, UpstreamBaseVersion } from "@opencode-ai/core/installation/version"
 import pkg from "../package.json"
 
 const singleFlag = process.argv.includes("--single")
 const baselineFlag = process.argv.includes("--baseline")
+const npmFlag = process.argv.includes("--npm")
 const skipInstall = process.argv.includes("--skip-install")
 const sourcemapsFlag = process.argv.includes("--sourcemaps")
 const plugin = createSolidTransformPlugin()
 const skipEmbedWebUi = process.argv.includes("--skip-embed-web-ui")
 const koteCodeVersion = process.env.KOTECODE_VERSION ?? DefaultKoteCodeVersion
+const upstreamVersion = process.env.OPENCODE_VERSION ?? UpstreamBaseVersion
+const releaseChannel =
+  process.env.KOTECODE_CHANNEL ??
+  (process.env.KOTECODE_VERSION ? (koteCodeVersion.includes("-") ? "beta" : "latest") : Script.channel)
+const npmScope = process.env.KOTECODE_NPM_SCOPE ?? "@kotecode-ai"
+
+if (!/^@[a-z0-9][a-z0-9._-]*$/.test(npmScope)) throw new Error(`Invalid KOTECODE_NPM_SCOPE: ${npmScope}`)
 
 const createEmbeddedWebUIBundle = async () => {
   console.log(`Building Web UI to embed in the binary`)
   const appDir = path.join(import.meta.dirname, "../../app")
   const dist = path.join(appDir, "dist")
-  await $`OPENCODE_CHANNEL=${Script.channel} bun run --cwd ${appDir} build`
+  await $`OPENCODE_CHANNEL=${releaseChannel} bun run --cwd ${appDir} build`
   const files = (await Array.fromAsync(new Bun.Glob("**/*").scan({ cwd: dist })))
     .map((file) => file.replaceAll("\\", "/"))
     .filter((file) => !file.endsWith(".map"))
@@ -115,26 +123,25 @@ const allTargets: {
   },
 ]
 
-const targets = singleFlag
-  ? allTargets.filter((item) => {
+const targets = (() => {
+  if (singleFlag) {
+    return allTargets.filter((item) => {
       if (item.os !== process.platform || item.arch !== process.arch) {
         return false
       }
 
-      // When building for the current platform, prefer a single native binary by default.
-      // Baseline binaries require additional Bun artifacts and can be flaky to download.
-      if (item.avx2 === false) {
-        return baselineFlag
-      }
-
-      // also skip abi-specific builds for the same reason
-      if (item.abi !== undefined) {
-        return false
-      }
-
-      return true
+      if (item.abi !== undefined) return false
+      if (item.arch === "x64") return baselineFlag === (item.avx2 === false)
+      return item.avx2 !== false
     })
-  : allTargets
+  }
+  if (npmFlag) {
+    return allTargets.filter(
+      (item) => !item.abi && (item.avx2 === false || (item.arch === "arm64" && item.os !== "win32")),
+    )
+  }
+  return allTargets
+})()
 
 await $`rm -rf dist`
 
@@ -155,6 +162,8 @@ for (const item of targets) {
   ]
     .filter(Boolean)
     .join("-")
+  const platform = item.os === "win32" ? "windows" : item.os
+  const npmName = `${npmScope}/${platform}-${item.arch}`
   console.log(`building ${name}`)
   await $`mkdir -p dist/${name}/bin`
 
@@ -177,8 +186,8 @@ for (const item of targets) {
       autoloadTsconfig: true,
       autoloadPackageJson: true,
       target: name.replace(pkg.name, "bun") as any,
-      outfile: `dist/${name}/bin/kotencode`,
-      execArgv: [`--user-agent=kotencode/${koteCodeVersion}`, "--use-system-ca", "--"],
+      outfile: `dist/${name}/bin/kotecode`,
+      execArgv: [`--user-agent=kotecode/${koteCodeVersion}`, "--use-system-ca", "--"],
       windows: {},
     },
     files: {
@@ -193,12 +202,12 @@ for (const item of targets) {
     ],
     define: {
       FFF_LIBC: JSON.stringify(item.abi === "musl" ? "musl" : "gnu"),
-      OPENCODE_VERSION: `'${Script.version}'`,
+      OPENCODE_VERSION: JSON.stringify(upstreamVersion),
       KOTECODE_VERSION: JSON.stringify(koteCodeVersion),
       OPENCODE_MODELS_DEV: generated.modelsData,
       OTUI_TREE_SITTER_WORKER_PATH: bunfsRoot + treeSitterWorkerPath,
       OPENCODE_WORKER_PATH: workerPath,
-      OPENCODE_CHANNEL: `'${Script.channel}'`,
+      OPENCODE_CHANNEL: JSON.stringify(releaseChannel),
       OPENCODE_LIBC: item.os === "linux" ? `'${item.abi ?? "glibc"}'` : "",
       ...(item.os === "linux" ? { "process.env.OPENTUI_LIBC": JSON.stringify(item.abi ?? "glibc") } : {}),
     },
@@ -206,7 +215,7 @@ for (const item of targets) {
 
   // Smoke test: only run if binary is for current platform
   if (item.os === process.platform && item.arch === process.arch && !item.abi) {
-    const binaryPath = `dist/${name}/bin/kotencode`
+    const binaryPath = `dist/${name}/bin/kotecode`
     console.log(`Running smoke test: ${binaryPath} --version`)
     try {
       const versionOutput = await $`${binaryPath} --version`.text()
@@ -221,29 +230,33 @@ for (const item of targets) {
   await Bun.file(`dist/${name}/package.json`).write(
     JSON.stringify(
       {
-        name,
+        name: npmName,
         version: koteCodeVersion,
+        description: `KoteCode CLI binary for ${platform} ${item.arch}`,
+        license: "MIT",
+        repository: {
+          type: "git",
+          url: "https://github.com/koteyye/KoteCode.git",
+        },
+        homepage: "https://github.com/koteyye/KoteCode#readme",
+        bugs: {
+          url: "https://github.com/koteyye/KoteCode/issues",
+        },
+        files: ["bin"],
         preferUnplugged: true,
         os: [item.os],
         cpu: [item.arch],
         ...(item.abi ? { libc: [item.abi] } : {}),
+        publishConfig: {
+          access: "public",
+          provenance: true,
+        },
       },
       null,
       2,
     ),
   )
-  binaries[name] = Script.version
-}
-
-if (Script.release) {
-  for (const key of Object.keys(binaries)) {
-    if (key.includes("linux")) {
-      await $`tar -czf ../../${key}.tar.gz *`.cwd(`dist/${key}/bin`)
-    } else {
-      await $`zip -r ../../${key}.zip *`.cwd(`dist/${key}/bin`)
-    }
-  }
-  await $`gh release upload v${Script.version} ./dist/*.zip ./dist/*.tar.gz --clobber --repo ${process.env.GH_REPO}`
+  binaries[name] = koteCodeVersion
 }
 
 export { binaries }

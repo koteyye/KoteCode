@@ -80,7 +80,7 @@ export const PrCommand = effectCmd({
           UI.println(`Importing session...`)
 
           const importResult = yield* Effect.promise(() =>
-            Process.text(["kotencode", "import", sessionUrl], { nothrow: true }),
+            Process.text(["kotecode", "import", sessionUrl], { nothrow: true }),
           )
           if (importResult.code === 0) {
             const sessionIdMatch = importResult.text.trim().match(/Imported session: ([a-zA-Z0-9_-]+)/)
@@ -98,10 +98,10 @@ export const PrCommand = effectCmd({
     UI.println("Starting KoteCode...")
     UI.println()
 
-    const kotencodeArgs = sessionId ? ["-s", sessionId] : []
+    const kotecodeArgs = sessionId ? ["-s", sessionId] : []
     const code = yield* Effect.promise(
       () =>
-        Process.spawn(["kotencode", ...kotencodeArgs], {
+        Process.spawn(["kotecode", ...kotecodeArgs], {
           stdin: "inherit",
           stdout: "inherit",
           stderr: "inherit",
@@ -110,6 +110,6 @@ export const PrCommand = effectCmd({
     )
     // Match legacy throw semantics — propagate as a defect so the top-level
     // index.ts catch handles it identically (exit 1, "Unexpected error" banner).
-    if (code !== 0) return yield* Effect.die(new Error(`kotencode exited with code ${code}`))
+    if (code !== 0) return yield* Effect.die(new Error(`kotecode exited with code ${code}`))
   }),
 })

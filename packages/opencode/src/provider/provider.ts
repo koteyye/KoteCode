@@ -462,9 +462,9 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
         autoload: false,
         options: {
           headers: {
-            "HTTP-Referer": "https://kotencode.ai/",
-            "X-Title": "kotencode",
-            "X-Source": "kotencode",
+            "HTTP-Referer": "https://github.com/koteyye/KoteCode",
+            "X-Title": "kotecode",
+            "X-Source": "kotecode",
           },
         },
       }),
@@ -473,8 +473,8 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
         autoload: false,
         options: {
           headers: {
-            "HTTP-Referer": "https://kotencode.ai/",
-            "X-Title": "kotencode",
+            "HTTP-Referer": "https://github.com/koteyye/KoteCode",
+            "X-Title": "kotecode",
           },
         },
       }),
@@ -483,8 +483,8 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
         autoload: provider.source === "config",
         options: {
           headers: {
-            "HTTP-Referer": "https://kotencode.ai/",
-            "X-Title": "kotencode",
+            "HTTP-Referer": "https://github.com/koteyye/KoteCode",
+            "X-Title": "kotecode",
             "X-BILLING-INVOKE-ORIGIN": "KoteCode",
           },
         },
@@ -494,8 +494,8 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
         autoload: false,
         options: {
           headers: {
-            "http-referer": "https://kotencode.ai/",
-            "x-title": "kotencode",
+            "http-referer": "https://github.com/koteyye/KoteCode",
+            "x-title": "kotecode",
           },
         },
       }),
@@ -600,8 +600,8 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
         autoload: false,
         options: {
           headers: {
-            "HTTP-Referer": "https://kotencode.ai/",
-            "X-Title": "kotencode",
+            "HTTP-Referer": "https://github.com/koteyye/KoteCode",
+            "X-Title": "kotecode",
           },
         },
       }),
@@ -622,7 +622,7 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
       const directory = yield* InstanceState.directory
 
       const aiGatewayHeaders = {
-        "User-Agent": `kotencode/${InstallationVersion} gitlab-ai-provider/${GITLAB_PROVIDER_VERSION} (${os.platform()} ${os.release()}; ${os.arch()})`,
+        "User-Agent": `kotecode/${InstallationVersion} gitlab-ai-provider/${GITLAB_PROVIDER_VERSION} (${os.platform()} ${os.release()}; ${os.arch()})`,
         "anthropic-beta": "context-1m-2025-08-07",
         ...providerConfig?.options?.aiGatewayHeaders,
       }
@@ -755,7 +755,7 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
         options: {
           apiKey,
           headers: {
-            "User-Agent": `kotencode/${InstallationVersion} cloudflare-workers-ai (${os.platform()} ${os.release()}; ${os.arch()})`,
+            "User-Agent": `kotecode/${InstallationVersion} cloudflare-workers-ai (${os.platform()} ${os.release()}; ${os.arch()})`,
           },
         },
         async getModel(sdk: any, modelID: string) {
@@ -823,7 +823,7 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
         skipCache: input.options?.skipCache,
         collectLog: input.options?.collectLog,
         headers: {
-          "User-Agent": `kotencode/${InstallationVersion} cloudflare-ai-gateway (${os.platform()} ${os.release()}; ${os.arch()})`,
+          "User-Agent": `kotecode/${InstallationVersion} cloudflare-ai-gateway (${os.platform()} ${os.release()}; ${os.arch()})`,
         },
       }
 
@@ -849,7 +849,7 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
         autoload: false,
         options: {
           headers: {
-            "X-Cerebras-3rd-Party-Integration": "kotencode",
+            "X-Cerebras-3rd-Party-Integration": "kotecode",
           },
         },
       }),
@@ -858,8 +858,8 @@ function custom(dep: CustomDep): Record<string, CustomLoader> {
         autoload: false,
         options: {
           headers: {
-            "HTTP-Referer": "https://kotencode.ai/",
-            "X-Title": "kotencode",
+            "HTTP-Referer": "https://github.com/koteyye/KoteCode",
+            "X-Title": "kotecode",
           },
         },
       }),

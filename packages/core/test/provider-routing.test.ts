@@ -11,7 +11,7 @@ describe("ProviderRouting", () => {
     expect(
       ProviderRouting.transport("direct", {
         source: "remote",
-        url: "https://proxy.kotencode.test",
+        url: "https://proxy.kotecode.test",
       }),
     ).toEqual({ source: "disabled" })
   })
@@ -19,7 +19,7 @@ describe("ProviderRouting", () => {
   test("keeps the resolved proxy transport in proxy mode", () => {
     const proxy = {
       source: "cache",
-      url: "https://proxy.kotencode.test",
+      url: "https://proxy.kotecode.test",
     } as const
     expect(ProviderRouting.transport("proxy", proxy)).toBe(proxy)
   })

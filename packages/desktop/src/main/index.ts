@@ -111,7 +111,7 @@ const main = Effect.gen(function* () {
   const onboardingTestRoot = ((): string | undefined => {
     if (!TEST_ONBOARDING) return
 
-    const root = join(tmpdir(), `kotencode-onboarding-${randomUUID()}`)
+    const root = join(tmpdir(), `kotecode-onboarding-${randomUUID()}`)
     rmSync(root, { recursive: true, force: true })
     ;["data", "config", "cache", "state", "desktop", "session"].forEach((dir) =>
       mkdirSync(join(root, dir), { recursive: true }),
@@ -172,7 +172,7 @@ const main = Effect.gen(function* () {
   preferAppEnv(app.getPath("userData"))
 
   app.on("second-instance", (_event: Event, argv: string[]) => {
-    const urls = argv.filter((arg: string) => arg.startsWith("kotencode://") || arg.startsWith("opencode://"))
+    const urls = argv.filter((arg: string) => arg.startsWith("kotecode://") || arg.startsWith("opencode://"))
     if (urls.length) {
       logger.log("deep link received via second-instance", { urls })
       emitDeepLinks(urls)
@@ -236,7 +236,7 @@ const main = Effect.gen(function* () {
       }),
     ),
   )
-  app.setAsDefaultProtocolClient("kotencode")
+  app.setAsDefaultProtocolClient("kotecode")
   registerRendererProtocol()
   setDockIcon()
   const updater = setupAutoUpdater(stopSidecars)

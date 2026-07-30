@@ -1,5 +1,4 @@
 import path from "path"
-import { exec } from "child_process"
 import { Filesystem } from "@/util/filesystem"
 import * as prompts from "@clack/prompts"
 import { map, pipe, sortBy, values } from "remeda"
@@ -18,8 +17,8 @@ import type {
 } from "@octokit/webhooks-types"
 import { UI } from "../ui"
 import { ModelsDev } from "@opencode-ai/core/models-dev"
+import { KoteCodeVersion } from "@opencode-ai/core/installation/version"
 import { InstanceRef } from "@/effect/instance-ref"
-import { SessionShare } from "@/share/session"
 import { Session } from "@/session/session"
 import type { SessionID } from "../../session/schema"
 import { MessageID, PartID } from "../../session/schema"
@@ -138,9 +137,9 @@ type IssueQueryResponse = {
   }
 }
 
-const AGENT_USERNAME = "opencode-agent[bot]"
+const AGENT_USERNAME = "github-actions[bot]"
 const AGENT_REACTION = "eyes"
-const WORKFLOW_FILE = ".github/workflows/opencode.yml"
+const WORKFLOW_FILE = ".github/workflows/kotecode.yml"
 
 // Event categories for routing
 // USER_EVENTS: triggered by user actions, have actor/issueId, support reactions/comments
@@ -163,8 +162,6 @@ export const githubInstall = Effect.fn("Cli.github.install")(function* () {
       UI.empty()
       prompts.intro("Install GitHub agent")
       const app = await getAppInfo()
-      await installGitHubApp()
-
       const providers = await Effect.runPromise(modelsDev.get()).then((p) => {
         // TODO: add guide for copilot, for now just hide it
         delete p["github-copilot"]
@@ -198,9 +195,9 @@ export const githubInstall = Effect.fn("Cli.github.install")(function* () {
             `    1. Commit the \`${WORKFLOW_FILE}\` file and push`,
             step2,
             "",
-            "    3. Go to a GitHub issue and comment `/oc summarize` to see the agent in action",
+            "    3. Go to a GitHub issue and comment `/kotecode summarize` to see the agent in action",
             "",
-            "   Learn more about the GitHub agent - https://opencode.ai/docs/github/#usage-examples",
+            "   KoteCode repository - https://github.com/koteyye/KoteCode",
           ].join("\n"),
         )
       }
@@ -275,57 +272,6 @@ export const githubInstall = Effect.fn("Cli.github.install")(function* () {
         return model
       }
 
-      async function installGitHubApp() {
-        const s = prompts.spinner()
-        s.start("Installing GitHub app")
-
-        // Get installation
-        const installation = await getInstallation()
-        if (installation) return s.stop("GitHub app already installed")
-
-        // Open browser
-        const url = "https://github.com/apps/opencode-agent"
-        const command =
-          process.platform === "darwin"
-            ? `open "${url}"`
-            : process.platform === "win32"
-              ? `start "" "${url}"`
-              : `xdg-open "${url}"`
-
-        exec(command, (error) => {
-          if (error) {
-            prompts.log.warn(`Could not open browser. Please visit: ${url}`)
-          }
-        })
-
-        // Wait for installation
-        s.message("Waiting for GitHub app to be installed")
-        const MAX_RETRIES = 120
-        let retries = 0
-        do {
-          const installation = await getInstallation()
-          if (installation) break
-
-          if (retries > MAX_RETRIES) {
-            s.stop(
-              `Failed to detect GitHub app installation. Make sure to install the app for the \`${app.owner}/${app.repo}\` repository.`,
-            )
-            throw new UI.CancelledError()
-          }
-
-          retries++
-          await sleep(1000)
-        } while (true) // oxlint-disable-line no-constant-condition
-
-        s.stop("Installed GitHub app")
-
-        async function getInstallation() {
-          return await fetch(`https://api.opencode.ai/get_github_app_installation?owner=${app.owner}&repo=${app.repo}`)
-            .then((res) => res.json())
-            .then((data) => data.installation)
-        }
-      }
-
       async function addWorkflowFiles() {
         const envStr =
           provider === "amazon-bedrock"
@@ -334,7 +280,7 @@ export const githubInstall = Effect.fn("Cli.github.install")(function* () {
 
         await Filesystem.write(
           path.join(app.root, WORKFLOW_FILE),
-          `name: opencode
+          `name: KoteCode
 
 on:
   issue_comment:
@@ -343,28 +289,30 @@ on:
     types: [created]
 
 jobs:
-  opencode:
+  kotecode:
     if: |
+      contains(github.event.comment.body, ' /kotecode') ||
+      startsWith(github.event.comment.body, '/kotecode') ||
       contains(github.event.comment.body, ' /oc') ||
       startsWith(github.event.comment.body, '/oc') ||
       contains(github.event.comment.body, ' /opencode') ||
       startsWith(github.event.comment.body, '/opencode')
     runs-on: ubuntu-latest
     permissions:
-      id-token: write
-      contents: read
-      pull-requests: read
-      issues: read
+      contents: write
+      pull-requests: write
+      issues: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
         with:
           persist-credentials: false
 
-      - name: Run opencode
-        uses: anomalyco/opencode/github@latest${envStr}
+      - name: Run KoteCode
+        uses: koteyye/KoteCode/github@v${KoteCodeVersion}${envStr}
         with:
-          model: ${provider}/${model}`,
+          model: ${provider}/${model}
+          version: ${KoteCodeVersion}`,
         )
 
         prompts.log.success(`Added workflow file: "${WORKFLOW_FILE}"`)
@@ -378,7 +326,6 @@ export const githubRun = Effect.fn("Cli.github.run")(function* (args: { event?: 
   if (!ctx) return yield* Effect.die("InstanceRef not provided")
   const gitSvc = yield* Git.Service
   const sessionSvc = yield* Session.Service
-  const sessionShare = yield* SessionShare.Service
   const sessionPrompt = yield* SessionPrompt.Service
   const events = yield* EventV2Bridge.Service
   const runLocalEffect = <A, E>(effect: Effect.Effect<A, E>) =>
@@ -405,7 +352,6 @@ export const githubRun = Effect.fn("Cli.github.run")(function* (args: { event?: 
     const { providerID, modelID } = normalizeModel()
     const variant = process.env["VARIANT"] || undefined
     const runId = normalizeRunId()
-    const share = normalizeShare()
     const oidcBaseUrl = normalizeOidcBaseUrl()
     const { owner, repo } = context.repo
     // For repo events (schedule, workflow_dispatch), payload has no issue/comment data
@@ -426,14 +372,12 @@ export const githubRun = Effect.fn("Cli.github.run")(function* (args: { event?: 
         ? (payload as IssueCommentEvent | IssuesEvent).issue.number
         : (payload as PullRequestEvent | PullRequestReviewCommentEvent).pull_request.number
     const runUrl = `/${owner}/${repo}/actions/runs/${runId}`
-    const shareBaseUrl = isMock ? "https://dev.opencode.ai" : "https://opencode.ai"
-
     let appToken: string
     let octoRest: Octokit
     let octoGraph: typeof graphql
-    let gitConfig: string
+    let gitConfig: string | undefined
+    let gitConfigured = false
     let session: { id: SessionID; title: string; version: string }
-    let shareId: string | undefined
     let exitCode = 0
     type PromptFiles = Awaited<ReturnType<typeof getUserPrompt>>["promptFiles"]
     const triggerCommentId = isCommentEvent
@@ -485,16 +429,14 @@ export const githubRun = Effect.fn("Cli.github.run")(function* (args: { event?: 
       })
 
       const { userPrompt, promptFiles } = await getUserPrompt()
-      if (!useGithubToken) {
-        await configureGit(appToken)
-      }
+      await configureGit(appToken)
       // Skip permission check and reactions for repo events (no actor to check, no issue to react to)
       if (isUserEvent) {
         await assertPermissions()
         await addReaction(commentType)
       }
 
-      // Setup opencode session
+      // Setup KoteCode session
       const repoData = await fetchRepo()
       session = await runLocalEffect(
         sessionSvc.create({
@@ -508,13 +450,7 @@ export const githubRun = Effect.fn("Cli.github.run")(function* (args: { event?: 
         }),
       )
       await subscribeSessionEvents()
-      shareId = await (async () => {
-        if (share === false) return
-        if (!share && repoData.data.private) return
-        await runLocalEffect(sessionShare.share(session.id))
-        return session.id.slice(-8)
-      })()
-      console.log("opencode session", session.id)
+      console.log("KoteCode session", session.id)
 
       // Handle event types:
       // REPO_EVENTS (schedule, workflow_dispatch): no issue/PR context, output to logs/PR only
@@ -543,7 +479,7 @@ export const githubRun = Effect.fn("Cli.github.run")(function* (args: { event?: 
             repoData.data.default_branch,
             branch,
             summary,
-            `${response}\n\nTriggered by ${triggerType}${footer({ image: true })}`,
+            `${response}\n\nTriggered by ${triggerType}${footer()}`,
           )
           if (pr) {
             console.log(`Created PR #${pr}`)
@@ -572,8 +508,7 @@ export const githubRun = Effect.fn("Cli.github.run")(function* (args: { event?: 
             const summary = await summarize(response)
             await pushToLocalBranch(summary, uncommittedChanges)
           }
-          const hasShared = prData.comments.nodes.some((c) => c.body.includes(`${shareBaseUrl}/s/${shareId}`))
-          await createComment(`${response}${footer({ image: !hasShared })}`)
+          await createComment(`${response}${footer()}`)
           await removeReaction(commentType)
         }
         // Fork PR
@@ -590,8 +525,7 @@ export const githubRun = Effect.fn("Cli.github.run")(function* (args: { event?: 
             const summary = await summarize(response)
             await pushToForkBranch(summary, prData, uncommittedChanges)
           }
-          const hasShared = prData.comments.nodes.some((c) => c.body.includes(`${shareBaseUrl}/s/${shareId}`))
-          await createComment(`${response}${footer({ image: !hasShared })}`)
+          await createComment(`${response}${footer()}`)
           await removeReaction(commentType)
         }
       }
@@ -606,7 +540,7 @@ export const githubRun = Effect.fn("Cli.github.run")(function* (args: { event?: 
         if (switched) {
           // Agent switched branches (likely created its own branch/PR).
           // Don't push the stale infrastructure branch — just comment.
-          await createComment(`${response}${footer({ image: true })}`)
+          await createComment(`${response}${footer()}`)
           await removeReaction(commentType)
         } else if (dirty) {
           const summary = await summarize(response)
@@ -615,16 +549,16 @@ export const githubRun = Effect.fn("Cli.github.run")(function* (args: { event?: 
             repoData.data.default_branch,
             branch,
             summary,
-            `${response}\n\nCloses #${issueId}${footer({ image: true })}`,
+            `${response}\n\nCloses #${issueId}${footer()}`,
           )
           if (pr) {
-            await createComment(`Created PR #${pr}${footer({ image: true })}`)
+            await createComment(`Created PR #${pr}${footer()}`)
           } else {
-            await createComment(`${response}${footer({ image: true })}`)
+            await createComment(`${response}${footer()}`)
           }
           await removeReaction(commentType)
         } else {
-          await createComment(`${response}${footer({ image: true })}`)
+          await createComment(`${response}${footer()}`)
           await removeReaction(commentType)
         }
       }
@@ -669,26 +603,17 @@ export const githubRun = Effect.fn("Cli.github.run")(function* (args: { event?: 
       return value
     }
 
-    function normalizeShare() {
-      const value = process.env["SHARE"]
-      if (!value) return undefined
-      if (value === "true") return true
-      if (value === "false") return false
-      throw new Error(`Invalid share value: ${value}. Share must be a boolean.`)
-    }
-
     function normalizeUseGithubToken() {
       const value = process.env["USE_GITHUB_TOKEN"]
-      if (!value) return false
+      if (!value) return true
       if (value === "true") return true
       if (value === "false") return false
       throw new Error(`Invalid use_github_token value: ${value}. Must be a boolean.`)
     }
 
-    function normalizeOidcBaseUrl(): string {
+    function normalizeOidcBaseUrl() {
       const value = process.env["OIDC_BASE_URL"]
-      if (!value) return "https://api.opencode.ai"
-      return value.replace(/\/+$/, "")
+      return value?.replace(/\/+$/, "")
     }
 
     function isIssueCommentEvent(
@@ -736,7 +661,7 @@ export const githubRun = Effect.fn("Cli.github.run")(function* (args: { event?: 
       }
 
       const reviewContext = getReviewCommentContext()
-      const mentions = (process.env["MENTIONS"] || "/opencode,/oc")
+      const mentions = (process.env["MENTIONS"] || "/kotecode,/opencode,/oc")
         .split(",")
         .map((m) => m.trim().toLowerCase())
         .filter(Boolean)
@@ -887,7 +812,7 @@ export const githubRun = Effect.fn("Cli.github.run")(function* (args: { event?: 
     }
 
     async function chat(message: string, files: PromptFiles = []) {
-      console.log("Sending message to opencode...")
+      console.log("Sending message to KoteCode...")
 
       return runLocalEffect(
         Effect.gen(function* () {
@@ -975,7 +900,7 @@ export const githubRun = Effect.fn("Cli.github.run")(function* (args: { event?: 
 
     async function getOidcToken() {
       try {
-        return await core.getIDToken("opencode-github-action")
+        return await core.getIDToken("kotecode-github-action")
       } catch (error) {
         console.error("Failed to get OIDC token:", error instanceof Error ? error.message : error)
         throw new Error(
@@ -986,6 +911,9 @@ export const githubRun = Effect.fn("Cli.github.run")(function* (args: { event?: 
     }
 
     async function exchangeForAppToken(token: string) {
+      if (!oidcBaseUrl) {
+        throw new Error("OIDC_BASE_URL is required when USE_GITHUB_TOKEN=false")
+      }
       const response = token.startsWith("github_pat_")
         ? await fetch(`${oidcBaseUrl}/exchange_github_app_token_with_pat`, {
             method: "POST",
@@ -1027,13 +955,18 @@ export const githubRun = Effect.fn("Cli.github.run")(function* (args: { event?: 
       const newCredentials = Buffer.from(`x-access-token:${appToken}`, "utf8").toString("base64")
 
       await gitRun(["config", "--local", config, `AUTHORIZATION: basic ${newCredentials}`])
+      gitConfigured = true
       await gitRun(["config", "--global", "user.name", AGENT_USERNAME])
       await gitRun(["config", "--global", "user.email", `${AGENT_USERNAME}@users.noreply.github.com`])
     }
 
     async function restoreGitConfig() {
-      if (gitConfig === undefined) return
+      if (!gitConfigured || isMock) return
       const config = "http.https://github.com/.extraheader"
+      if (gitConfig === undefined) {
+        await gitStatus(["config", "--local", "--unset-all", config])
+        return
+      }
       await gitRun(["config", "--local", config, gitConfig])
     }
 
@@ -1076,9 +1009,9 @@ export const githubRun = Effect.fn("Cli.github.run")(function* (args: { event?: 
         .join("")
       if (type === "schedule" || type === "dispatch") {
         const hex = crypto.randomUUID().slice(0, 6)
-        return `opencode/${type}-${hex}-${timestamp}`
+        return `kotecode-${type}-${hex}-${timestamp}`
       }
-      return `opencode/${type}${issueId}-${timestamp}`
+      return `kotecode-${type}${issueId}-${timestamp}`
     }
 
     async function pushToNewBranch(summary: string, branch: string, commit: boolean, isSchedule: boolean) {
@@ -1342,18 +1275,8 @@ export const githubRun = Effect.fn("Cli.github.run")(function* (args: { event?: 
       }
     }
 
-    function footer(opts?: { image?: boolean }) {
-      const image = (() => {
-        if (!shareId) return ""
-        if (!opts?.image) return ""
-
-        const titleAlt = encodeURIComponent(session.title.substring(0, 50))
-        const title64 = Buffer.from(session.title.substring(0, 700), "utf8").toString("base64")
-
-        return `<a href="${shareBaseUrl}/s/${shareId}"><img width="200" alt="${titleAlt}" src="https://social-cards.sst.dev/opencode-share/${title64}.png?model=${providerID}/${modelID}&version=${session.version}&id=${shareId}" /></a>\n`
-      })()
-      const shareUrl = shareId ? `[opencode session](${shareBaseUrl}/s/${shareId})&nbsp;&nbsp;|&nbsp;&nbsp;` : ""
-      return `\n\n${image}${shareUrl}[github run](${runUrl})`
+    function footer() {
+      return `\n\n[github run](${runUrl})`
     }
 
     async function fetchRepo() {
@@ -1413,7 +1336,7 @@ query($owner: String!, $repo: String!, $number: Int!) {
       return [
         "<github_action_context>",
         "You are running as a GitHub Action. Important:",
-        "- Git push and PR creation are handled AUTOMATICALLY by the opencode infrastructure after your response",
+        "- Git push and PR creation are handled AUTOMATICALLY by the KoteCode infrastructure after your response",
         "- Do NOT include warnings or disclaimers about GitHub tokens, workflow permissions, or PR creation capabilities",
         "- Do NOT suggest manual steps for creating PRs or pushing code - this happens automatically",
         "- Focus only on the code changes and your analysis/response",
@@ -1551,7 +1474,7 @@ query($owner: String!, $repo: String!, $number: Int!) {
       return [
         "<github_action_context>",
         "You are running as a GitHub Action. Important:",
-        "- Git push and PR creation are handled AUTOMATICALLY by the opencode infrastructure after your response",
+        "- Git push and PR creation are handled AUTOMATICALLY by the KoteCode infrastructure after your response",
         "- Do NOT include warnings or disclaimers about GitHub tokens, workflow permissions, or PR creation capabilities",
         "- Do NOT suggest manual steps for creating PRs or pushing code - this happens automatically",
         "- Focus only on the code changes and your analysis/response",

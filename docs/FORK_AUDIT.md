@@ -28,11 +28,11 @@ Fork base: OpenCode `1.18.5` — see [`../UPSTREAM_STATE.md`](../UPSTREAM_STATE.
 ### CLI / TUI
 
 - **CLI entrypoint:** `packages/opencode/src/index.ts` — yargs-based, registers ~24 commands,
-  handles `-h`/`--help` (custom `show()` prepends the ASCII logo), `--version` (uses
-  `InstallationVersion`), and forces `process.exit()` in `finally`.
-- **Launcher shim:** `packages/opencode/bin/opencode` (Node script, `#!/usr/bin/env node`) —
-  detects platform/arch (AVX2, musl), resolves the platform binary from a sibling
-  `opencode-<platform>-<arch>` npm sub-package, execs it. Honors `OPENCODE_BIN_PATH`.
+  handles `-h`/`--help` (custom `show()` prepends the ASCII logo), prints the injected
+  KoteCode tag version, and forces `process.exit()` in `finally`.
+- **Launcher shim:** `packages/opencode/bin/kotecode` (Node script, `#!/usr/bin/env node`) —
+  resolves the platform binary from a fork-owned optional npm package and execs it.
+  Honors `KOTECODE_BIN_PATH` plus `OPENCODE_BIN_PATH` as a compatibility alias.
 - **Commands:** `packages/opencode/src/cli/cmd/` (`run`, `serve`, `tui`, `agent`, `mcp`,
   `github`, `pr`, `providers`, `models`, `session`, `generate`, `export`, `import`, `attach`,
   `plug`, `upgrade`, `uninstall`, `stats`, `web`, `db`, `account`, `acp`, …) + `debug/`, `run/`.
@@ -69,17 +69,17 @@ single constant (see [`UPSTREAM.md`](./UPSTREAM.md) "expected-diff files").
 
 | Surface                                     | File                                                                                                                                   | Change for KoteCode                                                |
 | ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| XDG app dir name                            | `packages/core/src/global.ts` — `const app = "opencode"`                                                                               | → `"kotencode"`                                                    |
+| XDG app dir name                            | `packages/core/src/global.ts` — `const app = "opencode"`                                                                               | → `"kotecode"`                                                     |
 | Config-dir override                         | `packages/core/src/global.ts` `make()`                                                                                                 | honor `KOTECODE_CONFIG_DIR`                                        |
-| CLI `scriptName` / `--help` prefix          | `packages/opencode/src/index.ts`                                                                                                       | `scriptName("kotencode")`                                          |
+| CLI `scriptName` / `--help` prefix          | `packages/opencode/src/index.ts`                                                                                                       | `scriptName("kotecode")`                                           |
 | ASCII logo (TTY)                            | `packages/tui/src/logo.ts`                                                                                                             | new "KOTECODE" glyphs                                              |
 | ASCII wordmark (non-TTY)                    | `packages/opencode/src/cli/ui.ts` `wordmark`                                                                                           | new glyph array                                                    |
 | `--version` string                          | via `OPENCODE_VERSION` define → `installation/version.ts`                                                                              | show KoteCode + upstream                                           |
-| Binary outfile name                         | `packages/opencode/script/build.ts` (`outfile …/bin/opencode`)                                                                         | → `kotencode`                                                      |
-| npm package name (drives sub-package names) | `packages/opencode/package.json` `name`                                                                                                | → `"kotencode"`                                                    |
-| Launcher expected names                     | `packages/opencode/bin/opencode`                                                                                                       | `kotencode-…`, `kotencode(.exe)`, `.kotencode`                     |
-| User-Agent (models.dev)                     | `packages/core/src/models-dev.ts` `USER_AGENT`                                                                                         | `kotencode/…`                                                      |
-| Provider attribution headers                | `packages/opencode/src/provider/provider.ts` (openrouter/llmgateway/nvidia/vercel/zenmux/cerebras/kilo)                                | `kotencode` brand headers                                          |
+| Binary outfile name                         | `packages/opencode/script/build.ts` (`outfile …/bin/opencode`)                                                                         | → `kotecode`                                                       |
+| npm package name (drives sub-package names) | `packages/opencode/package.json` `name`                                                                                                | → `"kotecode"`                                                     |
+| Launcher expected names                     | `packages/opencode/bin/opencode`                                                                                                       | `kotecode-…`, `kotecode(.exe)`, `.kotecode`                        |
+| User-Agent (models.dev)                     | `packages/core/src/models-dev.ts` `USER_AGENT`                                                                                         | `kotecode/…`                                                       |
+| Provider attribution headers                | `packages/opencode/src/provider/provider.ts` (openrouter/llmgateway/nvidia/vercel/zenmux/cerebras/kilo)                                | `kotecode` brand headers                                           |
 | Root package identity                       | `package.json` (`name`, `description`, `repository.url`)                                                                               | KoteCode identity                                                  |
 | Desktop identity                            | `packages/desktop/{package.json, electron-builder.config.ts}`, `packages/desktop/src/main/{constants,index,logging,server,windows}.ts` | KoteCode app IDs/name/author and isolated runtime data             |
 | Desktop WSL bridge                          | `packages/desktop/src/main/wsl/`                                                                                                       | Disabled for alpha; inherited code installs/runs upstream OpenCode |
@@ -124,8 +124,8 @@ alongside — see [`CONFIGURATION.md`](./CONFIGURATION.md).
 Documented in full in [`NETWORK.md`](./NETWORK.md). Summary:
 
 - **models.dev** (`OPENCODE_MODELS_URL`, default `https://models.dev`) — model catalog, branded User-Agent.
-- **Version/upgrade checks** — npm registry / Homebrew / Scoop / Chocolatey / GitHub releases APIs.
-- **Install script** — downloads from `github.com/anomalyco/opencode/releases/...`.
+- **Version/upgrade checks** — KoteCode npm, Homebrew tap, or GitHub Releases APIs.
+- **Install scripts** — download only KoteCode Release archives and verify `SHA256SUMS`.
 - **Session sharing** — `https://opncd.ai` (legacy) or account `url` (authenticated).
 - **Auth/account** — device-code OAuth to account `url`/`server` (not hardcoded).
 - **Provider traffic** — to each AI provider's baseURL with attribution headers.
@@ -174,14 +174,18 @@ Ed25519 verification **from scratch** in `packages/core/src/kote/`, adding `@nob
 
 - Build script: `packages/opencode/script/build.ts` — 12 compile targets
   (darwin/linux/win32 × arm64/x64 + `-baseline` for non-AVX2 + `-musl` for Alpine).
-- Defines injected at compile time: `OPENCODE_VERSION`, `OPENCODE_CHANNEL`, `OPENCODE_LIBC`,
-  `OPENCODE_WORKER_PATH`, `OTUI_TREE_SITTER_WORKER_PATH`. Output: `dist/<name>/bin/opencode`.
-- Release workflow: `.github/workflows/publish.yml` (triggers on `ci`/`dev`/`beta`/`snapshot-*`).
-  Jobs: `version`, `build-cli` (Ubuntu), `sign-cli-windows` (Azure Trusted Signing),
-  `build-electron` (6-target matrix, Apple codesign), `publish` (npm, `gh release`, Docker/AUR/Tauri).
+- Defines injected at compile time: `OPENCODE_VERSION`, `KOTECODE_VERSION`, `OPENCODE_CHANNEL`,
+  `OPENCODE_LIBC`, `OPENCODE_WORKER_PATH`, `OTUI_TREE_SITTER_WORKER_PATH`.
+  Output: `dist/<name>/bin/kotecode`.
+- Upstream release workflow: `.github/workflows/publish.yml`. It remains guarded for
+  `anomalyco/opencode` and is not KoteCode's release path.
+- KoteCode uses `.github/workflows/kotecode-release.yml` for tests, native CLI and
+  Windows/Linux Desktop builds, checksums, updater metadata, and a draft Release.
+- `.github/workflows/kotecode-publish.yml` is a separately confirmed, environment-gated
+  publication path for GitHub, npm OIDC, and the Homebrew PR.
 - **Upstream pipeline does not transfer to a fork** (Blacksmith runners, Azure/Apple signing,
-  Tauri keys, npm secrets). KoteCode's draft release builds **unsigned** CLI artifacts for
-  Windows x64, Linux x64, macOS arm64 — see [`BUILD.md`](./BUILD.md).
+  Tauri keys, npm secrets). See [`RELEASE_AUDIT.md`](./RELEASE_AUDIT.md) and
+  [`../RELEASING.md`](../RELEASING.md).
 
 ## 12. Conclusion and scope decisions
 

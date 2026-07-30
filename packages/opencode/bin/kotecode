@@ -1,0 +1,64 @@
+#!/usr/bin/env node
+
+// KoteCode npm launcher. The main package contains no native executable; npm
+// selects one verified platform package through optionalDependencies.
+
+const childProcess = require("node:child_process")
+const fs = require("node:fs")
+const os = require("node:os")
+const path = require("node:path")
+
+const platform = { darwin: "darwin", linux: "linux", win32: "windows" }[os.platform()] ?? os.platform()
+const arch = { x64: "x64", arm64: "arm64" }[os.arch()] ?? os.arch()
+const packageName = `@kotecode-ai/${platform}-${arch}`
+const binaryName = platform === "windows" ? "kotecode.exe" : "kotecode"
+const override = process.env.KOTECODE_BIN_PATH || process.env.OPENCODE_BIN_PATH
+
+function findBinary(start) {
+  let current = start
+  for (;;) {
+    const candidate = path.join(current, "node_modules", packageName, "bin", binaryName)
+    if (fs.existsSync(candidate)) return candidate
+    const parent = path.dirname(current)
+    if (parent === current) return
+    current = parent
+  }
+}
+
+const target = override || findBinary(path.dirname(fs.realpathSync(__filename)))
+if (!target) {
+  console.error(
+    `KoteCode does not support ${os.platform()}/${os.arch()}, or npm did not install ${packageName}. ` +
+      `Reinstall with \"npm install -g kotecode\" and make sure optional dependencies are enabled.`,
+  )
+  process.exit(1)
+}
+
+const child = childProcess.spawn(target, process.argv.slice(2), { stdio: "inherit" })
+const signals = ["SIGINT", "SIGTERM", "SIGHUP"]
+const forwarders = Object.fromEntries(
+  signals.map((signal) => [
+    signal,
+    () => {
+      try {
+        child.kill(signal)
+      } catch {
+        // The child may already have exited.
+      }
+    },
+  ]),
+)
+
+child.on("error", (error) => {
+  console.error(error.message)
+  process.exit(1)
+})
+signals.forEach((signal) => process.on(signal, forwarders[signal]))
+child.on("exit", (code, signal) => {
+  signals.forEach((item) => process.removeListener(item, forwarders[item]))
+  if (signal) {
+    process.kill(process.pid, signal)
+    return
+  }
+  process.exit(typeof code === "number" ? code : 0)
+})

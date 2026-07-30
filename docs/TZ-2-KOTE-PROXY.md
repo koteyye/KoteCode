@@ -449,8 +449,8 @@ transport, считаются неподдержанными до отдельн
 CLI-интерфейс диагностики:
 
 ```bash
-kotencode debug proxy
-kotencode debug proxy --model openai/gpt-5
+kotecode debug proxy
+kotecode debug proxy --model openai/gpt-5
 ```
 
 ## 14. Изменения клиентской части KoteCode

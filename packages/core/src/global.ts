@@ -9,7 +9,7 @@ import { makeGlobalNode } from "./effect/app-node"
 
 // KoteCode brand: public XDG app name. Internal package names (@opencode-ai/*) and
 // OPENCODE_* env vars are intentionally kept (compatibility layer) — see docs/UPSTREAM.md.
-const app = "kotencode"
+const app = "kotecode"
 const data = Flag.KOTECODE_DATA_DIR ?? path.join(xdgData!, app)
 const cache = Flag.KOTECODE_CACHE_DIR ?? path.join(xdgCache!, app)
 const config = Flag.KOTECODE_CONFIG_DIR ?? Flag.OPENCODE_CONFIG_DIR ?? path.join(xdgConfig!, app)

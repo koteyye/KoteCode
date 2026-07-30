@@ -8,13 +8,13 @@ on top; when both are set, KoteCode's take precedence.
 
 A new KoteCode install uses its own directories (separate from OpenCode's):
 
-| Directory | Linux                      | macOS                                     | Windows                          |
-| --------- | -------------------------- | ----------------------------------------- | -------------------------------- |
-| config    | `~/.config/kotencode`      | `~/Library/Application Support/kotencode` | `%APPDATA%\kotencode`            |
-| data      | `~/.local/share/kotencode` | `~/Library/Application Support/kotencode` | `%LOCALAPPDATA%\kotencode`       |
-| cache     | `~/.cache/kotencode`       | `~/Library/Caches/kotencode`              | `%LOCALAPPDATA%\kotencode\cache` |
-| state     | `~/.local/state/kotencode` | `~/Library/Application Support/kotencode` | `%LOCALAPPDATA%\kotencode\state` |
-| log       | `<data>/log`               | `<data>/log`                              | `<data>\log`                     |
+| Directory | Linux                     | macOS                                    | Windows                         |
+| --------- | ------------------------- | ---------------------------------------- | ------------------------------- |
+| config    | `~/.config/kotecode`      | `~/Library/Application Support/kotecode` | `%APPDATA%\kotecode`            |
+| data      | `~/.local/share/kotecode` | `~/Library/Application Support/kotecode` | `%LOCALAPPDATA%\kotecode`       |
+| cache     | `~/.cache/kotecode`       | `~/Library/Caches/kotecode`              | `%LOCALAPPDATA%\kotecode\cache` |
+| state     | `~/.local/state/kotecode` | `~/Library/Application Support/kotecode` | `%LOCALAPPDATA%\kotecode\state` |
+| log       | `<data>/log`              | `<data>/log`                             | `<data>\log`                    |
 
 ### Overriding directories
 
@@ -30,10 +30,10 @@ over the OpenCode equivalent, which takes precedence over the platform default):
 
 ## Config files
 
-KoteCode loads `config.json`, `opencode.json`, `opencode.jsonc`, `kotencode.json`,
-and `kotencode.jsonc` from the config directory. Later files override earlier files,
+KoteCode loads `config.json`, `opencode.json`, `opencode.jsonc`, `kotecode.json`,
+and `kotecode.jsonc` from the config directory. Later files override earlier files,
 so the KoteCode-branded files have priority. The default write target is
-`kotencode.jsonc`.
+`kotecode.jsonc`.
 
 Project-local config is discovered by walking up from the current directory looking
 for the upstream-compatible `.opencode/` folder and JSON/JSONC files inside it.
@@ -41,7 +41,7 @@ for the upstream-compatible `.opencode/` folder and JSON/JSONC files inside it.
 Set the config file path explicitly:
 
 ```bash
-KOTECODE_CONFIG=/path/to/my-config.jsonc kotencode
+KOTECODE_CONFIG=/path/to/my-config.jsonc kotecode
 ```
 
 ### Minimal example
@@ -71,9 +71,9 @@ or supported authorization flow.
 | `KOTECODE_BOOTSTRAP_URL`        | Override the bootstrap config URL (dev/testing)                           |
 | `KOTECODE_PROXY_URL`            | Force the HTTPS Proxy origin — **priority over bootstrap**                |
 | `KOTECODE_DISABLE_PROXY`        | Explicitly send provider requests directly                                |
-| `KOTECODE_DISABLE_UPDATE_CHECK` | Reserved update-check kill switch; updates are currently disabled         |
+| `KOTECODE_DISABLE_UPDATE_CHECK` | Disable the cached, notification-only update check                        |
 | `KOTECODE_BIN_PATH`             | Point the launcher at a specific binary (also honors `OPENCODE_BIN_PATH`) |
-| `KOTECODE_LANG`                 | Terminal UI language: `ru` or `en`                                       |
+| `KOTECODE_LANG`                 | Terminal UI language: `ru` or `en`                                        |
 
 KoteCode does not perform automatic update checks and rejects manual/API
 upgrade requests. Install a newer build explicitly from the KoteCode GitHub Releases
@@ -105,10 +105,10 @@ An explicit `tui.json` value takes precedence over the environment variable.
 
 Kote Gateway wraps existing providers; it does not add a provider ID or credential.
 
-| Transport                | Provider URL and credentials | Network path                                    |
-| ------------------------ | ---------------------------- | ----------------------------------------------- |
+| Transport                  | Provider URL and credentials | Network path                                    |
+| -------------------------- | ---------------------------- | ----------------------------------------------- |
 | **Kote Gateway** (default) | Unchanged                    | HTTPS `CONNECT` tunnel from signed Proxy origin |
-| **Direct**               | Unchanged                    | KoteCode connects directly to the provider      |
+| **Direct**                 | Unchanged                    | KoteCode connects directly to the provider      |
 
 The Desktop app lets you choose this mode while connecting each provider and change
 it later in **Settings → Providers**. The model selector shows the selected mode once
@@ -117,9 +117,9 @@ in the provider group heading.
 Use the same setting from the CLI interactively or pass both values explicitly:
 
 ```bash
-kotencode providers routing
-kotencode providers routing openai gateway
-kotencode providers routing anthropic direct
+kotecode providers routing
+kotecode providers routing openai gateway
+kotecode providers routing anthropic direct
 ```
 
 The same choice can also be configured manually per provider:
@@ -147,8 +147,8 @@ fails. Local plain-HTTP providers remain direct.
 Inspect the resolved transport, and optionally the original host for a selected model:
 
 ```bash
-kotencode debug proxy
-kotencode debug proxy --model openai/gpt-5
+kotecode debug proxy
+kotecode debug proxy --model openai/gpt-5
 ```
 
 ### Local Proxy override
@@ -157,13 +157,13 @@ For local development or diagnostics, force a Proxy origin without touching the
 bootstrap flow:
 
 ```bash
-KOTECODE_PROXY_URL=https://kote-proxy.kotey-ye.ru kotencode
+KOTECODE_PROXY_URL=https://kote-proxy.kotey-ye.ru kotecode
 ```
 
 Use explicit direct transport:
 
 ```bash
-KOTECODE_DISABLE_PROXY=1 kotencode
+KOTECODE_DISABLE_PROXY=1 kotecode
 ```
 
 Resolution order is `disabled` → `environment` → `remote` → `cache` → `none`.
@@ -175,10 +175,10 @@ KoteCode does **not** touch your OpenCode configuration automatically. To import
 non-secret settings on demand:
 
 ```bash
-kotencode migrate-from-opencode               # copies non-secret settings only
-kotencode migrate-from-opencode --with-secrets     # also imports API keys/tokens (explicit opt-in)
-kotencode migrate-from-opencode --dry-run          # preview without writing
-kotencode migrate-from-opencode --force            # overwrite an existing KoteCode config
+kotecode migrate-from-opencode               # copies non-secret settings only
+kotecode migrate-from-opencode --with-secrets     # also imports API keys/tokens (explicit opt-in)
+kotecode migrate-from-opencode --dry-run          # preview without writing
+kotecode migrate-from-opencode --force            # overwrite an existing KoteCode config
 ```
 
 Your original OpenCode files are **never modified or deleted**. Secret-looking values

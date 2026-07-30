@@ -8,35 +8,35 @@ export function resolveChannel(): Channel {
   return "dev"
 }
 
-export const SIDECAR_BINARIES: Array<{ rustTarget: string; ocBinary: string; assetExt: string }> = [
+export const SIDECAR_BINARIES: Array<{ rustTarget: string; cliBinary: string; assetExt: string }> = [
   {
     rustTarget: "aarch64-apple-darwin",
-    ocBinary: "opencode-darwin-arm64",
+    cliBinary: "kotecode-darwin-arm64",
     assetExt: "zip",
   },
   {
     rustTarget: "x86_64-apple-darwin",
-    ocBinary: "opencode-darwin-x64-baseline",
+    cliBinary: "kotecode-darwin-x64-baseline",
     assetExt: "zip",
   },
   {
     rustTarget: "aarch64-pc-windows-msvc",
-    ocBinary: "opencode-windows-arm64",
+    cliBinary: "kotecode-windows-arm64",
     assetExt: "zip",
   },
   {
     rustTarget: "x86_64-pc-windows-msvc",
-    ocBinary: "opencode-windows-x64-baseline",
+    cliBinary: "kotecode-windows-x64-baseline",
     assetExt: "zip",
   },
   {
     rustTarget: "x86_64-unknown-linux-gnu",
-    ocBinary: "opencode-linux-x64-baseline",
+    cliBinary: "kotecode-linux-x64-baseline",
     assetExt: "tar.gz",
   },
   {
     rustTarget: "aarch64-unknown-linux-gnu",
-    ocBinary: "opencode-linux-arm64",
+    cliBinary: "kotecode-linux-arm64",
     assetExt: "tar.gz",
   },
 ]
@@ -61,9 +61,9 @@ export function getCurrentSidecar(target = RUST_TARGET ?? nativeTarget()) {
 export async function copyBinaryToSidecarFolder(source: string) {
   const dir = `resources`
   await $`mkdir -p ${dir}`
-  const dest = windowsify(`${dir}/opencode-cli`)
+  const dest = windowsify(`${dir}/kotecode-cli`)
   await $`cp ${source} ${dest}`
-  if (process.platform === "win32" && process.env.GITHUB_ACTIONS === "true") {
+  if (process.platform === "win32" && process.env.KOTECODE_WINDOWS_SIGNING === "true") {
     await $`pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File ../../script/sign-windows.ps1 ${dest}`
   }
   if (process.platform === "darwin") await $`codesign --force --sign - ${dest}`
