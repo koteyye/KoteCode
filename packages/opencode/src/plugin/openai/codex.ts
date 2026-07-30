@@ -353,7 +353,8 @@ export async function CodexAuthPlugin(input: PluginInput, options: CodexAuthPlug
       provider: "openai",
       async loader(getAuth) {
         const auth = await getAuth()
-        const websocketFetch = options.experimentalWebSockets
+        const websocketFetch =
+          options.experimentalWebSockets && (await (options.resolveProxy ?? resolveProxy)()).source === "disabled"
           ? OpenAIWebSocketPool.createWebSocketFetch({ httpFetch: fetch })
           : undefined
         if (websocketFetch) {

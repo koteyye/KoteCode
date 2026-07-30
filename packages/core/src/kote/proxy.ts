@@ -8,7 +8,7 @@ const agents = new Map<string, ProxyAgent>()
 
 export class ProxyUnavailableError extends Error {
   constructor(result: Extract<ResolveProxyResult, { source: "none" }>) {
-    super(`Kote Proxy is unavailable: ${result.reason}${result.hint ? " — " + result.hint : ""}`)
+    super(`Kote Gateway is unavailable: ${result.reason}${result.hint ? " — " + result.hint : ""}`)
     this.name = "ProxyUnavailableError"
   }
 }
@@ -17,7 +17,7 @@ export class ProxyTargetError extends Error {
   constructor(value: string) {
     const url = URL.parse(value)
     const target = url ? `${url.protocol}//${url.host}` : "an invalid provider URL"
-    super(`Kote Proxy only supports HTTPS provider requests; refusing direct request to ${target}`)
+    super(`Kote Gateway only supports HTTPS provider requests; refusing direct request to ${target}`)
     this.name = "ProxyTargetError"
   }
 }

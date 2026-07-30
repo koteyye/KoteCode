@@ -16,6 +16,7 @@ import { ConfigPluginV1 } from "./plugin"
 import { ConfigProviderV1 } from "./provider"
 import { ConfigServerV1 } from "./server"
 import { ConfigSkillsV1 } from "./skills"
+import { Gateway } from "../../kote/gateway"
 
 export type Layout = ConfigLayoutV1.Layout
 
@@ -109,6 +110,9 @@ export const Info = Schema.Struct({
   ).annotate({ description: "Agent configuration, see https://opencode.ai/docs/agents" }),
   provider: Schema.optional(Schema.Record(Schema.String, ConfigProviderV1.Info)).annotate({
     description: "Custom provider configurations and model overrides",
+  }),
+  gateway: Schema.optional(Gateway.Info).annotate({
+    description: "Named custom proxies and the active route used instead of Kote Gateway",
   }),
   mcp: Schema.optional(
     Schema.Record(Schema.String, Schema.Union([ConfigMCPV1.Info, Schema.Struct({ enabled: Schema.Boolean })])),

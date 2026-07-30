@@ -21,7 +21,7 @@ for (const channel of channels) {
 
     expect(config.appId).toBe(channel.appId)
     expect(config.extraMetadata?.desktopName).toBe(`${channel.appId}.desktop`)
-    expect(config.linux?.executableName).toBe(channel.appId)
+    expect(config.linux?.executableName).toBe("kotecode-desktop")
     expect(config.linux?.desktop?.entry?.StartupWMClass).toBe(channel.appId)
   })
 }
@@ -39,4 +39,23 @@ test("does not package an OpenCode launcher into KoteCode Linux artifacts", asyn
   expect(config.deb?.fpm ?? []).toEqual([])
   expect(config.rpm?.fpm ?? []).toEqual([])
   expect(JSON.stringify(config)).not.toContain("opencode-desktop.desktop")
+})
+
+test("uses the public v0.1.0 artifact names and unsigned Windows policy", async () => {
+  const previous = process.env.OPENCODE_CHANNEL
+  process.env.OPENCODE_CHANNEL = "prod"
+
+  const module = await import("./electron-builder.config.ts?artifacts=prod")
+  const config = module.default as Configuration
+
+  if (previous === undefined) delete process.env.OPENCODE_CHANNEL
+  else process.env.OPENCODE_CHANNEL = previous
+
+  expect(config.nsis?.artifactName).toBe("KoteCode-desktop-windows-${arch}-setup.${ext}")
+  expect(config.artifactName).toBe("KoteCode-desktop-windows-${arch}-portable.${ext}")
+  expect(config.appImage?.artifactName).toBe("KoteCode-desktop-linux-${arch}.${ext}")
+  expect(config.deb?.artifactName).toBe("KoteCode-desktop-linux-${arch}.${ext}")
+  expect(config.rpm?.artifactName).toBe("KoteCode-desktop-linux-${arch}.${ext}")
+  expect(config.win?.verifyUpdateCodeSignature).toBe(false)
+  expect(config.mac).toBeUndefined()
 })

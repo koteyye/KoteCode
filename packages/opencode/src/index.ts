@@ -35,7 +35,7 @@ const args = hideBin(process.argv)
 
 function show(out: string) {
   const text = out.trimStart()
-  if (!text.startsWith("kotencode ")) {
+  if (!text.startsWith("kotecode ")) {
     process.stderr.write(UI.logo() + EOL + EOL)
     process.stderr.write(text + EOL)
     return
@@ -45,7 +45,7 @@ function show(out: string) {
 
 const cli = yargs(args)
   .parserConfiguration({ "populate--": true })
-  .scriptName("kotencode")
+  .scriptName("kotecode")
   .wrap(100)
   .help("help", "show help")
   .alias("help", "h")
@@ -120,7 +120,7 @@ const cli = yargs(args)
 try {
   // KoteCode: print the composed version (KoteCode + upstream) for --version/-v.
   // yargs' built-in .version() only takes a single string; emitting the two-line form
-  // here keeps `kotencode --version` spec-compliant (ТЗ §12).
+  // here keeps `kotecode --version` spec-compliant (ТЗ §12).
   if (args.includes("-v") || args.includes("--version")) {
     process.stdout.write(versionString() + EOL)
     process.exit(0)

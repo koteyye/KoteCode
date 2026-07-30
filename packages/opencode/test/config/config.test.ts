@@ -313,7 +313,7 @@ it.effect("creates global jsonc config with schema when no global configs exist"
     Effect.gen(function* () {
       yield* Config.use.get().pipe(provideInstanceEffect(dir))
 
-      const content = yield* FSUtil.use.readFileString(path.join(dir, "kotencode.jsonc"))
+      const content = yield* FSUtil.use.readFileString(path.join(dir, "kotecode.jsonc"))
       expect(content).toContain('"$schema": "https://opencode.ai/config.json"')
     }).pipe(Effect.provide(testInstanceStoreLayer), Effect.provide(LayerNode.compile(CrossSpawnSpawner.node))),
   ),
@@ -329,15 +329,15 @@ it.effect("does not create global config when OPENCODE_CONFIG_DIR is set", () =>
         Effect.gen(function* () {
           yield* Config.use.get().pipe(provideInstanceEffect(dir))
 
-          expect(yield* FSUtil.use.existsSafe(path.join(dir, "kotencode.jsonc"))).toBe(false)
+          expect(yield* FSUtil.use.existsSafe(path.join(dir, "kotecode.jsonc"))).toBe(false)
         }).pipe(Effect.provide(testInstanceStoreLayer), Effect.provide(LayerNode.compile(CrossSpawnSpawner.node))),
       ),
     )
   }),
 )
 
-it.effect("loads the branded kotencode.jsonc global config", () =>
-  withGlobalConfig({ config: { model: "kote/model" }, name: "kotencode.jsonc" }, ({ dir }) =>
+it.effect("loads the branded kotecode.jsonc global config", () =>
+  withGlobalConfig({ config: { model: "kote/model" }, name: "kotecode.jsonc" }, ({ dir }) =>
     Effect.gen(function* () {
       const config = yield* Config.use.get().pipe(provideInstanceEffect(dir))
       expect(config.model).toBe("kote/model")

@@ -17,7 +17,7 @@ export type CatalogModelStatus = typeof CatalogModelStatus.Type
 
 // KoteCode brand: the models.dev catalog request is attributed to KoteCode.
 // Internal Installation* values still reflect the OpenCode base (compatibility layer).
-const USER_AGENT = `kotencode/${InstallationChannel}/${InstallationVersion}/${Flag.OPENCODE_CLIENT}`
+const USER_AGENT = `kotecode/${InstallationChannel}/${InstallationVersion}/${Flag.OPENCODE_CLIENT}`
 
 const CostTier = Schema.Struct({
   input: Schema.Finite,

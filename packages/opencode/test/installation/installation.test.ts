@@ -1,4 +1,4 @@
-import { describe, expect } from "bun:test"
+import { describe, expect, test } from "bun:test"
 import { makeGlobalNode } from "@opencode-ai/core/effect/app-node"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { httpClient } from "@opencode-ai/core/effect/app-node-platform"
@@ -6,7 +6,6 @@ import { Effect, Layer, Stream } from "effect"
 import { HttpClient, HttpClientRequest, HttpClientResponse } from "effect/unstable/http"
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process"
 import { Installation } from "../../src/installation"
-import { InstallationChannel, InstallationVersion } from "@opencode-ai/core/installation/version"
 import { CrossSpawnSpawner } from "@opencode-ai/core/cross-spawn-spawner"
 import { testEffect } from "../lib/effect"
 
@@ -67,55 +66,20 @@ function testLayer(
 }
 
 describe("installation", () => {
-  describe("KoteCode alpha safety lock", () => {
-    const latestHttpCalls: string[] = []
-    const latestProcessCalls: string[] = []
-    testEffect(
-      testLayer(
-        (request) => {
-          latestHttpCalls.push(request.url)
-          return jsonResponse({ tag_name: "v9.9.9" })
-        },
-        (cmd, args) => {
-          latestProcessCalls.push([cmd, ...args].join(" "))
-          return ""
-        },
-      ),
-    ).effect("returns the installed version without checking upstream", () =>
-      Effect.gen(function* () {
-        expect(Installation.UpdatesEnabled).toBe(false)
-        expect(yield* Installation.use.latest()).toBe(InstallationVersion)
-        expect(latestHttpCalls).toEqual([])
-        expect(latestProcessCalls).toEqual([])
-      }),
-    )
-
-    const upgradeHttpCalls: string[] = []
-    const upgradeProcessCalls: string[] = []
-    testEffect(
-      testLayer(
-        (request) => {
-          upgradeHttpCalls.push(request.url)
-          return new Response("upstream installer")
-        },
-        (cmd, args) => {
-          upgradeProcessCalls.push([cmd, ...args].join(" "))
-          return ""
-        },
-      ),
-    ).effect("rejects upgrades before fetching or launching an installer", () =>
-      Effect.gen(function* () {
-        const error = yield* Effect.flip(Installation.use.upgrade("curl", "9.9.9"))
-        expect(error).toBeInstanceOf(Installation.UpgradeFailedError)
-        expect(error.stderr).toBe(Installation.UpdatesDisabledMessage)
-        expect(upgradeHttpCalls).toEqual([])
-        expect(upgradeProcessCalls).toEqual([])
-      }),
-    )
+  describe("upgrade policy", () => {
+    test("enforces channels and explicit downgrades", () => {
+      expect(Installation.UpdatesEnabled).toBe(true)
+      expect(Installation.validateUpgradeTarget("0.2.0", "0.1.0", "latest")).toContain("--allow-downgrade")
+      expect(Installation.validateUpgradeTarget("0.2.0", "0.1.0", "latest", true)).toBeUndefined()
+      expect(Installation.validateUpgradeTarget("0.1.0", "0.2.0-beta.1", "latest")).toContain("prerelease")
+      expect(Installation.validateUpgradeTarget("0.1.0-beta.1", "0.1.0-beta.2", "beta")).toBeUndefined()
+      expect(Installation.validateUpgradeTarget("0.1.0-beta.1", "0.1.0", "beta")).toContain("beta channel")
+      expect(Installation.validateUpgradeTarget("0.1.0", "0.1.0", "latest")).toContain("already installed")
+    })
   })
 
-  describe.skipIf(!Installation.UpdatesEnabled)("latest", () => {
-    testEffect(testLayer(() => jsonResponse({ tag_name: "v1.2.3" }))).effect(
+  describe("latest", () => {
+    testEffect(testLayer(() => jsonResponse({ tag_name: "v1.2.3", draft: false, prerelease: false }))).effect(
       "reads release version from GitHub releases",
       () =>
         Effect.gen(function* () {
@@ -124,7 +88,7 @@ describe("installation", () => {
         }),
     )
 
-    testEffect(testLayer(() => jsonResponse({ tag_name: "v4.0.0-beta.1" }))).effect(
+    testEffect(testLayer(() => jsonResponse({ tag_name: "v4.0.0-beta.1", draft: false, prerelease: true }))).effect(
       "strips v prefix from GitHub release tag",
       () =>
         Effect.gen(function* () {
@@ -143,7 +107,7 @@ describe("installation", () => {
       Effect.gen(function* () {
         const result = yield* Installation.use.latest("npm")
         expect(result).toBe("1.5.0")
-        expect(npmCalls).toContain(`https://registry.npmjs.org/opencode-ai/${InstallationChannel}`)
+        expect(npmCalls).toContain("https://registry.npmjs.org/kotecode/latest")
       }),
     )
 
@@ -157,7 +121,7 @@ describe("installation", () => {
       Effect.gen(function* () {
         const result = yield* Installation.use.latest("bun")
         expect(result).toBe("1.6.0")
-        expect(bunCalls).toContain(`https://registry.npmjs.org/opencode-ai/${InstallationChannel}`)
+        expect(bunCalls).toContain("https://registry.npmjs.org/kotecode/latest")
       }),
     )
 
@@ -171,51 +135,20 @@ describe("installation", () => {
       Effect.gen(function* () {
         const result = yield* Installation.use.latest("pnpm")
         expect(result).toBe("1.7.0")
-        expect(pnpmCalls).toContain(`https://registry.npmjs.org/opencode-ai/${InstallationChannel}`)
-      }),
-    )
-
-    testEffect(testLayer(() => jsonResponse({ version: "2.3.4" }))).effect("reads scoop manifest versions", () =>
-      Effect.gen(function* () {
-        const result = yield* Installation.use.latest("scoop")
-        expect(result).toBe("2.3.4")
-      }),
-    )
-
-    testEffect(testLayer(() => jsonResponse({ d: { results: [{ Version: "3.4.5" }] } }))).effect(
-      "reads chocolatey feed versions",
-      () =>
-        Effect.gen(function* () {
-          const result = yield* Installation.use.latest("choco")
-          expect(result).toBe("3.4.5")
-        }),
-    )
-
-    testEffect(
-      testLayer(
-        () => jsonResponse({ versions: { stable: "2.0.0" } }),
-        (cmd, args) => {
-          // getBrewFormula: return core formula (no tap)
-          if (cmd === "brew" && args.includes("--formula") && args.includes("anomalyco/tap/opencode")) return ""
-          if (cmd === "brew" && args.includes("--formula") && args.includes("opencode")) return "opencode"
-          return ""
-        },
-      ),
-    ).effect("reads brew formulae API versions", () =>
-      Effect.gen(function* () {
-        const result = yield* Installation.use.latest("brew")
-        expect(result).toBe("2.0.0")
+        expect(pnpmCalls).toContain("https://registry.npmjs.org/kotecode/latest")
       }),
     )
 
     const brewInfoJson = JSON.stringify({
       formulae: [{ versions: { stable: "2.1.0" } }],
     })
+    const brewCalls: string[] = []
     testEffect(
       testLayer(
-        () => jsonResponse({}), // HTTP not used for tap formula
+        () => jsonResponse({}),
         (cmd, args) => {
-          if (cmd === "brew" && args.includes("anomalyco/tap/opencode") && args.includes("--formula")) return "opencode"
+          brewCalls.push([cmd, ...args].join(" "))
+          if (cmd === "brew" && args.includes("list")) return "kotecode"
           if (cmd === "brew" && args.includes("--json=v2")) return brewInfoJson
           return ""
         },
@@ -224,11 +157,12 @@ describe("installation", () => {
       Effect.gen(function* () {
         const result = yield* Installation.use.latest("brew")
         expect(result).toBe("2.1.0")
+        expect(brewCalls).toContain("brew info --json=v2 koteyye/tap/kotecode")
       }),
     )
   })
 
-  describe.skipIf(!Installation.UpdatesEnabled)("upgrade", () => {
+  describe("upgrade", () => {
     testEffect(
       testLayer(
         () => jsonResponse({}),
@@ -248,12 +182,22 @@ describe("installation", () => {
       }),
     )
 
+    const directHttpCalls: string[] = []
     testEffect(
       testLayer(
-        () => new Response("install script with token=secret", { status: 200 }),
+        (request) => {
+          directHttpCalls.push(request.url)
+          return new Response("install script with token=secret", { status: 200 })
+        },
         (cmd, args) => {
           if (cmd === "bash" && args[0] === "--version") return "GNU bash"
           if (cmd === "bash" || cmd === "sh") return { code: 1, stderr: "script output with token=secret" }
+          if ((cmd === "pwsh" || cmd === "powershell") && args.includes("$PSVersionTable.PSVersion")) {
+            return "7.5.0"
+          }
+          if (cmd === "pwsh" || cmd === "powershell") {
+            return { code: 1, stderr: "script output with token=secret" }
+          }
           return ""
         },
       ),
@@ -265,6 +209,9 @@ describe("installation", () => {
         expect(error.message).toBe(error.stderr)
         expect(error.stderr).not.toContain("secret")
         expect(error.stderr).not.toContain("script output")
+        expect(directHttpCalls).toContain(
+          `https://raw.githubusercontent.com/koteyye/KoteCode/v9.9.9/${process.platform === "win32" ? "install.ps1" : "install"}`,
+        )
       }),
     )
 
@@ -280,6 +227,7 @@ describe("installation", () => {
       ),
     ).effect("falls back to sh when bash is unavailable during curl upgrade", () =>
       Effect.gen(function* () {
+        if (process.platform === "win32") return
         yield* Installation.use.upgrade("curl", "9.9.9")
       }),
     )

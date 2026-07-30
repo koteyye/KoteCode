@@ -741,7 +741,7 @@ describe("session.llm-native.request", () => {
         providerOptions: { instructions: "You are concise." },
         headers: {},
         abort: new AbortController().signal,
-        proxy: { source: "environment", url: "https://proxy.kotencode.test" },
+        proxy: { source: "environment", url: "https://proxy.kotecode.test" },
       })
       expect(native.type).toBe("supported")
       if (native.type === "unsupported") throw new Error(native.reason)
@@ -750,7 +750,7 @@ describe("session.llm-native.request", () => {
       expect(captures).toHaveLength(1)
       expect(captures[0]).toMatchObject({
         url: "https://api.openai.com/v1/responses",
-        proxy: "https://proxy.kotencode.test",
+        proxy: "https://proxy.kotecode.test",
         body: {
           model: "gpt-5-mini",
           instructions: "You are concise.",

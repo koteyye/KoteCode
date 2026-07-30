@@ -25,6 +25,7 @@ import { ConfigToolOutput } from "./config/tool-output"
 import { ConfigWatcher } from "./config/watcher"
 import { ConfigV1 } from "./v1/config/config"
 import { ConfigMigrateV1 } from "./v1/config/migrate"
+import { Gateway } from "./kote/gateway"
 
 export class Info extends Schema.Class<Info>("Config.Info")({
   $schema: Schema.optional(Schema.String).annotate({
@@ -104,6 +105,9 @@ export class Info extends Schema.Class<Info>("Config.Info")({
   }),
   experimental: ConfigExperimental.Experimental.pipe(Schema.optional),
   providers: Schema.Record(Schema.String, ConfigProvider.Info).pipe(Schema.optional),
+  gateway: Gateway.Info.pipe(Schema.optional).annotate({
+    description: "Named custom proxies and the active route used instead of Kote Gateway",
+  }),
 }) {}
 
 export class Document extends Schema.Class<Document>("Config.Document")({

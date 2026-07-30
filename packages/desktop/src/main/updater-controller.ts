@@ -2,10 +2,12 @@ import type { UpdaterState } from "@opencode-ai/app/updater"
 
 export type { UpdaterState } from "@opencode-ai/app/updater"
 
-export type UpdaterReadyRecord = { version: string }
+export type UpdaterReadyRecord = { version: string; notes?: string }
 
 export type UpdaterBackend = {
-  checkForUpdates(): Promise<{ isUpdateAvailable?: boolean; updateInfo?: { version?: string } } | null | undefined>
+  checkForUpdates(): Promise<
+    { isUpdateAvailable?: boolean; updateInfo?: { version?: string; releaseNotes?: string } } | null | undefined
+  >
   downloadUpdate(): Promise<unknown>
   quitAndInstall(): void
 }
@@ -44,15 +46,17 @@ export function createUpdaterController(input: {
       transition({ status: "checking" })
       const result = await input.backend.checkForUpdates()
       const version = result?.updateInfo?.version
+      const notes = result?.updateInfo?.releaseNotes
       if (!result?.isUpdateAvailable || !version || version === input.currentVersion) {
         await input.persistence.clear()
         return transition({ status: "up-to-date" })
       }
 
-      transition({ status: "downloading", version })
+      const metadata = notes ? { notes } : {}
+      transition({ status: "downloading", version, ...metadata })
       await input.backend.downloadUpdate()
-      await input.persistence.set({ version })
-      return transition({ status: "ready", version })
+      await input.persistence.set({ version, ...metadata })
+      return transition({ status: "ready", version, ...metadata })
     })()
       .catch((error) =>
         transition({ status: "error", message: error instanceof Error ? error.message : String(error) }),
@@ -79,15 +83,17 @@ export function createUpdaterController(input: {
     async install() {
       if (state.status !== "ready") throw new Error("Update is not ready to install")
       const version = state.version
-      transition({ status: "installing", version })
+      const notes = state.notes
+      const metadata = notes ? { notes } : {}
+      transition({ status: "installing", version, ...metadata })
       await input
         .stop()
         .then(() => {
           input.backend.quitAndInstall()
-          transition({ status: "ready", version })
+          transition({ status: "ready", version, ...metadata })
         })
         .catch((error) => {
-          transition({ status: "ready", version })
+          transition({ status: "ready", version, ...metadata })
           throw error
         })
     },

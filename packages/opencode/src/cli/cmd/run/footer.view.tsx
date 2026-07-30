@@ -50,6 +50,7 @@ import type {
   RunInput,
   RunPrompt,
   RunProvider,
+  RunProviderRouting,
   RunResource,
   RunTuiConfig,
 } from "./types"
@@ -80,6 +81,7 @@ type RunFooterViewProps = {
   resources: () => RunResource[]
   commands: () => RunCommand[] | undefined
   providers: () => RunProvider[] | undefined
+  providerRouting: () => Record<string, RunProviderRouting>
   currentModel: () => RunInput["model"]
   variants: () => string[]
   currentVariant: () => string | undefined
@@ -437,8 +439,8 @@ export function RunFooterView(props: RunFooterViewProps) {
     return {
       model: model().model,
       variant: props.currentVariant(),
-      provider: undefined,
-      // Prefer without provider, but keep it on the shared width policy if we add it back.
+      provider: model().provider,
+      routing: props.providerRouting()[current.providerID],
     }
   })
   const statusColor = createMemo(() => {
@@ -885,10 +887,23 @@ export function RunFooterView(props: RunFooterViewProps) {
                         <Show when={info().provider}>
                           {(provider) => <span style={{ fg: theme().muted }}> {provider()}</span>}
                         </Show>
+                        <Show when={info().routing}>
+                          {(routing) => (
+                            <span
+                              style={{
+                                fg: routing() === "proxy" ? theme().highlight : theme().muted,
+                                bold: routing() === "proxy",
+                              }}
+                            >
+                              {" · "}
+                              {t(routing() === "proxy" ? "Kote Gateway" : "Direct")}
+                            </span>
+                          )}
+                        </Show>
                         <Show when={info().variant}>
                           {(variant) => (
                             <>
-                              <span style={{ fg: theme().warning, bold: true }}> {variant()}</span>
+                              <span style={{ fg: theme().warning, bold: true }}>{" · " + variant()}</span>
                             </>
                           )}
                         </Show>

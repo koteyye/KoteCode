@@ -15,9 +15,16 @@ export const APP_IDS = {
   prod: "ai.kotecode.desktop",
 } as const satisfies Record<Channel, string>
 
-// KoteCode releases do not have a fork-owned desktop update pipeline yet.
-// Keep this disabled together with the CLI updater safety lock.
-export const UPDATER_ENABLED = false
+export type UpdaterMode = "disabled" | "install" | "notify"
+
+export const UPDATER_MODE: UpdaterMode = (() => {
+  if (CHANNEL === "dev") return "disabled"
+  if (process.platform === "win32") return "install"
+  if (process.platform === "linux" && process.env.APPIMAGE) return "install"
+  if (process.platform === "linux") return "notify"
+  return "disabled"
+})()
+export const UPDATER_ENABLED = UPDATER_MODE !== "disabled"
 
 // Upstream's WSL integration installs and launches ~/.opencode/bin/opencode.
 // Keep it unreachable until KoteCode publishes and verifies its own Linux sidecar.

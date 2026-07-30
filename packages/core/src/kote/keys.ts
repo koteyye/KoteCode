@@ -1,4 +1,4 @@
-// Embedded public key for verifying Kote Proxy bootstrap configurations.
+// Embedded public key for verifying Kote Gateway bootstrap configurations.
 //
 // Only the PUBLIC key lives in the repository. The corresponding private key is
 // kept by the project owner OUTSIDE the repo (see docs/BOOTSTRAP.md) and is used

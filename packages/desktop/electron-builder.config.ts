@@ -5,6 +5,7 @@ import { promisify } from "node:util"
 
 import type { Configuration } from "electron-builder"
 import { APP_IDS, APP_NAMES } from "./src/main/constants"
+import desktopPackage from "./package.json"
 
 const execFileAsync = promisify(execFile)
 const packageDir = path.dirname(fileURLToPath(import.meta.url))
@@ -14,6 +15,7 @@ const signScript = path.join(rootDir, "script", "sign-windows.ps1")
 async function signWindows(configuration: { path: string }) {
   if (process.platform !== "win32") return
   if (process.env.GITHUB_ACTIONS !== "true") return
+  if (process.env.KOTECODE_WINDOWS_SIGNING !== "true") return
 
   await execFileAsync(
     "pwsh",
@@ -29,7 +31,8 @@ const channel = (() => {
 })()
 
 const getBase = (appId: string): Configuration => ({
-  artifactName: "kotencode-desktop-${os}-${arch}.${ext}",
+  artifactName: "KoteCode-desktop-windows-${arch}-portable.${ext}",
+  generateUpdatesFilesForAllChannels: true,
   directories: {
     output: "dist",
     buildResources: "resources",
@@ -41,6 +44,7 @@ const getBase = (appId: string): Configuration => ({
   // https://www.electron.build/docs/linux/
   extraMetadata: {
     desktopName: `${appId}.desktop`,
+    version: process.env.KOTECODE_VERSION ?? desktopPackage.version,
   },
   files: ["out/**/*", "resources/**/*"],
   extraResources: [
@@ -50,32 +54,21 @@ const getBase = (appId: string): Configuration => ({
       filter: ["index.js", "index.d.ts", "build/Release/mac_window.node", "swift-build/**"],
     },
   ],
-  mac: {
-    category: "public.app-category.developer-tools",
-    icon: `resources/icons/icon.icns`,
-    hardenedRuntime: true,
-    gatekeeperAssess: false,
-    entitlements: "resources/entitlements.plist",
-    entitlementsInherit: "resources/entitlements.plist",
-    notarize: true,
-    target: ["dmg", "zip"],
-  },
-  dmg: {
-    sign: true,
-  },
   protocols: {
     name: "KoteCode",
-    schemes: ["kotencode"],
+    schemes: ["kotecode"],
   },
   win: {
     icon: `resources/icons/icon.ico`,
+    executableName: "KoteCode",
     signtoolOptions: {
       sign: signWindows,
     },
-    target: ["nsis"],
+    target: ["nsis", "zip"],
     verifyUpdateCodeSignature: false,
   },
   nsis: {
+    artifactName: "KoteCode-desktop-windows-${arch}-setup.${ext}",
     oneClick: true,
     perMachine: false,
     installerIcon: `resources/icons/icon.ico`,
@@ -84,7 +77,7 @@ const getBase = (appId: string): Configuration => ({
   linux: {
     icon: `resources/icons`,
     category: "Development",
-    executableName: appId,
+    executableName: "kotecode-desktop",
     desktop: {
       entry: {
         // Match the installed .desktop file and hicolor icon basename so
@@ -93,6 +86,17 @@ const getBase = (appId: string): Configuration => ({
       },
     },
     target: ["AppImage", "deb", "rpm"],
+  },
+  appImage: {
+    artifactName: "KoteCode-desktop-linux-${arch}.${ext}",
+  },
+  deb: {
+    artifactName: "KoteCode-desktop-linux-${arch}.${ext}",
+    packageName: "kotecode",
+  },
+  rpm: {
+    artifactName: "KoteCode-desktop-linux-${arch}.${ext}",
+    packageName: "kotecode",
   },
 })
 
@@ -106,7 +110,8 @@ function getConfig() {
         ...base,
         appId,
         productName: APP_NAMES.dev,
-        rpm: { packageName: "kotencode-dev" },
+        deb: { ...base.deb, packageName: "kotecode-dev" },
+        rpm: { ...base.rpm, packageName: "kotecode-dev" },
       }
     }
     case "beta": {
@@ -114,9 +119,10 @@ function getConfig() {
         ...base,
         appId,
         productName: APP_NAMES.beta,
-        protocols: { name: "KoteCode Beta", schemes: ["kotencode"] },
+        protocols: { name: "KoteCode Beta", schemes: ["kotecode"] },
         publish: { provider: "github", owner: "koteyye", repo: "KoteCode", channel: "beta" },
-        rpm: { packageName: "kotencode-beta" },
+        deb: { ...base.deb, packageName: "kotecode-beta" },
+        rpm: { ...base.rpm, packageName: "kotecode-beta" },
       }
     }
     case "prod": {
@@ -124,9 +130,8 @@ function getConfig() {
         ...base,
         appId,
         productName: APP_NAMES.prod,
-        protocols: { name: "KoteCode", schemes: ["kotencode"] },
+        protocols: { name: "KoteCode", schemes: ["kotecode"] },
         publish: { provider: "github", owner: "koteyye", repo: "KoteCode", channel: "latest" },
-        rpm: { packageName: "kotencode" },
       }
     }
   }

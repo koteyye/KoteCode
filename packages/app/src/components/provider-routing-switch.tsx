@@ -1,6 +1,7 @@
 import { useLanguage } from "@/context/language"
 import type { ProviderRouting } from "@/utils/provider-routing"
 import type { Component } from "solid-js"
+import { useGatewayName } from "@/hooks/use-gateway-name"
 
 export const ProviderRoutingSwitch: Component<{
   value: ProviderRouting
@@ -10,6 +11,7 @@ export const ProviderRoutingSwitch: Component<{
   onChange: (value: ProviderRouting) => void
 }> = (props) => {
   const language = useLanguage()
+  const gatewayName = useGatewayName()
   const proxy = () => props.value === "proxy"
 
   return (
@@ -45,7 +47,7 @@ export const ProviderRoutingSwitch: Component<{
       </span>
       <span class={props.compact ? "whitespace-nowrap" : "flex min-w-0 flex-col"}>
         <span class={props.v2 ? "text-v2-text-text-base" : "text-text-base"}>
-          {language.t(proxy() ? "provider.routing.proxy.short" : "provider.routing.direct.short")}
+          {proxy() ? gatewayName() : language.t("provider.routing.direct.short")}
         </span>
         <span classList={{ hidden: !!props.compact }}>
           {language.t(proxy() ? "provider.routing.proxy.description" : "provider.routing.direct.description")}

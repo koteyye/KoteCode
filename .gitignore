@@ -48,3 +48,4 @@ bootstrap.signed.private.json
 .serena/
 .omo/
 .test-xdg-*/
+.bun-runtime-cache/

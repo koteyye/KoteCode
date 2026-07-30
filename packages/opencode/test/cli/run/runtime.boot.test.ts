@@ -215,9 +215,26 @@ describe("run runtime boot", () => {
         response: new Response(),
       }),
     )
+    spyOn(sdk.config, "get").mockImplementation(() =>
+      Promise.resolve({
+        data: {
+          provider: {
+            openai: {
+              routing: "direct",
+            },
+          },
+        } as never,
+        error: undefined,
+        request: new Request("https://opencode.test"),
+        response: new Response(),
+      }),
+    )
 
     await expect(resolveModelInfo(sdk, "/workspace", { providerID: "openai", modelID: "gpt-5" })).resolves.toEqual({
       providers: configured.providers,
+      routing: {
+        openai: "direct",
+      },
       variants: ["high", "minimal"],
       limits: {
         "openai/gpt-5": 128000,
@@ -262,6 +279,20 @@ describe("run runtime boot", () => {
       connected: [],
     }
     spyOn(sdk.config, "providers").mockRejectedValue(new Error("boom"))
+    spyOn(sdk.config, "get").mockImplementation(() =>
+      Promise.resolve({
+        data: {
+          provider: {
+            anthropic: {
+              routing: "direct",
+            },
+          },
+        } as never,
+        error: undefined,
+        request: new Request("https://opencode.test"),
+        response: new Response(),
+      }),
+    )
     spyOn(sdk.provider, "list").mockImplementation(() =>
       Promise.resolve({
         data,
@@ -273,6 +304,10 @@ describe("run runtime boot", () => {
 
     await expect(resolveModelInfo(sdk, "/workspace", { providerID: "openai", modelID: "gpt-5" })).resolves.toEqual({
       providers: data.all,
+      routing: {
+        anthropic: "direct",
+        openai: "proxy",
+      },
       variants: ["high", "minimal"],
       limits: {
         "openai/gpt-5": 128000,

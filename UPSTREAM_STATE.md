@@ -19,7 +19,7 @@ It is the single source of truth for "what is KoteCode based on?".
 
 ## Remotes
 
-- `origin`   — `https://github.com/koteyye/KoteCode.git` (this fork)
+- `origin` — `https://github.com/koteyye/KoteCode.git` (this fork)
 - `upstream` — `https://github.com/anomalyco/opencode.git` (official OpenCode)
 
 ## Versioning (KoteCode)
@@ -27,7 +27,7 @@ It is the single source of truth for "what is KoteCode based on?".
 KoteCode keeps its own version independent of upstream. The first release is
 `KoteCode 0.1.0-alpha.1`, based on `OpenCode 1.18.5 (e5cc278)`.
 
-`kotencode --version` prints both the KoteCode version and the upstream base.
+`kotecode --version` prints both the KoteCode version and the upstream base.
 
 ## How to refresh this record
 

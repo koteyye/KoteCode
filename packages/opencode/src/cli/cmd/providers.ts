@@ -5,6 +5,7 @@ import { CliError, effectCmd, fail } from "../effect-cmd"
 import { UI } from "../ui"
 import * as Prompt from "../effect/prompt"
 import { ModelsDev } from "@opencode-ai/core/models-dev"
+import { ProviderRouting } from "@opencode-ai/core/kote/provider-routing"
 
 import { map, pipe, sortBy, values } from "remeda"
 import path from "path"
@@ -16,7 +17,7 @@ import type { Hooks } from "@opencode-ai/plugin"
 import { Process } from "@/util/process"
 import { errorMessage } from "@/util/error"
 import { text } from "node:stream/consumers"
-import { Effect, Option } from "effect"
+import { Effect, Exit, Option } from "effect"
 
 type PluginAuth = NonNullable<Hooks["auth"]>
 
@@ -236,12 +237,30 @@ export function resolvePluginProviders(input: {
   return result
 }
 
+type ProviderRoutingOption = {
+  value: string
+  label: string
+}
+
+export function resolveProviderRoutingID(input: string, options: ProviderRoutingOption[]) {
+  const match =
+    options.find((option) => option.value === input) ??
+    options.find((option) => option.label.toLowerCase() === input.toLowerCase())
+  if (match) return match.value
+  if (/^[0-9a-z][0-9a-z-]*$/.test(input)) return input
+}
+
 export const ProvidersCommand = cmd({
   command: "providers",
   aliases: ["auth"],
   describe: "manage AI providers and credentials",
   builder: (yargs) =>
-    yargs.command(ProvidersListCommand).command(ProvidersLoginCommand).command(ProvidersLogoutCommand).demandCommand(),
+    yargs
+      .command(ProvidersListCommand)
+      .command(ProvidersLoginCommand)
+      .command(ProvidersLogoutCommand)
+      .command(ProvidersRoutingCommand)
+      .demandCommand(),
   async handler() {},
 })
 
@@ -530,5 +549,95 @@ export const ProvidersLogoutCommand = effectCmd({
     if (!provider) return yield* fail(`Unknown configured provider "${args.provider}"`)
     yield* Effect.orDie(authSvc.remove(provider))
     yield* Prompt.outro("Logout successful")
+  }),
+})
+
+export const ProvidersRoutingCommand = effectCmd({
+  command: "routing [provider] [mode]",
+  aliases: ["route"],
+  describe: "configure Kote Gateway routing for a provider",
+  instance: false,
+  builder: (yargs) =>
+    yargs
+      .positional("provider", {
+        describe: "provider id or name",
+        type: "string",
+      })
+      .positional("mode", {
+        describe: "provider connection route",
+        choices: ["gateway", "direct"] as const,
+      }),
+  handler: Effect.fn("Cli.providers.routing")(function* (args) {
+    const authSvc = yield* Auth.Service
+    const configSvc = yield* Config.Service
+    const modelsDev = yield* ModelsDev.Service
+    const config = yield* configSvc.getGlobal()
+    const catalog = yield* Effect.exit(modelsDev.get())
+    const database = Exit.isSuccess(catalog) ? catalog.value : {}
+    const credentials = yield* Effect.orDie(authSvc.all())
+    const providerIDs = new Set([
+      ...Object.keys(credentials),
+      ...Object.keys(config.provider ?? {}),
+      ...Object.entries(database).flatMap(([id, provider]) =>
+        provider.env.some((name) => process.env[name]) ? [id] : [],
+      ),
+    ])
+    const options = [...providerIDs]
+      .map((id) => ({
+        value: id,
+        label: database[id]?.name ?? config.provider?.[id]?.name ?? id,
+        hint: ProviderRouting.read(config.provider?.[id]?.routing) === "proxy" ? "Kote Gateway" : "Direct",
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label))
+
+    UI.empty()
+    yield* Prompt.intro("Provider routing")
+
+    const provider = args.provider
+      ? resolveProviderRoutingID(args.provider, options)
+      : options.length > 0
+        ? yield* promptValue(
+            yield* Prompt.autocomplete({
+              message: "Select provider",
+              maxItems: 8,
+              options,
+            }),
+          )
+        : undefined
+    if (!provider) {
+      if (args.provider) return yield* fail(`Unknown provider "${args.provider}"`)
+      return yield* fail("No configured providers found. Pass a provider id explicitly.")
+    }
+
+    const mode =
+      (args.mode === "gateway" ? "proxy" : args.mode) ??
+      (yield* promptValue(
+        yield* Prompt.select({
+          message: "Connection route",
+          options: [
+            {
+              label: "Kote Gateway",
+              value: "proxy" as const,
+              hint: ProviderRouting.read(config.provider?.[provider]?.routing) === "proxy" ? "current" : undefined,
+            },
+            {
+              label: "Direct",
+              value: "direct" as const,
+              hint: ProviderRouting.read(config.provider?.[provider]?.routing) === "direct" ? "current" : undefined,
+            },
+          ],
+        }),
+      ))
+
+    yield* configSvc.updateGlobal({
+      provider: {
+        [provider]: {
+          routing: mode,
+        },
+      },
+    })
+
+    const name = database[provider]?.name ?? config.provider?.[provider]?.name ?? provider
+    yield* Prompt.outro(`${name}: ${mode === "proxy" ? "Kote Gateway" : "Direct"}`)
   }),
 })

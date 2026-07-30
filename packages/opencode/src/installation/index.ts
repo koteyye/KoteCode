@@ -11,18 +11,16 @@ import { AppProcess } from "@opencode-ai/core/process"
 import path from "path"
 import { makeRuntime } from "@opencode-ai/core/effect/runtime"
 import semver from "semver"
-import { InstallationChannel, InstallationVersion } from "@opencode-ai/core/installation/version"
-import { NpmConfig } from "@opencode-ai/core/npm-config"
+import { InstallationChannel, KoteCodeVersion } from "@opencode-ai/core/installation/version"
 import { InstallationEvent } from "@opencode-ai/schema/installation-event"
 
-export type Method = "curl" | "npm" | "yarn" | "pnpm" | "bun" | "brew" | "scoop" | "choco" | "unknown"
+export type Method = "curl" | "npm" | "yarn" | "pnpm" | "bun" | "brew" | "unknown"
 
 export type ReleaseType = "patch" | "minor" | "major"
 
 export const Event = InstallationEvent
-export const UpdatesEnabled = false
-export const UpdatesDisabledMessage =
-  "KoteCode updates are not configured yet. Install a newer build from https://github.com/koteyye/KoteCode/releases."
+export const UpdatesEnabled = true
+export const UpdatesDisabledMessage = "KoteCode update checks are disabled"
 
 export function getReleaseType(current: string, latest: string): ReleaseType {
   const currMajor = semver.major(current)
@@ -42,7 +40,7 @@ export const Info = Schema.Struct({
 export type Info = Schema.Schema.Type<typeof Info>
 
 export function userAgent(client = "cli") {
-  return `opencode/${InstallationChannel}/${InstallationVersion}/${client}`
+  return `kotecode/${InstallationChannel}/${KoteCodeVersion}/${client}`
 }
 
 export const USER_AGENT = userAgent()
@@ -64,22 +62,37 @@ export class UpgradeFailedError extends Schema.TaggedErrorClass<UpgradeFailedErr
 }
 
 // Response schemas for external version APIs
-const GitHubRelease = Schema.Struct({ tag_name: Schema.String })
+const GitHubRelease = Schema.Struct({
+  tag_name: Schema.String,
+  draft: Schema.Boolean,
+  prerelease: Schema.Boolean,
+})
 const NpmPackage = Schema.Struct({ version: Schema.String })
-const BrewFormula = Schema.Struct({ versions: Schema.Struct({ stable: Schema.String }) })
 const BrewInfoV2 = Schema.Struct({
   formulae: Schema.Array(Schema.Struct({ versions: Schema.Struct({ stable: Schema.String }) })),
 })
-const ChocoPackage = Schema.Struct({
-  d: Schema.Struct({ results: Schema.Array(Schema.Struct({ Version: Schema.String })) }),
-})
-const ScoopManifest = NpmPackage
+
+export function validateUpgradeTarget(current: string, target: string, channel: string, allowDowngrade = false) {
+  if (!semver.valid(target)) return `Invalid KoteCode version: ${target}`
+  if (channel === "latest" && semver.prerelease(target)) return "Stable KoteCode cannot upgrade to a prerelease"
+  if (channel === "beta" && !semver.prerelease(target)?.includes("beta")) {
+    return "KoteCode Beta can only upgrade within the beta channel"
+  }
+  if (semver.valid(current) && semver.eq(target, current)) return `KoteCode ${target} is already installed`
+  if (!allowDowngrade && semver.valid(current) && semver.lt(target, current)) {
+    return `Refusing to downgrade from ${current} to ${target} without --allow-downgrade`
+  }
+}
 
 export interface Interface {
   readonly info: () => Effect.Effect<Info>
   readonly method: () => Effect.Effect<Method>
   readonly latest: (method?: Method) => Effect.Effect<string>
-  readonly upgrade: (method: Method, target: string) => Effect.Effect<void, UpgradeFailedError>
+  readonly upgrade: (
+    method: Method,
+    target: string,
+    options?: { allowDowngrade?: boolean },
+  ) => Effect.Effect<void, UpgradeFailedError>
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/Installation") {}
@@ -126,35 +139,40 @@ const layer: Layer.Layer<Service, never, HttpClient.HttpClient | AppProcess.Serv
     )
 
     const getBrewFormula = Effect.fnUntraced(function* () {
-      const tapFormula = yield* text(["brew", "list", "--formula", "anomalyco/tap/opencode"])
-      if (tapFormula.includes("opencode")) return "anomalyco/tap/opencode"
-      const coreFormula = yield* text(["brew", "list", "--formula", "opencode"])
-      if (coreFormula.includes("opencode")) return "opencode"
-      return "opencode"
+      const formula = "koteyye/tap/kotecode"
+      const installed = yield* text(["brew", "list", "--formula", formula])
+      if (installed.includes("kotecode")) return formula
+      return formula
     })
 
     const upgradeFailure = (method: Method, result?: { code: number; stdout: string; stderr: string }) => {
-      if (method === "choco") return "not running from an elevated command shell"
-      if (result) return `Upgrade failed for ${method} (exit code ${result.code}).`
+      if (result) {
+        return `Upgrade failed for ${method} (exit code ${result.code}).`
+      }
       return `Upgrade failed for ${method}.`
     }
 
-    const upgradeScriptShell = Effect.fnUntraced(function* () {
-      const bashVersion = yield* text(["bash", "--version"])
-      if (bashVersion) return "bash"
-      return "sh"
-    })
-
-    const upgradeCurl = Effect.fnUntraced(
+    const upgradeDirect = Effect.fnUntraced(
       function* (target: string) {
-        const response = yield* httpOk.execute(HttpClientRequest.get("https://opencode.ai/install"))
+        const windows = process.platform === "win32"
+        const script = windows ? "install.ps1" : "install"
+        const response = yield* httpOk.execute(
+          HttpClientRequest.get(`https://raw.githubusercontent.com/koteyye/KoteCode/v${target}/${script}`),
+        )
         const body = yield* response.text
         const bodyBytes = new TextEncoder().encode(body)
-        const shell = yield* upgradeScriptShell()
+        const powershell = windows
+          ? (yield* text(["pwsh", "-NoProfile", "-NonInteractive", "-Command", "$PSVersionTable.PSVersion"])) && "pwsh"
+          : undefined
+        const command = windows ? powershell || "powershell" : (yield* text(["bash", "--version"])) ? "bash" : "sh"
+        const args = windows ? ["-NoProfile", "-NonInteractive", "-Command", "-"] : []
         const result = yield* appProcess.run(
-          ChildProcess.make(shell, [], {
+          ChildProcess.make(command, args, {
             stdin: Stream.make(bodyBytes),
-            env: { VERSION: target },
+            env: {
+              VERSION: target,
+              KOTECODE_UPGRADE_PID: String(process.pid),
+            },
             extendEnv: true,
           }),
         )
@@ -170,13 +188,14 @@ const layer: Layer.Layer<Service, never, HttpClient.HttpClient | AppProcess.Serv
     const result: Interface = {
       info: Effect.fn("Installation.info")(function* () {
         return {
-          version: InstallationVersion,
+          version: KoteCodeVersion,
           latest: yield* result.latest(),
         }
       }),
       method: Effect.fn("Installation.method")(function* () {
-        if (process.execPath.includes(path.join(".opencode", "bin"))) return "curl" as Method
+        if (process.execPath.includes(path.join(".kotecode", "bin"))) return "curl" as Method
         if (process.execPath.includes(path.join(".local", "bin"))) return "curl" as Method
+        if (process.execPath.toLowerCase().includes(path.join("kotecode", "bin").toLowerCase())) return "curl" as Method
         const exec = process.execPath.toLowerCase()
 
         const checks: Array<{ name: Method; command: () => Effect.Effect<string> }> = [
@@ -184,9 +203,7 @@ const layer: Layer.Layer<Service, never, HttpClient.HttpClient | AppProcess.Serv
           { name: "yarn", command: () => text(["yarn", "global", "list"]) },
           { name: "pnpm", command: () => text(["pnpm", "list", "-g", "--depth=0"]) },
           { name: "bun", command: () => text(["bun", "pm", "ls", "-g"]) },
-          { name: "brew", command: () => text(["brew", "list", "--formula", "opencode"]) },
-          { name: "scoop", command: () => text(["scoop", "list", "opencode"]) },
-          { name: "choco", command: () => text(["choco", "list", "--limit-output", "opencode"]) },
+          { name: "brew", command: () => text(["brew", "list", "--formula", "koteyye/tap/kotecode"]) },
         ]
 
         checks.sort((a, b) => {
@@ -199,9 +216,7 @@ const layer: Layer.Layer<Service, never, HttpClient.HttpClient | AppProcess.Serv
 
         for (const check of checks) {
           const output = yield* check.command()
-          const installedName =
-            check.name === "brew" || check.name === "choco" || check.name === "scoop" ? "opencode" : "opencode-ai"
-          if (output.includes(installedName)) {
+          if (output.includes("kotecode")) {
             return check.name
           }
         }
@@ -209,119 +224,100 @@ const layer: Layer.Layer<Service, never, HttpClient.HttpClient | AppProcess.Serv
         return "unknown" as Method
       }),
       latest: Effect.fn("Installation.latest")(function* (installMethod?: Method) {
-        if (!UpdatesEnabled) return InstallationVersion
         const detectedMethod = installMethod || (yield* result.method())
+        const channel = InstallationChannel === "beta" ? "beta" : "latest"
 
         if (detectedMethod === "brew") {
           const formula = yield* getBrewFormula()
-          if (formula.includes("/")) {
-            const infoJson = yield* text(["brew", "info", "--json=v2", formula])
-            const info = yield* Schema.decodeUnknownEffect(Schema.fromJsonString(BrewInfoV2))(infoJson)
-            return info.formulae[0].versions.stable
-          }
-          const response = yield* httpOk.execute(
-            HttpClientRequest.get("https://formulae.brew.sh/api/formula/opencode.json").pipe(
-              HttpClientRequest.acceptJson,
-            ),
-          )
-          const data = yield* HttpClientResponse.schemaBodyJson(BrewFormula)(response)
-          return data.versions.stable
+          const infoJson = yield* text(["brew", "info", "--json=v2", formula])
+          const info = yield* Schema.decodeUnknownEffect(Schema.fromJsonString(BrewInfoV2))(infoJson)
+          return info.formulae[0].versions.stable
         }
 
-        if (detectedMethod === "npm" || detectedMethod === "bun" || detectedMethod === "pnpm") {
+        if (["npm", "yarn", "bun", "pnpm"].includes(detectedMethod)) {
           const response = yield* httpOk.execute(
-            HttpClientRequest.get(
-              `${yield* NpmConfig.registry(process.cwd())}/opencode-ai/${InstallationChannel}`,
-            ).pipe(HttpClientRequest.acceptJson),
+            HttpClientRequest.get(`https://registry.npmjs.org/kotecode/${channel}`).pipe(HttpClientRequest.acceptJson),
           )
           const data = yield* HttpClientResponse.schemaBodyJson(NpmPackage)(response)
           return data.version
         }
 
-        if (detectedMethod === "choco") {
+        if (channel === "latest") {
           const response = yield* httpOk.execute(
-            HttpClientRequest.get(
-              "https://community.chocolatey.org/api/v2/Packages?$filter=Id%20eq%20%27opencode%27%20and%20IsLatestVersion&$select=Version",
-            ).pipe(HttpClientRequest.setHeaders({ Accept: "application/json;odata=verbose" })),
+            HttpClientRequest.get("https://api.github.com/repos/koteyye/KoteCode/releases/latest").pipe(
+              HttpClientRequest.acceptJson,
+            ),
           )
-          const data = yield* HttpClientResponse.schemaBodyJson(ChocoPackage)(response)
-          return data.d.results[0].Version
-        }
-
-        if (detectedMethod === "scoop") {
-          const response = yield* httpOk.execute(
-            HttpClientRequest.get(
-              "https://raw.githubusercontent.com/ScoopInstaller/Main/master/bucket/opencode.json",
-            ).pipe(HttpClientRequest.setHeaders({ Accept: "application/json" })),
-          )
-          const data = yield* HttpClientResponse.schemaBodyJson(ScoopManifest)(response)
-          return data.version
+          const data = yield* HttpClientResponse.schemaBodyJson(GitHubRelease)(response)
+          return data.tag_name.replace(/^v/, "")
         }
 
         const response = yield* httpOk.execute(
-          HttpClientRequest.get("https://api.github.com/repos/anomalyco/opencode/releases/latest").pipe(
+          HttpClientRequest.get("https://api.github.com/repos/koteyye/KoteCode/releases?per_page=30").pipe(
             HttpClientRequest.acceptJson,
           ),
         )
-        const data = yield* HttpClientResponse.schemaBodyJson(GitHubRelease)(response)
-        return data.tag_name.replace(/^v/, "")
+        const releases = yield* HttpClientResponse.schemaBodyJson(Schema.Array(GitHubRelease))(response)
+        const release = releases.find((item) => {
+          const version = item.tag_name.replace(/^v/, "")
+          return !item.draft && item.prerelease && semver.prerelease(version)?.includes("beta")
+        })
+        if (!release) return yield* Effect.die(new Error("No KoteCode beta release is available"))
+        return release.tag_name.replace(/^v/, "")
       }, Effect.orDie),
-      upgrade: Effect.fn("Installation.upgrade")(function* (m: Method, target: string) {
+      upgrade: Effect.fn("Installation.upgrade")(function* (
+        m: Method,
+        target: string,
+        options?: { allowDowngrade?: boolean },
+      ) {
         if (!UpdatesEnabled) return yield* new UpgradeFailedError({ stderr: UpdatesDisabledMessage })
-        let upgradeResult: { code: number; stdout: string; stderr: string } | undefined
-        switch (m) {
-          case "curl":
-            upgradeResult = yield* upgradeCurl(target)
-            break
-          case "npm":
-            upgradeResult = yield* run(["npm", "install", "-g", `opencode-ai@${target}`])
-            break
-          case "pnpm":
-            upgradeResult = yield* run(["pnpm", "install", "-g", `opencode-ai@${target}`])
-            break
-          case "bun":
-            upgradeResult = yield* run(["bun", "install", "-g", `opencode-ai@${target}`])
-            break
-          case "brew": {
-            const formula = yield* getBrewFormula()
-            const env = { HOMEBREW_NO_AUTO_UPDATE: "1" }
-            if (formula.includes("/")) {
-              const tap = yield* run(["brew", "tap", "anomalyco/tap"], { env })
-              if (tap.code !== 0) {
-                upgradeResult = tap
-                break
-              }
-              const repo = yield* text(["brew", "--repo", "anomalyco/tap"])
-              const dir = repo.trim()
-              if (dir) {
-                const pull = yield* run(["git", "pull", "--ff-only"], { cwd: dir, env })
-                if (pull.code !== 0) {
-                  upgradeResult = pull
-                  break
-                }
-              }
-            }
-            upgradeResult = yield* run(["brew", "upgrade", formula], { env })
-            break
+        const validation = validateUpgradeTarget(KoteCodeVersion, target, InstallationChannel, options?.allowDowngrade)
+        if (validation) return yield* new UpgradeFailedError({ stderr: validation })
+        const upgradeResult = yield* Effect.gen(function* () {
+          if (m === "curl") return yield* upgradeDirect(target)
+          if (m === "npm") {
+            return yield* run(["npm", "install", "-g", `kotecode@${target}`, "--registry=https://registry.npmjs.org"])
           }
-          case "choco":
-            upgradeResult = yield* run(["choco", "upgrade", "opencode", `--version=${target}`, "-y"])
-            break
-          case "scoop":
-            upgradeResult = yield* run(["scoop", "install", `opencode@${target}`])
-            break
-          default:
-            return yield* new UpgradeFailedError({ stderr: `Unknown installation method: ${m}` })
-        }
+          if (m === "yarn") {
+            return yield* run([
+              "yarn",
+              "global",
+              "add",
+              `kotecode@${target}`,
+              "--registry",
+              "https://registry.npmjs.org",
+            ])
+          }
+          if (m === "pnpm") {
+            return yield* run(["pnpm", "add", "-g", `kotecode@${target}`, "--registry=https://registry.npmjs.org"])
+          }
+          if (m === "bun") {
+            return yield* run([
+              "bun",
+              "install",
+              "-g",
+              `kotecode@${target}`,
+              "--registry",
+              "https://registry.npmjs.org",
+            ])
+          }
+          if (m === "brew") {
+            return yield* run(["brew", "upgrade", yield* getBrewFormula()], {
+              env: { HOMEBREW_NO_AUTO_UPDATE: "1" },
+            })
+          }
+          return yield* new UpgradeFailedError({
+            stderr:
+              "Could not determine how KoteCode was installed. Use one of:\n" +
+              "  npm install -g kotecode@latest\n" +
+              "  brew upgrade koteyye/tap/kotecode\n" +
+              "  https://github.com/koteyye/KoteCode/releases",
+          })
+        })
         if (!upgradeResult || upgradeResult.code !== 0) {
           return yield* new UpgradeFailedError({ stderr: upgradeFailure(m, upgradeResult) })
         }
-        yield* Effect.logInfo("upgraded", {
-          method: m,
-          target,
-          stdout: upgradeResult.stdout,
-          stderr: upgradeResult.stderr,
-        })
+        yield* Effect.logInfo("upgraded", { method: m, target })
         yield* text([process.execPath, "--version"])
       }),
     }

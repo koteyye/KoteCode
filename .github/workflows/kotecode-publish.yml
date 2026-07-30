@@ -1,0 +1,199 @@
+name: Publish approved KoteCode release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing draft release tag (for example v0.1.0)"
+        required: true
+        type: string
+      confirmation:
+        description: "Type PUBLISH followed by the tag"
+        required: true
+        type: string
+
+concurrency:
+  group: kotecode-publish-${{ inputs.tag }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  BUN_VERSION: "1.3.14"
+  BUN_INSTALL_CACHE_DIR: ${{ github.workspace }}/.bun-runtime-cache
+  KOTECODE_NPM_SCOPE: "@kotecode-ai"
+
+jobs:
+  validate:
+    name: Validate approval and draft
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      version: ${{ steps.release.outputs.version }}
+      tag: ${{ steps.release.outputs.tag }}
+      channel: ${{ steps.release.outputs.channel }}
+      stable: ${{ steps.release.outputs.stable }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+          fetch-depth: 0
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Validate exact confirmation
+        id: release
+        shell: bash
+        env:
+          TAG: ${{ inputs.tag }}
+          CONFIRMATION: ${{ inputs.confirmation }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REPOSITORY" = "koteyye/KoteCode"
+          test "$CONFIRMATION" = "PUBLISH $TAG"
+          bun run scripts/release/validate.ts "$TAG"
+          test "$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" --jq .draft)" = "true"
+
+  publish-release:
+    name: Publish GitHub Release
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: release
+    permissions:
+      contents: write
+    steps:
+      - name: Publish the approved draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.validate.outputs.tag }}
+        run: gh release edit "$TAG" --draft=false --repo "$GITHUB_REPOSITORY"
+
+  publish-npm:
+    name: Publish npm packages with OIDC
+    needs:
+      - validate
+      - publish-release
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validate.outputs.tag }}
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+          package-manager-cache: false
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Verify npm Trusted Publishing toolchain
+        shell: bash
+        run: |
+          node -e '
+            const [major, minor] = process.versions.node.split(".").map(Number)
+            if (major < 22 || (major === 22 && minor < 14)) process.exit(1)
+          '
+          npm --version
+          node -e '
+            const [major, minor, patch] = require("child_process").execFileSync("npm", ["--version"], { encoding: "utf8" }).trim().split(".").map(Number)
+            if (major < 11 || (major === 11 && (minor < 5 || (minor === 5 && patch < 1)))) process.exit(1)
+          '
+
+      - name: Build npm platform packages
+        env:
+          KOTECODE_VERSION: ${{ needs.validate.outputs.version }}
+          KOTECODE_CHANNEL: ${{ needs.validate.outputs.channel }}
+        run: bun run packages/opencode/script/build.ts --npm
+
+      - name: Validate npm package contents
+        working-directory: packages/opencode
+        run: bun run script/publish.ts --dry-run
+
+      - name: Publish platform and main packages
+        working-directory: packages/opencode
+        run: bun run script/publish.ts
+
+      - name: Smoke test global npm installation
+        shell: bash
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          set -euo pipefail
+          prefix="$RUNNER_TEMP/kotecode-npm"
+          npm install --global --prefix "$prefix" "kotecode@$VERSION"
+          "$prefix/bin/kotecode" --version | grep -F "KoteCode v$VERSION"
+          npm uninstall --global --prefix "$prefix" kotecode
+
+  update-homebrew:
+    name: Open Homebrew tap pull request
+    if: needs.validate.outputs.stable == 'true'
+    needs:
+      - validate
+      - publish-npm
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validate.outputs.tag }}
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Generate Formula from published checksums
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          mkdir -p homebrew
+          curl --fail --silent --show-error --location \
+            "https://github.com/koteyye/KoteCode/releases/download/v$VERSION/SHA256SUMS" \
+            --output homebrew/SHA256SUMS
+          bun run scripts/release/homebrew.ts "$VERSION" homebrew/SHA256SUMS homebrew/Formula/kotecode.rb
+
+      - name: Create tap pull request
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          set -euo pipefail
+          test -n "$GH_TOKEN"
+          gh repo clone koteyye/homebrew-tap tap
+          default_branch="$(gh repo view koteyye/homebrew-tap --json defaultBranchRef --jq .defaultBranchRef.name)"
+          branch="kotecode-$VERSION"
+          git -C tap checkout -b "$branch"
+          mkdir -p tap/Formula
+          cp homebrew/Formula/kotecode.rb tap/Formula/kotecode.rb
+          git -C tap config user.name "github-actions[bot]"
+          git -C tap config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git -C tap add Formula/kotecode.rb
+          git -C tap commit -m "chore: update kotecode to v$VERSION"
+          git -C tap push --set-upstream origin "$branch"
+          gh pr create \
+            --repo koteyye/homebrew-tap \
+            --base "$default_branch" \
+            --head "$branch" \
+            --title "chore: update kotecode to v$VERSION" \
+            --body "Updates Formula/kotecode.rb from the published KoteCode v$VERSION checksums."

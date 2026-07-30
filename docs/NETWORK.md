@@ -1,23 +1,23 @@
 # Network audit
 
 KoteCode inherits OpenCode's provider surface and adds one KoteCode-owned service:
-Kote Proxy. The Proxy is a standard HTTPS `CONNECT` transport; it is not an LLM
+Kote Gateway. The Proxy is a standard HTTPS `CONNECT` transport; it is not an LLM
 provider and has no provider API key.
 
 ## Endpoints
 
-| #   | Endpoint                                                                         | Purpose                         | Data visible to endpoint                                                  | Disable                                                                     |
-| --- | -------------------------------------------------------------------------------- | ------------------------------- | ------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| 1   | `kote-bootstrap.kotey-ye.ru`                                                     | Fetch signed Proxy bootstrap    | GET, no body or API key                                                   | Set `KOTECODE_PROXY_URL`, or use `KOTECODE_DISABLE_PROXY=1`                 |
-| 2   | Signed Proxy origin                                                              | Open an HTTPS `CONNECT` tunnel  | Client IP, target hostname/port, timing and byte counts                   | `KOTECODE_DISABLE_PROXY=1`                                                  |
-| 3   | Selected AI provider (`api.openai.com`, `api.anthropic.com`, `openrouter.ai`, …) | Model request                   | User API key/OAuth token, prompts, code, tools, attachments and responses | Select another provider or do not send a request                            |
-| 4   | `models.dev` or `OPENCODE_MODELS_URL`                                            | Model catalog                   | GET and branded User-Agent                                                | `OPENCODE_DISABLE_MODELS_FETCH=1`                                           |
-| 5   | KoteCode GitHub Releases                                                         | Future update checks            | Disabled in the current alpha                                             | Already disabled; `KOTECODE_DISABLE_UPDATE_CHECK=1` remains the kill switch |
-| 6   | `opncd.ai` or authenticated account URL                                          | Explicit session sharing        | Shared session and account bearer token                                   | `OPENCODE_DISABLE_SHARE=1`                                                  |
-| 7   | Provider/account authorization endpoints                                         | API-key/OAuth login and refresh | Provider-specific auth data                                               | Do not run the authorization flow                                           |
-| 8   | User-configured `OTEL_EXPORTER_OTLP_ENDPOINT`                                    | OpenTelemetry                   | Trace data expected by the user's exporter                                | Do not configure OTEL                                                       |
+| #   | Endpoint                                                                         | Purpose                         | Data visible to endpoint                                                  | Disable                                                     |
+| --- | -------------------------------------------------------------------------------- | ------------------------------- | ------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| 1   | `kote-bootstrap.kotey-ye.ru`                                                     | Fetch signed Proxy bootstrap    | GET, no body or API key                                                   | Set `KOTECODE_PROXY_URL`, or use `KOTECODE_DISABLE_PROXY=1` |
+| 2   | Signed Proxy origin                                                              | Open an HTTPS `CONNECT` tunnel  | Client IP, target hostname/port, timing and byte counts                   | `KOTECODE_DISABLE_PROXY=1`                                  |
+| 3   | Selected AI provider (`api.openai.com`, `api.anthropic.com`, `openrouter.ai`, …) | Model request                   | User API key/OAuth token, prompts, code, tools, attachments and responses | Select another provider or do not send a request            |
+| 4   | `models.dev` or `OPENCODE_MODELS_URL`                                            | Model catalog                   | GET and branded User-Agent                                                | `OPENCODE_DISABLE_MODELS_FETCH=1`                           |
+| 5   | KoteCode GitHub Releases or npm                                                  | Cached update notification      | Version/channel only; no automatic CLI download                           | `KOTECODE_DISABLE_UPDATE_CHECK=1`                           |
+| 6   | `opncd.ai` or authenticated account URL                                          | Explicit session sharing        | Shared session and account bearer token                                   | `OPENCODE_DISABLE_SHARE=1`                                  |
+| 7   | Provider/account authorization endpoints                                         | API-key/OAuth login and refresh | Provider-specific auth data                                               | Do not run the authorization flow                           |
+| 8   | User-configured `OTEL_EXPORTER_OTLP_ENDPOINT`                                    | OpenTelemetry                   | Trace data expected by the user's exporter                                | Do not configure OTEL                                       |
 
-## End-to-end TLS through Kote Proxy
+## End-to-end TLS through Kote Gateway
 
 For an HTTPS provider request, KoteCode asks the Proxy to connect to the original
 provider host:
@@ -29,10 +29,10 @@ CONNECT api.openai.com:443
 After the Proxy returns `200 Connection Established`, KoteCode creates TLS directly
 with `api.openai.com` through the byte tunnel. Therefore:
 
-- Kote Proxy sees the client IP, provider hostname, timing, and traffic volume;
-- Kote Proxy does not see the provider URL path/query;
-- Kote Proxy does not see the user's API key or OAuth token;
-- Kote Proxy does not see prompts, code, tools, attachments, or responses;
+- Kote Gateway sees the client IP, provider hostname, timing, and traffic volume;
+- Kote Gateway does not see the provider URL path/query;
+- Kote Gateway does not see the user's API key or OAuth token;
+- Kote Gateway does not see prompts, code, tools, attachments, or responses;
 - the provider sees the same authenticated request it would receive in direct mode;
 - KoteCode validates the provider's TLS certificate;
 - no KoteCode CA is installed and no TLS interception is performed.
@@ -42,7 +42,7 @@ arbitrary public relay.
 
 ## What is proxied
 
-Only runtime requests made by a selected provider SDK receive the Kote Proxy option.
+Only runtime requests made by a selected provider SDK receive the Kote Gateway option.
 The following remain direct:
 
 - bootstrap fetch, avoiding a circular dependency;
@@ -64,20 +64,20 @@ unavailable. The provider request fails with a Proxy diagnostic.
 The user can explicitly choose direct transport:
 
 ```bash
-KOTECODE_DISABLE_PROXY=1 kotencode
+KOTECODE_DISABLE_PROXY=1 kotecode
 ```
 
 The active source and sanitized endpoint are available without exposing credentials:
 
 ```bash
-kotencode debug proxy
-kotencode debug proxy --model openai/gpt-5
+kotecode debug proxy
+kotecode debug proxy --model openai/gpt-5
 ```
 
 For development, a Proxy origin can be forced without changing bootstrap:
 
 ```bash
-KOTECODE_PROXY_URL=https://kote-proxy.kotey-ye.ru kotencode
+KOTECODE_PROXY_URL=https://kote-proxy.kotey-ye.ru kotecode
 ```
 
 ## Dynamic Proxy address

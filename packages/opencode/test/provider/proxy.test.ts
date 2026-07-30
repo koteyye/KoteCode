@@ -9,14 +9,14 @@ import {
 
 describe("provider proxy transport", () => {
   test("routes HTTPS strings, URLs, and Requests through the resolved proxy", () => {
-    const result = { source: "remote", url: "https://proxy.kotencode.test" } as const
+    const result = { source: "remote", url: "https://proxy.kotecode.test" } as const
     expect(proxyForRequest("https://api.openai.com/v1/responses", result)).toBe(result.url)
     expect(proxyForRequest(new URL("https://api.anthropic.com/v1/messages"), result)).toBe(result.url)
     expect(proxyForRequest(new Request("https://openrouter.ai/api/v1/chat/completions"), result)).toBe(result.url)
   })
 
   test("preserves request options while injecting the proxy", () => {
-    const result = { source: "cache", url: "https://proxy.kotencode.test" } as const
+    const result = { source: "cache", url: "https://proxy.kotecode.test" } as const
     const signal = new AbortController().signal
     const init = proxyRequestInit(
       "https://api.openai.com/v1/responses",
@@ -38,13 +38,13 @@ describe("provider proxy transport", () => {
       },
       { preconnect() {} },
     ) satisfies typeof globalThis.fetch
-    const fetch = proxyFetch(runtimeFetch, { source: "environment", url: "https://proxy.kotencode.test" })
+    const fetch = proxyFetch(runtimeFetch, { source: "environment", url: "https://proxy.kotecode.test" })
 
     await fetch("https://api.anthropic.com/v1/messages", { method: "POST" })
     expect(calls).toEqual([
       {
         input: "https://api.anthropic.com/v1/messages",
-        init: { method: "POST", proxy: "https://proxy.kotencode.test" },
+        init: { method: "POST", proxy: "https://proxy.kotecode.test" },
       },
     ])
   })
@@ -68,7 +68,7 @@ describe("provider proxy transport", () => {
     const request = () =>
       proxyForRequest("http://provider.example.test/v1/chat/completions?api_key=must-not-leak", {
         source: "remote",
-        url: "https://proxy.kotencode.test",
+        url: "https://proxy.kotecode.test",
       })
     expect(request).toThrow(ProxyTargetError)
     expect(request).toThrow("refusing direct request to http://provider.example.test")
@@ -83,7 +83,7 @@ describe("provider proxy transport", () => {
     } as const
     expect(() => proxyForRequest("https://api.openai.com/v1/responses", result)).toThrow(ProxyUnavailableError)
     expect(() => proxyForRequest("https://api.openai.com/v1/responses", result)).toThrow(
-      "Kote Proxy is unavailable: remote bootstrap is unreachable",
+      "Kote Gateway is unavailable: remote bootstrap is unreachable",
     )
   })
 })

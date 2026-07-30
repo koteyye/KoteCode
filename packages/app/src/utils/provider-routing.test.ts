@@ -3,7 +3,7 @@ import type { Config } from "@opencode-ai/sdk/v2/client"
 import { providerRouting, withProviderRouting } from "./provider-routing"
 
 describe("providerRouting", () => {
-  test("defaults existing providers to Kote Proxy", () => {
+  test("defaults existing providers to Kote Gateway", () => {
     expect(providerRouting({} as Config, "openai")).toBe("proxy")
   })
 

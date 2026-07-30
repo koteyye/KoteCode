@@ -4,7 +4,7 @@ import { effectCmd, fail } from "../../effect-cmd"
 
 export const ProxyCommand = effectCmd({
   command: "proxy",
-  describe: "show Kote Proxy transport diagnostics",
+  describe: "show Kote Gateway transport diagnostics",
   builder: (yargs) =>
     yargs.option("model", {
       type: "string",
@@ -43,7 +43,7 @@ export const ProxyCommand = effectCmd({
             : {}),
           ...("reason" in proxy ? { reason: proxy.reason, hint: proxy.hint } : {}),
           ...(model ? { selected: model } : {}),
-          direct_mode: "Set KOTECODE_DISABLE_PROXY=1 to bypass Kote Proxy explicitly.",
+          direct_mode: "Set KOTECODE_DISABLE_PROXY=1 to bypass Kote Gateway explicitly.",
         },
         null,
         2,
@@ -52,7 +52,8 @@ export const ProxyCommand = effectCmd({
   }),
 })
 
-function source(value: "disabled" | "environment" | "remote" | "cache" | "none") {
+function source(value: "disabled" | "environment" | "custom" | "remote" | "cache" | "none") {
+  if (value === "custom") return "custom proxy"
   if (value === "remote") return "remote bootstrap"
   if (value === "cache") return "cached bootstrap"
   return value

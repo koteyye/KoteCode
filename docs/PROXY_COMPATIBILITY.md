@@ -1,4 +1,4 @@
-# Kote Proxy compatibility
+# Kote Gateway compatibility
 
 This matrix describes KoteCode client transport support. It does not claim
 end-to-end provider compatibility until the production Proxy and its allowlist are
@@ -17,7 +17,7 @@ The production Proxy origin is `https://kote-proxy.kotey-ye.ru`.
 | Vertex/Snowflake custom fetch wrappers                   | Proxy option is preserved by the wrapper                   | Pending provider-specific smoke test |
 | Local HTTP endpoints (`localhost`, `127.0.0.0/8`, `::1`) | Explicitly direct                                          | Not applicable                       |
 | Remote plain HTTP endpoint                               | Rejected to prevent silent direct bypass                   | Unsupported                          |
-| WebSocket transport                                      | No fetch-based Proxy injection                             | Unsupported pending separate design  |
+| WebSocket transport                                      | Disabled while Kote Gateway is active                      | HTTP streaming selected              |
 | gRPC or SDK-owned socket transport                       | No fetch-based Proxy injection                             | Unsupported pending separate design  |
 
 ## Automated client checks
@@ -27,7 +27,8 @@ The production Proxy origin is `https://kote-proxy.kotey-ye.ru`.
 - HTTPS provider requests receive the Bun `proxy` option;
 - API-key/OAuth request options and cancellation signals are preserved;
 - native OpenAI OAuth fetch receives the Proxy option;
-- explicit direct mode bypasses Kote Proxy;
+- OpenAI WebSocket transport is available only in explicit direct mode;
+- explicit direct mode bypasses Kote Gateway;
 - loopback HTTP stays direct;
 - unavailable Proxy and remote plain HTTP fail closed.
 

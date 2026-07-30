@@ -1736,6 +1736,7 @@ export type AgentConfig = {
 export type ProviderConfig = {
   api?: string
   name?: string
+  routing?: "proxy" | "direct"
   env?: Array<string>
   id?: string
   npm?: string
@@ -1947,6 +1948,14 @@ export type Config = {
   }
   provider?: {
     [key: string]: ProviderConfig
+  }
+  gateway?: {
+    active?: string
+    proxies?: Array<{
+      id: string
+      name: string
+      url: string
+    }>
   }
   mcp?: {
     [key: string]:

@@ -13,6 +13,8 @@ const russian: Record<string, string> = {
   Dialog: "Диалог",
   Provider: "Провайдер",
   Providers: "Провайдеры",
+  Direct: "Напрямую",
+  "Kote Gateway": "Kote Gateway",
   Permission: "Разрешение",
   Question: "Вопрос",
   Terminal: "Терминал",
@@ -177,6 +179,34 @@ const russian: Record<string, string> = {
   "View debug info": "Показать отладочную информацию",
   "Open docs": "Открыть документацию",
   "Exit the app": "Выйти из приложения",
+  "Switch to light mode": "Переключить на светлую тему",
+  "Switch to dark mode": "Переключить на тёмную тему",
+  "Lock theme mode": "Заблокировать режим темы",
+  "Unlock theme mode": "Разблокировать режим темы",
+  "Toggle debug panel": "Показать панель отладки",
+  "Toggle console": "Показать консоль",
+  "Write heap snapshot": "Сохранить дамп кучи",
+  "Heap snapshot written to {{files}}": "Дамп кучи сохранён в {{files}}",
+  "Disable terminal title": "Отключить заголовок терминала",
+  "Enable terminal title": "Включить заголовок терминала",
+  "Disable animations": "Отключить анимации",
+  "Enable animations": "Включить анимации",
+  "Disable file context": "Отключить файловый контекст",
+  "Enable file context": "Включить файловый контекст",
+  "Disable diff wrapping": "Отключить перенос строк в diff",
+  "Enable diff wrapping": "Включить перенос строк в diff",
+  "Disable paste summary": "Отключить сводку вставки",
+  "Enable paste summary": "Включить сводку вставки",
+  "Disable session directory filtering": "Отключить фильтрацию каталога сессий",
+  "Enable session directory filtering": "Включить фильтрацию каталога сессий",
+  "Disable auto-approve permissions": "Отключить автоодобрение разрешений",
+  "Enable auto-approve permissions": "Включить автоодобрение разрешений",
+  "Show tips": "Показать подсказки",
+  "Hide tips": "Скрыть подсказки",
+  "Plugins": "Плагины",
+  "Install plugin": "Установить плагин",
+  "Open diff viewer": "Открыть просмотрщик изменений",
+  "Suspend terminal": "Приостановить терминал",
   "Update Failed": "Ошибка обновления",
   "Update failed": "Не удалось обновить",
   "Update Complete": "Обновление завершено",
@@ -214,9 +244,12 @@ export function resolveLanguage(input?: string): Language {
 }
 
 export function translate(input: string, language: Language = "ru", variables?: Record<string, string | number>) {
+  // exact dictionary matches take priority over dynamic regex rules,
+  // otherwise "Write heap snapshot" is mangled into "Запись heap snapshot" before lookup
   const dynamic =
     language === "ru"
-      ? input
+      ? russian[input] ??
+        input
           .replace(/^(\d+) queued$/, "$1 в очереди")
           .replace(/^(\d+) active$/, "$1 активных")
           .replace(/^(\d+) recent$/, "$1 недавних")

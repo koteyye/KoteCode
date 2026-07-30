@@ -185,10 +185,11 @@ function makeQueryOptionsApi(
 ) {
   return {
     globalConfig: () => loadGlobalConfigQuery(scope, serverSDK()),
-    projects: () => loadProjectsQuery(scope, serverAPI.project),
+    projects: () => loadProjectsQuery(scope, serverAPI.project, serverSDK(), protocol),
     providers: (directory: PathKey | null) =>
       loadProvidersQuery(scope, directory, serverAPI, directory ? sdkFor(directory) : serverSDK(), protocol),
-    path: (directory: PathKey | null) => loadPathQuery(scope, directory, serverAPI.path),
+    path: (directory: PathKey | null) =>
+      loadPathQuery(scope, directory, serverAPI.path, directory ? sdkFor(directory) : serverSDK(), protocol),
     agents: (directory: PathKey) => loadAgentsQuery(scope, directory, serverAPI.agent, sdkFor(directory), protocol),
     references: (directory: PathKey) =>
       loadReferencesQuery(scope, directory, serverAPI.reference, sdkFor(directory), protocol),

@@ -30,6 +30,8 @@ export type RunCommand = NonNullable<Awaited<ReturnType<OpencodeClient["command"
 
 export type RunProvider = NonNullable<Awaited<ReturnType<OpencodeClient["provider"]["list"]>>["data"]>["all"][number]
 
+export type RunProviderRouting = "proxy" | "direct"
+
 export type RunPrompt = {
   messageID?: string
   partID?: string
@@ -231,6 +233,7 @@ export type FooterEvent =
   | {
       type: "models"
       providers: RunProvider[]
+      routing: Record<string, RunProviderRouting>
     }
   | {
       type: "variants"

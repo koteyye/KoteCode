@@ -78,7 +78,7 @@ export const Info = Schema.Struct({
   api: Schema.optional(Schema.String),
   name: Schema.optional(Schema.String),
   routing: Schema.optional(ProviderRouting.Mode).annotate({
-    description: "Route provider requests through Kote Proxy or connect directly",
+    description: "Route provider requests through Kote Gateway or connect directly",
   }),
   env: Schema.optional(Schema.mutable(Schema.Array(Schema.String))),
   id: Schema.optional(Schema.String),

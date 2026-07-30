@@ -1,10 +1,19 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
-  "version": "1.18.5",
-  "name": "kotencode",
+  "version": "0.1.0",
+  "name": "kotecode",
+  "description": "KoteCode — AI coding agent based on OpenCode",
   "type": "module",
   "license": "MIT",
   "private": true,
+  "homepage": "https://github.com/koteyye/KoteCode#readme",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/koteyye/KoteCode.git"
+  },
+  "bugs": {
+    "url": "https://github.com/koteyye/KoteCode/issues"
+  },
   "scripts": {
     "typecheck": "tsgo --noEmit",
     "test": "bun test --timeout 30000 --only-failures",
@@ -16,7 +25,7 @@
     "dev:temporary": "bun run --conditions=browser ./src/temporary.ts"
   },
   "bin": {
-    "kotencode": "./bin/kotencode"
+    "kotecode": "./bin/kotecode"
   },
   "exports": {
     "./*": "./src/*.ts"

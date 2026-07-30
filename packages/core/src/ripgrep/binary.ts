@@ -1,5 +1,5 @@
 import path from "path"
-import { Context, Effect, Layer, Stream } from "effect"
+import { Context, Effect, Exit, Layer, Stream } from "effect"
 import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/unstable/http"
 import { ChildProcess } from "effect/unstable/process"
 import { ChildProcessSpawner } from "effect/unstable/process/ChildProcessSpawner"
@@ -21,6 +21,7 @@ export namespace RipgrepBinary {
     "ia32-win32": { platform: "i686-pc-windows-msvc", extension: "zip" },
     "x64-win32": { platform: "x86_64-pc-windows-msvc", extension: "zip" },
   } as const
+  const installations = new Map<string, Promise<Exit.Exit<string, Error>>>()
 
   interface Interface {
     readonly filepath: Effect.Effect<string, Error>
@@ -88,6 +89,26 @@ export namespace RipgrepBinary {
         if (process.platform !== "win32") yield* fs.chmod(target, 0o755)
       }, Effect.scoped)
 
+      const download = Effect.fnUntraced(function* (target: string, config: (typeof PLATFORM)[keyof typeof PLATFORM]) {
+        const filename = `ripgrep-${VERSION}-${config.platform}.${config.extension}`
+        const url = `https://github.com/BurntSushi/ripgrep/releases/download/${VERSION}/${filename}`
+        const archive = path.join(Global.Path.bin, filename)
+
+        yield* Effect.logInfo("downloading ripgrep", { url })
+        yield* fs.ensureDir(Global.Path.bin).pipe(Effect.orDie)
+        const bytes = yield* HttpClientRequest.get(url).pipe(
+          http.execute,
+          Effect.flatMap((response) => response.arrayBuffer),
+          Effect.mapError((cause) => (cause instanceof Error ? cause : new Error(String(cause)))),
+        )
+        if (bytes.byteLength === 0) throw new Error(`failed to download ripgrep from ${url}`)
+
+        yield* fs.writeWithDirs(archive, new Uint8Array(bytes))
+        yield* extract(archive, config, target)
+        yield* fs.remove(archive, { force: true }).pipe(Effect.ignore)
+        return target
+      })
+
       return Service.of({
         filepath: yield* Effect.cached(
           Effect.gen(function* () {
@@ -101,23 +122,11 @@ export namespace RipgrepBinary {
             const config = PLATFORM[platformKey]
             if (!config) throw new Error(`unsupported platform for ripgrep: ${platformKey}`)
 
-            const filename = `ripgrep-${VERSION}-${config.platform}.${config.extension}`
-            const url = `https://github.com/BurntSushi/ripgrep/releases/download/${VERSION}/${filename}`
-            const archive = path.join(Global.Path.bin, filename)
-
-            yield* Effect.logInfo("downloading ripgrep", { url })
-            yield* fs.ensureDir(Global.Path.bin).pipe(Effect.orDie)
-            const bytes = yield* HttpClientRequest.get(url).pipe(
-              http.execute,
-              Effect.flatMap((response) => response.arrayBuffer),
-              Effect.mapError((cause) => (cause instanceof Error ? cause : new Error(String(cause)))),
+            const exit = yield* Effect.promise(() =>
+              installOnce(target, () => Effect.runPromiseExit(download(target, config))),
             )
-            if (bytes.byteLength === 0) throw new Error(`failed to download ripgrep from ${url}`)
-
-            yield* fs.writeWithDirs(archive, new Uint8Array(bytes))
-            yield* extract(archive, config, target)
-            yield* fs.remove(archive, { force: true }).pipe(Effect.ignore)
-            return target
+            if (Exit.isFailure(exit)) return yield* Effect.failCause(exit.cause)
+            return exit.value
           }),
         ),
       })
@@ -129,4 +138,17 @@ export namespace RipgrepBinary {
     layer: layer,
     deps: [FSUtil.node, httpClient, CrossSpawnSpawner.node],
   })
+
+  function installOnce(target: string, install: () => Promise<Exit.Exit<string, Error>>) {
+    const active = installations.get(target)
+    if (active) return active
+
+    const next = install()
+    installations.set(target, next)
+    const clear = () => {
+      if (installations.get(target) === next) installations.delete(target)
+    }
+    next.then(clear, clear)
+    return next
+  }
 }

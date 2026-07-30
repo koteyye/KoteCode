@@ -47,7 +47,7 @@ function countSecrets(value: unknown): number {
   return 0
 }
 
-const CONFIG_FILENAMES = ["kotencode.jsonc", "kotencode.json", "config.json", "opencode.jsonc", "opencode.json"]
+const CONFIG_FILENAMES = ["kotecode.jsonc", "kotecode.json", "config.json", "opencode.jsonc", "opencode.json"]
 
 interface MigrateArgs {
   withSecrets: boolean
@@ -56,7 +56,7 @@ interface MigrateArgs {
 }
 
 /**
- * `kotencode migrate-from-opencode`
+ * `kotecode migrate-from-opencode`
  *
  * Detects an existing OpenCode configuration and copies user settings into the
  * KoteCode config directory. Per the KoteCode spec (ТЗ §8.3):
@@ -87,11 +87,11 @@ export const MigrateCommand = {
       }),
   handler: async (args: MigrateArgs) => {
     // Resolve the OpenCode config dir: the OpenCode default is the sibling "opencode"
-    // directory under the same XDG root as KoteCode's "kotencode" directory.
+    // directory under the same XDG root as KoteCode's "kotecode" directory.
     const koteConfigDir = Global.Path.config
     const opencodeConfigDir = (() => {
       const koteDir = path.basename(koteConfigDir)
-      if (koteDir === "kotencode") return path.join(path.dirname(koteConfigDir), "opencode")
+      if (koteDir === "kotecode") return path.join(path.dirname(koteConfigDir), "opencode")
       // If the user overrode KOTECODE_CONFIG_DIR to something custom, fall back to the
       // platform-default opencode location via the OPENCODE_CONFIG_DIR flag if present.
       const flag = process.env.OPENCODE_CONFIG_DIR
@@ -145,7 +145,7 @@ export const MigrateCommand = {
       (await existsAsync(sourceAuthFile))
 
     // Resolve the destination KoteCode config file.
-    let destFile = path.join(koteConfigDir, "kotencode.jsonc")
+    let destFile = path.join(koteConfigDir, "kotecode.jsonc")
     if (!args.force) {
       for (const name of CONFIG_FILENAMES) {
         const candidate = path.join(koteConfigDir, name)

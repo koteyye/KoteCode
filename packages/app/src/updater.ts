@@ -4,10 +4,10 @@ export type UpdaterState =
   | { status: "disabled" }
   | { status: "idle" }
   | { status: "checking" }
-  | { status: "downloading"; version: string; percent?: number }
-  | { status: "ready"; version: string }
+  | { status: "downloading"; version: string; notes?: string; percent?: number }
+  | { status: "ready"; version: string; notes?: string }
   | { status: "up-to-date" }
-  | { status: "installing"; version: string }
+  | { status: "installing"; version: string; notes?: string }
   | { status: "error"; message: string }
 
 export type UpdaterPlatform = {

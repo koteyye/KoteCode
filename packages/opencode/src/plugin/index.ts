@@ -31,6 +31,8 @@ import type { WorkspaceAdapter } from "@/control-plane/types"
 import { RuntimeFlags } from "@/effect/runtime-flags"
 import { EventV2Bridge } from "@/event-v2-bridge"
 import { InstallationChannel } from "@opencode-ai/core/installation/version"
+import { Gateway } from "@opencode-ai/core/kote/gateway"
+import { resolveProxy } from "@opencode-ai/core/kote/bootstrap"
 
 type State = {
   hooks: Hooks[]
@@ -62,12 +64,13 @@ export function experimentalWebSocketsEnabled(input: { enabled: boolean; channel
 }
 
 // Built-in plugins that are directly imported (not installed from npm)
-function internalPlugins(flags: RuntimeFlags.Info): PluginInstance[] {
+function internalPlugins(flags: RuntimeFlags.Info, customProxyUrl?: string): PluginInstance[] {
   return [
     // Temporary rollout: pre-release builds use WebSockets by default; releases require explicit opt-in.
     (input) =>
       CodexAuthPlugin(input, {
         experimentalWebSockets: experimentalWebSocketsEnabled({ enabled: flags.experimentalWebSockets }),
+        resolveProxy: () => resolveProxy({ customUrl: customProxyUrl }),
       }),
     CopilotAuthPlugin,
     GitlabAuthPlugin,
@@ -163,7 +166,9 @@ const layer = Layer.effect(
           $: typeof Bun === "undefined" ? undefined : Bun.$,
         }
 
-        for (const plugin of flags.disableDefaultPlugins ? [] : internalPlugins(flags)) {
+        for (const plugin of flags.disableDefaultPlugins
+          ? []
+          : internalPlugins(flags, Gateway.customProxyUrl(cfg.gateway))) {
           const init = yield* Effect.tryPromise({
             try: () => plugin(input),
             catch: errorMessage,

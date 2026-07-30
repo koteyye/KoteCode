@@ -265,6 +265,28 @@ describe("kote bootstrap resolution", () => {
     ).toMatchObject({ source: "environment", url: "https://override.example" })
   })
 
+  it("uses a selected custom HTTP proxy before bootstrap", async () => {
+    expect(
+      await resolveProxy({
+        customUrl: "http://user:secret@proxy.example:8080/",
+        fetch: async () => {
+          throw new Error("must not fetch")
+        },
+      }),
+    ).toMatchObject({ source: "custom", url: "http://user:secret@proxy.example:8080" })
+  })
+
+  it("fails closed when the selected custom proxy is invalid", async () => {
+    const result = await resolveProxy({
+      customUrl: "https://proxy.example/path",
+      fetch: async () => {
+        throw new Error("must not fetch")
+      },
+    })
+    expect(result).toMatchObject({ source: "none" })
+    if (result.source === "none") expect(result.reason).toContain("custom proxy URL is invalid")
+  })
+
   it("rejects an unsafe environment override without fetching", async () => {
     process.env.KOTECODE_PROXY_URL = "file:///tmp/proxy"
     const result = await resolveProxy({
@@ -293,7 +315,7 @@ describe("kote bootstrap resolution", () => {
   })
 
   it("keeps the production cache below the KoteCode cache directory", () => {
-    expect(cachePath()).toContain(path.join("kotencode", "kote", "bootstrap.json"))
+    expect(cachePath()).toContain(path.join("kotecode", "kote", "bootstrap.json"))
   })
 })
 

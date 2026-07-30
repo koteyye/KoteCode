@@ -124,6 +124,135 @@ describe("bootstrapDirectory", () => {
     expect(store.status).toBe("complete")
     expect(mcpReads).toEqual([])
   })
+
+  test("uses legacy instance endpoints for v1 sidecars", async () => {
+    const legacyCalls: string[] = []
+    const currentCalls: string[] = []
+    const [store, setStore] = directoryState()
+    const currentApi = {
+      ...api,
+      command: {
+        list: async () => {
+          currentCalls.push("command")
+          return { location: {}, data: [] }
+        },
+      },
+      mcp: {
+        list: async () => {
+          currentCalls.push("mcp")
+          return { location: {}, data: [] }
+        },
+        resource: {
+          catalog: async () => {
+            currentCalls.push("mcpResources")
+            return { location: {}, data: { resources: [], templates: [] } }
+          },
+        },
+      },
+      path: {
+        get: async () => {
+          currentCalls.push("path")
+          return { state: "", config: "", worktree: "/current", directory: "/current", home: "/home" }
+        },
+      },
+      project: {
+        list: async () => [],
+        current: async () => {
+          currentCalls.push("project")
+          return { id: "current-project", directory: "/current" }
+        },
+      },
+      vcs: {
+        get: async () => {
+          currentCalls.push("vcs")
+          return { location: {}, data: { branch: "current", defaultBranch: "main" } }
+        },
+      },
+    } as unknown as ServerApi
+    const sdk = {
+      app: { agents: async () => ({ data: [] }) },
+      command: {
+        list: async () => {
+          legacyCalls.push("command")
+          return { data: [] }
+        },
+      },
+      config: { get: async () => ({ data: {} }) },
+      experimental: {
+        resource: {
+          list: async () => {
+            legacyCalls.push("mcpResources")
+            return { data: {} }
+          },
+        },
+      },
+      mcp: {
+        status: async () => {
+          legacyCalls.push("mcp")
+          return { data: {} }
+        },
+      },
+      path: {
+        get: async () => {
+          legacyCalls.push("path")
+          return {
+            data: { state: "", config: "", worktree: "/project", directory: "/project", home: "/home" },
+          }
+        },
+      },
+      permission: { list: async () => ({ data: [] }) },
+      project: {
+        current: async () => {
+          legacyCalls.push("project")
+          return { data: { id: "legacy-project", worktree: "/project" } }
+        },
+      },
+      provider: { list: async () => ({ data: { all: [], connected: [], default: {} } }) },
+      question: { list: async () => ({ data: [] }) },
+      session: { status: async () => ({ data: {} }) },
+      v2: { reference: { list: async () => ({ data: { data: [] } }) } },
+      vcs: {
+        get: async () => {
+          legacyCalls.push("vcs")
+          return { data: { branch: "legacy", default_branch: "main" } }
+        },
+      },
+    } as unknown as OpencodeClient
+
+    await bootstrapDirectory({
+      directory: "/project",
+      scope: ServerScope.local,
+      mcp: true,
+      global: {
+        config: {} satisfies Config,
+        path: { state: "", config: "", worktree: "", directory: "", home: "/home" },
+        project: [],
+        provider,
+      },
+      sdk,
+      api: currentApi,
+      store,
+      setStore,
+      vcsCache: { setStore() {} } as unknown as VcsCache,
+      loadSessions() {},
+      translate: (key) => key,
+      queryClient: new QueryClient(),
+      protocol: Promise.resolve("v1"),
+    })
+
+    await new Promise((resolve) => setTimeout(resolve, 80))
+
+    expect(currentCalls).toEqual([])
+    expect(legacyCalls).toContain("project")
+    expect(legacyCalls).toContain("path")
+    expect(legacyCalls).toContain("vcs")
+    expect(legacyCalls).toContain("command")
+    expect(legacyCalls).toContain("mcp")
+    expect(legacyCalls).toContain("mcpResources")
+    expect(store.project).toBe("legacy-project")
+    expect(store.vcs).toEqual({ branch: "legacy", default_branch: "main" })
+    expect(store.status).toBe("complete")
+  })
 })
 
 describe("query keys", () => {
@@ -212,6 +341,50 @@ describe("query keys", () => {
     const result = await new QueryClient().fetchQuery(loadProjectsQuery(ServerScope.local, api))
 
     expect(result.map((project) => project.id)).toEqual(["a", "b"])
+  })
+
+  test("loads projects and paths from legacy endpoints for v1 sidecars", async () => {
+    const calls: string[] = []
+    const legacy = {
+      path: {
+        get: async () => {
+          calls.push("legacyPath")
+          return {
+            data: { state: "", config: "", worktree: "/legacy", directory: "/legacy", home: "/home" },
+          }
+        },
+      },
+      project: {
+        list: async () => {
+          calls.push("legacyProjects")
+          return { data: [{ id: "legacy", worktree: "/legacy" }] }
+        },
+      },
+    } as unknown as OpencodeClient
+    const projectApi = {
+      list: async () => {
+        calls.push("currentProjects")
+        return []
+      },
+    } as unknown as ProjectApi
+    const pathApi = {
+      get: async () => {
+        calls.push("currentPath")
+        return { state: "", config: "", worktree: "/current", directory: "/current", home: "/home" }
+      },
+    } as Parameters<typeof loadPathQuery>[2]
+    const queryClient = new QueryClient()
+
+    const projects = await queryClient.fetchQuery(
+      loadProjectsQuery(ServerScope.local, projectApi, legacy, Promise.resolve("v1")),
+    )
+    const path = await queryClient.fetchQuery(
+      loadPathQuery(ServerScope.local, "/legacy", pathApi, legacy, Promise.resolve("v1")),
+    )
+
+    expect(calls).toEqual(["legacyProjects", "legacyPath"])
+    expect(projects.map((project) => project.id)).toEqual(["legacy"])
+    expect(path.directory).toBe("/legacy")
   })
 
   test("loads references from the current location-scoped endpoint", async () => {
