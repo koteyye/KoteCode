@@ -259,7 +259,10 @@ jobs:
           node-version: "22"
 
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        # tree-sitter-powershell falls back to node-gyp when its prebuilt binary
+        # does not match the Windows runner. Hoisting exposes Bun's transitive
+        # node-gyp binary to that install script.
+        run: bun install --frozen-lockfile --linker hoisted
 
       - name: Prepare Desktop
         working-directory: packages/desktop

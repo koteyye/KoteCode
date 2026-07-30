@@ -6,7 +6,8 @@
   "license": "MIT",
   "homepage": "https://github.com/koteyye/KoteCode",
   "author": {
-    "name": "KoteCode contributors"
+    "name": "KoteCode contributors",
+    "email": "koteyye@users.noreply.github.com"
   },
   "scripts": {
     "typecheck": "tsgo -b",
