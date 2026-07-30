@@ -1,12 +1,11 @@
 import { Npm } from "@opencode-ai/core/npm"
 import { describe, expect } from "bun:test"
-import { Cause, Effect, Layer } from "effect"
+import { Cause, Effect } from "effect"
 import fs from "fs/promises"
 import os from "os"
 import path from "path"
 import { fileURLToPath } from "url"
 import { AISDK } from "@opencode-ai/core/aisdk"
-import { AppNodeBuilder } from "@opencode-ai/core/effect/app-node-builder"
 import { ModelV2 } from "@opencode-ai/core/model"
 import { PluginV2 } from "@opencode-ai/core/plugin"
 import { PluginHost } from "@opencode-ai/core/plugin/host"
@@ -18,7 +17,6 @@ import { PluginTestLayer } from "./fixture"
 const fixtureProvider = new URL("./fixtures/provider-factory.ts", import.meta.url).href
 const fixtureProviderPath = fileURLToPath(fixtureProvider)
 const it = testEffect(PluginTestLayer)
-const itWithAISDK = testEffect(Layer.mergeAll(PluginTestLayer, AppNodeBuilder.build(AISDK.node)))
 
 function npmEntrypoint(entrypoint?: string) {
   return Npm.Service.of({
@@ -114,7 +112,7 @@ describe("DynamicProviderPlugin", () => {
     }),
   )
 
-  itWithAISDK.effect("wraps missing npm entrypoint failures as AISDK init errors", () =>
+  it.effect("wraps missing npm entrypoint failures as AISDK init errors", () =>
     Effect.gen(function* () {
       const aisdk = yield* AISDK.Service
       yield* addPlugin(npmEntrypoint())
@@ -131,7 +129,7 @@ describe("DynamicProviderPlugin", () => {
     }),
   )
 
-  itWithAISDK.effect("wraps dynamic import failures as AISDK init errors", () =>
+  it.effect("wraps dynamic import failures as AISDK init errors", () =>
     Effect.gen(function* () {
       const aisdk = yield* AISDK.Service
       yield* addPlugin()
@@ -148,7 +146,7 @@ describe("DynamicProviderPlugin", () => {
     }),
   )
 
-  itWithAISDK.live("wraps missing provider factory exports as AISDK init errors", () =>
+  it.live("wraps missing provider factory exports as AISDK init errors", () =>
     Effect.gen(function* () {
       const plugin = yield* PluginV2.Service
       const aisdk = yield* AISDK.Service
@@ -167,7 +165,7 @@ describe("DynamicProviderPlugin", () => {
     }),
   )
 
-  itWithAISDK.effect("uses the model api.id for the default language model", () =>
+  it.effect("uses the model api.id for the default language model", () =>
     Effect.gen(function* () {
       const plugin = yield* PluginV2.Service
       const aisdk = yield* AISDK.Service
