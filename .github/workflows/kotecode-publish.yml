@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Existing draft release tag (for example v0.1.0)"
+        description: "Existing release tag (for example v0.1.0)"
         required: true
         type: string
       confirmation:
@@ -26,7 +26,7 @@ env:
 
 jobs:
   validate:
-    name: Validate approval and draft
+    name: Validate approval and release
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -37,6 +37,7 @@ jobs:
       tag: ${{ steps.release.outputs.tag }}
       channel: ${{ steps.release.outputs.channel }}
       stable: ${{ steps.release.outputs.stable }}
+      draft: ${{ steps.release.outputs.draft }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -62,10 +63,11 @@ jobs:
           test "$GITHUB_REPOSITORY" = "koteyye/KoteCode"
           test "$CONFIRMATION" = "PUBLISH $TAG"
           bun run scripts/release/validate.ts "$TAG"
-          test "$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft)" = "true"
+          draft="$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft)"
+          echo "draft=$draft" >> "$GITHUB_OUTPUT"
 
   publish-release:
-    name: Publish GitHub Release
+    name: Publish GitHub Release if needed
     needs: validate
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -77,7 +79,13 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ needs.validate.outputs.tag }}
-        run: gh release edit "$TAG" --draft=false --repo "$GITHUB_REPOSITORY"
+          DRAFT: ${{ needs.validate.outputs.draft }}
+        run: |
+          if [ "$DRAFT" = "true" ]; then
+            gh release edit "$TAG" --draft=false --repo "$GITHUB_REPOSITORY"
+            exit
+          fi
+          echo "Release $TAG is already public; continuing the resumable publish."
 
   publish-npm:
     name: Publish npm packages
@@ -146,7 +154,16 @@ jobs:
         run: |
           set -euo pipefail
           prefix="$RUNNER_TEMP/kotecode-npm"
-          npm install --global --prefix "$prefix" "kotecode@$VERSION"
+          installed=false
+          for attempt in $(seq 1 12); do
+            if npm install --global --prefix "$prefix" "kotecode@$VERSION" --prefer-online; then
+              installed=true
+              break
+            fi
+            echo "npm metadata has not propagated yet (attempt $attempt/12); retrying in 10 seconds."
+            sleep 10
+          done
+          test "$installed" = "true"
           "$prefix/bin/kotecode" --version | grep -F "KoteCode v$VERSION"
           npm uninstall --global --prefix "$prefix" kotecode
 
