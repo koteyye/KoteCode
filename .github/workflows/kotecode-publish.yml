@@ -133,17 +133,32 @@ jobs:
             if (major < 11 || (major === 11 && (minor < 5 || (minor === 5 && patch < 1)))) process.exit(1)
           '
 
+      - name: Check whether npm release is already published
+        id: npm_release
+        shell: bash
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          if [ "$(npm view "kotecode@$VERSION" version --prefer-online 2>/dev/null)" = "$VERSION" ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            exit
+          fi
+          echo "exists=false" >> "$GITHUB_OUTPUT"
+
       - name: Build npm platform packages
+        if: steps.npm_release.outputs.exists != 'true'
         env:
           KOTECODE_VERSION: ${{ needs.validate.outputs.version }}
           KOTECODE_CHANNEL: ${{ needs.validate.outputs.channel }}
         run: bun run packages/opencode/script/build.ts --npm
 
       - name: Validate npm package contents
+        if: steps.npm_release.outputs.exists != 'true'
         working-directory: packages/opencode
         run: bun run script/publish.ts --dry-run
 
       - name: Publish platform and main packages
+        if: steps.npm_release.outputs.exists != 'true'
         working-directory: packages/opencode
         run: bun run script/publish.ts
 
@@ -205,6 +220,7 @@ jobs:
         run: |
           set -euo pipefail
           test -n "$GH_TOKEN"
+          gh auth setup-git
           gh repo clone koteyye/homebrew-tap tap
           default_branch="$(gh repo view koteyye/homebrew-tap --json defaultBranchRef --jq .defaultBranchRef.name)"
           branch="kotecode-$VERSION"
