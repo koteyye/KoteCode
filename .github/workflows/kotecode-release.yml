@@ -370,6 +370,7 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
           KOTECODE_VERSION: ${{ needs.validate.outputs.version }}
           KOTECODE_CHANNEL: ${{ needs.validate.outputs.channel }}
+          KOTECODE_ARTIFACT_ARCH: x64
           OPENCODE_CHANNEL: ${{ needs.validate.outputs.channel == 'latest' && 'prod' || 'beta' }}
         run: bunx electron-builder --linux --x64 --publish never --config electron-builder.config.ts
 

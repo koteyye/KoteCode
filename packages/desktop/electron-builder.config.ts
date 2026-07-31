@@ -11,6 +11,7 @@ const execFileAsync = promisify(execFile)
 const packageDir = path.dirname(fileURLToPath(import.meta.url))
 const rootDir = path.resolve(packageDir, "../..")
 const signScript = path.join(rootDir, "script", "sign-windows.ps1")
+const linuxArtifactName = `KoteCode-desktop-linux-${process.env.KOTECODE_ARTIFACT_ARCH ?? "${arch}"}.\${ext}`
 
 async function signWindows(configuration: { path: string }) {
   if (process.platform !== "win32") return
@@ -88,14 +89,14 @@ const getBase = (appId: string): Configuration => ({
     target: ["AppImage", "deb", "rpm"],
   },
   appImage: {
-    artifactName: "KoteCode-desktop-linux-${arch}.${ext}",
+    artifactName: linuxArtifactName,
   },
   deb: {
-    artifactName: "KoteCode-desktop-linux-${arch}.${ext}",
+    artifactName: linuxArtifactName,
     packageName: "kotecode",
   },
   rpm: {
-    artifactName: "KoteCode-desktop-linux-${arch}.${ext}",
+    artifactName: linuxArtifactName,
     packageName: "kotecode",
   },
 })

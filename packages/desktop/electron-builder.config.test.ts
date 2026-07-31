@@ -59,3 +59,18 @@ test("uses the public v0.1.0 artifact names and unsigned Windows policy", async 
   expect(config.win?.verifyUpdateCodeSignature).toBe(false)
   expect(config.mac).toBeUndefined()
 })
+
+test("uses the release architecture label for Linux artifacts", async () => {
+  const previous = process.env.KOTECODE_ARTIFACT_ARCH
+  process.env.KOTECODE_ARTIFACT_ARCH = "x64"
+
+  const module = await import("./electron-builder.config.ts?artifacts=x64")
+  const config = module.default as Configuration
+
+  if (previous === undefined) delete process.env.KOTECODE_ARTIFACT_ARCH
+  else process.env.KOTECODE_ARTIFACT_ARCH = previous
+
+  expect(config.appImage?.artifactName).toBe("KoteCode-desktop-linux-x64.${ext}")
+  expect(config.deb?.artifactName).toBe("KoteCode-desktop-linux-x64.${ext}")
+  expect(config.rpm?.artifactName).toBe("KoteCode-desktop-linux-x64.${ext}")
+})
