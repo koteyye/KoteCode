@@ -187,7 +187,7 @@ jobs:
           restore-keys: bun-${{ runner.os }}-${{ runner.arch }}-
 
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        run: bun install --frozen-lockfile ${{ runner.os == 'Windows' && '--linker hoisted' || '' }}
 
       - name: Build native CLI
         shell: bash
@@ -404,6 +404,95 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  build-desktop-macos:
+    name: Desktop macOS ${{ matrix.label }}
+    needs:
+      - validate
+      - test
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: Intel
+            runner: macos-15-intel
+            arch: x64
+          - label: Apple Silicon
+            runner: macos-15
+            arch: arm64
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('bun.lock') }}
+          restore-keys: bun-${{ runner.os }}-${{ runner.arch }}-
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Prepare Desktop
+        working-directory: packages/desktop
+        env:
+          KOTECODE_VERSION: ${{ needs.validate.outputs.version }}
+          KOTECODE_CHANNEL: ${{ needs.validate.outputs.channel }}
+          OPENCODE_CHANNEL: ${{ needs.validate.outputs.channel == 'latest' && 'prod' || 'beta' }}
+        run: bun ./scripts/prepare.ts
+
+      - name: Build Desktop
+        working-directory: packages/desktop
+        env:
+          OPENCODE_CHANNEL: ${{ needs.validate.outputs.channel == 'latest' && 'prod' || 'beta' }}
+        run: bun run build
+
+      - name: Package unsigned DMG and zip
+        working-directory: packages/desktop
+        timeout-minutes: 30
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+          KOTECODE_VERSION: ${{ needs.validate.outputs.version }}
+          KOTECODE_CHANNEL: ${{ needs.validate.outputs.channel }}
+          OPENCODE_CHANNEL: ${{ needs.validate.outputs.channel == 'latest' && 'prod' || 'beta' }}
+        run: bunx electron-builder --mac --${{ matrix.arch }} --publish never --config electron-builder.config.ts
+
+      - name: Smoke test macOS artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          dmg="packages/desktop/dist/KoteCode-desktop-macos-${{ matrix.arch }}.dmg"
+          archive="packages/desktop/dist/KoteCode-desktop-macos-${{ matrix.arch }}.zip"
+          test -f "$dmg"
+          test -f "$archive"
+          hdiutil verify "$dmg"
+          mkdir "macos-smoke-${{ matrix.arch }}"
+          ditto -x -k "$archive" "macos-smoke-${{ matrix.arch }}"
+          app="$(find "macos-smoke-${{ matrix.arch }}" -maxdepth 1 -name '*.app' -print -quit)"
+          test -n "$app"
+          test -x "$app/Contents/MacOS/KoteCode"
+          if codesign -dv --verbose=4 "$app" 2>&1 | grep -q '^Authority='; then
+            echo "v0.1.0 expects a macOS app without a Developer ID signature" >&2
+            exit 1
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-macos-${{ matrix.arch }}
+          path: |
+            packages/desktop/dist/KoteCode-desktop-macos-${{ matrix.arch }}.dmg
+            packages/desktop/dist/KoteCode-desktop-macos-${{ matrix.arch }}.zip
+          if-no-files-found: error
+          retention-days: 14
+
   checksums:
     name: Verify release bundle
     needs:
@@ -411,6 +500,7 @@ jobs:
       - build-cli
       - build-desktop-windows
       - build-desktop-linux
+      - build-desktop-macos
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:

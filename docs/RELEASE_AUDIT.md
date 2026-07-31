@@ -32,8 +32,8 @@
 - Startup update checks are notification-only, cached for 24 hours, time-bounded, and optional.
 - Desktop points to `koteyye/KoteCode`, disallows downgrade, separates stable/beta, and supports NSIS plus
   AppImage updates. deb/rpm installs notify and link to Releases instead of replacing managed files.
-- Windows signing is optional and disabled for `v0.1.0`; macOS Desktop configuration and assets are absent
-  from the release workflow.
+- Windows signing is optional and disabled for `v0.1.0`; macOS Desktop is built for Intel and Apple Silicon
+  without signing, notarization, or updater metadata.
 - Install scripts verify `SHA256SUMS`, avoid automatic sudo, and replace binaries atomically.
 - The KoteCode GitHub Action uses the workflow token by default and does not publish session shares to
   inherited OpenCode services.
@@ -54,9 +54,9 @@ These are not release/update identities and renaming them would increase merge a
 ## Distribution decisions
 
 - Supported CLI: Windows x64, Linux x64/ARM64, macOS Intel/Apple Silicon.
-- Supported Desktop: Windows x64 and Linux x64.
-- Unsupported in `v0.1.0`: Windows ARM64 CLI, every Desktop ARM64 build, macOS Desktop, Homebrew Cask,
-  MSIX, Microsoft Store, Scoop, Chocolatey, AUR, and automatic Nix publication.
+- Supported Desktop: Windows x64, Linux x64, and macOS Intel/Apple Silicon.
+- Unsupported in `v0.1.0`: Windows ARM64 CLI, Windows/Linux Desktop ARM64, Homebrew Cask, macOS Desktop
+  auto-update, MSIX, Microsoft Store, Scoop, Chocolatey, AUR, and automatic Nix publication.
 - Sentry upload is inactive because KoteCode workflows provide no Sentry credentials. OpenTelemetry
   remains user-configured; release/update code adds no telemetry.
 
@@ -67,10 +67,10 @@ These are not release/update identities and renaming them would increase merge a
 - Configure npm Trusted Publishers, the protected `release` environment, tag protection, and the
   fine-grained Homebrew tap token.
 - Cross-target CLI builds, npm pack dry runs, Windows Desktop packaging, and local Windows install/upgrade
-  smokes passed. Run native Linux/macOS CLI and Linux Desktop install/upgrade/uninstall smokes before
-  `v0.1.0`.
+  smokes passed. Run native Linux/macOS CLI, Linux Desktop install/upgrade/uninstall, and macOS Desktop
+  launch/removal smokes before `v0.1.0`.
 - Unsigned Windows artifacts can be warned about or blocked by SmartScreen, Smart App Control, or
-  enterprise policy.
+  enterprise policy. Unsigned and unnotarized macOS artifacts can be blocked by Gatekeeper.
 - GitHub-hosted ARM64 labels currently include public-preview Linux/Windows offerings; Linux ARM64 must
   remain in the matrix and pass before being claimed. Windows ARM64 remains excluded.
 - Homebrew checksums cannot be final until CI has produced the exact release archives; the Formula is

@@ -68,6 +68,15 @@ const getBase = (appId: string): Configuration => ({
     target: ["nsis", "zip"],
     verifyUpdateCodeSignature: false,
   },
+  mac: {
+    icon: "resources/icons/icon.icns",
+    category: "public.app-category.developer-tools",
+    executableName: "KoteCode",
+    target: ["dmg", "zip"],
+    artifactName: "KoteCode-desktop-macos-${arch}.${ext}",
+    identity: null,
+    notarize: false,
+  },
   nsis: {
     artifactName: "KoteCode-desktop-windows-${arch}-setup.${ext}",
     oneClick: true,

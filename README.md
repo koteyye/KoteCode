@@ -124,16 +124,16 @@ bun run packages/opencode/script/build.ts --single # produces dist/kotecode-*/bi
 
 ### Supported release platforms
 
-| Component | Platforms                                               |
-| --------- | ------------------------------------------------------- |
-| CLI       | Windows x64; Linux x64/ARM64; macOS Intel/Apple Silicon |
-| Desktop   | Windows x64; Linux x64 (`AppImage`, `.deb`, `.rpm`)     |
+| Component | Platforms                                                                                       |
+| --------- | ----------------------------------------------------------------------------------------------- |
+| CLI       | Windows x64; Linux x64/ARM64; macOS Intel/Apple Silicon                                         |
+| Desktop   | Windows x64; Linux x64 (`AppImage`, `.deb`, `.rpm`); macOS Intel/Apple Silicon (`.dmg`, `.zip`) |
 
-macOS Desktop and Windows/Linux Desktop ARM64 are not included in `v0.1.0`.
+Windows ARM64 and Linux ARM64 Desktop are not included in `v0.1.0`.
 
-> **Unsigned Windows builds:** the publisher is shown as unknown and SmartScreen may warn.
-> Smart App Control or corporate policy can block execution. KoteCode is not distributed as
-> MSIX or through Microsoft Store. Verify the downloaded file against `SHA256SUMS`.
+> **Unsigned Desktop builds:** Windows shows an unknown publisher and SmartScreen may warn.
+> Smart App Control or corporate policy can block execution. macOS Gatekeeper may also block
+> the unnotarized app. Verify the downloaded file against `SHA256SUMS`.
 
 ### Updating and uninstalling
 
@@ -147,7 +147,7 @@ brew uninstall koteyye/tap/kotecode
 rm ~/.local/bin/kotecode
 ```
 
-Remove Windows Desktop from **Installed apps**. Remove Linux packages with
+Remove Windows Desktop from **Installed apps**. Delete `KoteCode.app` on macOS. Remove Linux packages with
 `sudo apt remove kotecode` or `sudo dnf remove kotecode`; delete the AppImage for a portable install.
 Application settings are retained so an update or reinstall does not discard them.
 

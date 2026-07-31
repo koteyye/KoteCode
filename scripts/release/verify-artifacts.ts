@@ -17,6 +17,10 @@ const required = [
   "KoteCode-desktop-linux-x64.AppImage",
   "KoteCode-desktop-linux-x64.deb",
   "KoteCode-desktop-linux-x64.rpm",
+  "KoteCode-desktop-macos-x64.dmg",
+  "KoteCode-desktop-macos-x64.zip",
+  "KoteCode-desktop-macos-arm64.dmg",
+  "KoteCode-desktop-macos-arm64.zip",
   `${channel}.yml`,
   `${channel}-linux.yml`,
   "SHA256SUMS",
@@ -24,16 +28,6 @@ const required = [
 const files = await Array.fromAsync(new Bun.Glob("*").scan({ cwd: directory }))
 const missing = required.filter((file) => !files.includes(file))
 if (missing.length > 0) throw new Error(`Missing release artifacts:\n${missing.join("\n")}`)
-
-const forbidden = files.filter(
-  (file) =>
-    file === "latest-mac.yml" ||
-    file.endsWith(".dmg") ||
-    file.endsWith(".app.zip") ||
-    file.toLowerCase().includes("darwin-desktop") ||
-    file.toLowerCase().includes("mac-desktop"),
-)
-if (forbidden.length > 0) throw new Error(`macOS Desktop artifacts are forbidden in v0.1.0:\n${forbidden.join("\n")}`)
 
 const sums = Object.fromEntries(
   (await Bun.file(path.join(directory, "SHA256SUMS")).text())
@@ -49,4 +43,4 @@ for (const file of required.filter((item) => item !== "SHA256SUMS")) {
   if (hasher.digest("hex") !== sums[file]) throw new Error(`Checksum verification failed for ${file}`)
 }
 
-console.log(`Verified ${required.length - 1} release artifacts and macOS Desktop exclusion`)
+console.log(`Verified ${required.length - 1} release artifacts`)

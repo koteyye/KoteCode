@@ -100,12 +100,12 @@ workflow builds each supported native target on its matching GitHub-hosted runne
 ## Release artifacts (CI)
 
 The draft release workflow `.github/workflows/kotecode-release.yml` builds five
-CLI targets plus Windows/Linux Desktop. Manual dispatch is a dry run; a pushed
+CLI targets plus Windows/Linux/macOS Desktop. Manual dispatch is a dry run; a pushed
 SemVer tag additionally creates a draft GitHub Release. See
 [`../RELEASING.md`](../RELEASING.md) for the exact artifact list and approval flow.
 
 > **Signing:** these artifacts are **unsigned**. Upstream OpenCode uses Azure
-> Trusted Signing (Windows) and Apple codesigning, which are not available to
+> Trusted Signing (Windows) and Apple codesigning/notarization, which are not available to
 > this fork. Operating systems may show a "unverified publisher" warning. Signing
 > signing keys are intentionally out of scope for `v0.1.0`.
 

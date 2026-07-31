@@ -79,7 +79,7 @@ The release workflows set this automatically.
 ## 4. CI dry run
 
 Run **KoteCode release candidate** with `workflow_dispatch` and a version such as `0.1.0-test.1`.
-Manual dispatch performs the full tests and five CLI plus Windows/Linux Desktop builds, creates
+Manual dispatch performs the full tests and five CLI plus Windows/Linux/macOS Desktop builds, creates
 `SHA256SUMS`, validates the release bundle, and generates a Homebrew Formula artifact. It does not create
 or publish a GitHub Release.
 
@@ -101,13 +101,15 @@ Record results for:
 - Homebrew audit/install/test/uninstall against a temporary tap branch;
 - clean Windows install, test-version upgrade, portable archive, and uninstall;
 - Linux AppImage extraction/launch, `.deb` install/remove, and `.rpm` install/remove;
+- macOS Intel and Apple Silicon DMG verification, ZIP extraction, launch, and removal;
 - persisted settings across Desktop updates;
 - offline update-check failure;
 - stable-to-beta isolation and downgrade refusal;
-- absence of macOS Desktop assets and OpenCode update-feed requests.
+- absence of OpenCode update-feed requests.
 
 Windows SmartScreen and enterprise-policy behavior cannot be made reliable without a trusted certificate;
-record the warning or block as an expected `v0.1.0` limitation.
+record the warning or block as an expected `v0.1.0` limitation. Record macOS Gatekeeper behavior as an
+expected limitation of the unsigned and unnotarized Desktop build.
 
 ## 6. Create the tag
 
@@ -123,7 +125,7 @@ The tag workflow:
 1. validates the tag and checks GitHub/npm for an existing version;
 2. runs package typechecks and tests;
 3. builds and smoke-tests CLI artifacts;
-4. builds unsigned Windows and Linux Desktop artifacts;
+4. builds unsigned Windows, Linux, and macOS Desktop artifacts;
 5. verifies package structure and calculates `SHA256SUMS`;
 6. creates a draft GitHub Release without `--clobber`.
 
@@ -138,7 +140,7 @@ bun run release:verify artifacts
 ```
 
 The owner must compare the exact file list with the list in section 14, review `SHA256SUMS`, confirm smoke
-test results, and acknowledge the unsigned Windows warning.
+test results, and acknowledge the unsigned Windows and macOS warnings.
 
 ## 8. Publish after owner approval
 
@@ -208,7 +210,7 @@ npm dist-tag rm kotecode beta
 Run these only after inspecting every platform package version. A dist-tag rollback does not delete or
 rewrite an npm version.
 
-## 13. Future signing and macOS Desktop
+## 13. Future Desktop signing
 
 Windows identity is stable now: product `KoteCode`, executable `KoteCode.exe`, app ID
 `ai.kotecode.desktop`, update repository `koteyye/KoteCode`, and the KoteCode user-data directory.
@@ -230,9 +232,10 @@ Expected future secret names:
 
 Do not use a self-signed certificate for a public release.
 
-macOS Desktop remains excluded. Adding it later requires a stable bundle ID, Apple Developer certificate,
-notarization, `latest-mac.yml`, signed updater testing, and a separate Homebrew Cask decision. None of
-those assets may be added to `v0.1.0`.
+macOS Desktop is included for Intel and Apple Silicon as unsigned, unnotarized DMG and ZIP downloads with
+the stable bundle ID `ai.kotecode.desktop`. Automatic macOS Desktop updates and a Homebrew Cask are not
+enabled in `v0.1.0`. A future signed release requires an Apple Developer certificate, notarization,
+`latest-mac.yml`, and signed updater testing before those channels are enabled.
 
 ## 14. Expected `v0.1.0` release files
 
@@ -248,10 +251,14 @@ KoteCode-desktop-windows-x64-portable.zip
 KoteCode-desktop-linux-x64.AppImage
 KoteCode-desktop-linux-x64.deb
 KoteCode-desktop-linux-x64.rpm
+KoteCode-desktop-macos-x64.dmg
+KoteCode-desktop-macos-x64.zip
+KoteCode-desktop-macos-arm64.dmg
+KoteCode-desktop-macos-arm64.zip
 latest.yml
 latest-linux.yml
 SHA256SUMS
 ```
 
-Windows ARM64 CLI and all Desktop ARM64 builds are not claimed as supported until their complete native
-dependency set passes smoke tests on the corresponding GitHub-hosted ARM64 runner.
+Windows ARM64 CLI and Windows/Linux Desktop ARM64 builds are not claimed as supported until their complete
+native dependency set passes smoke tests on the corresponding GitHub-hosted ARM64 runner.

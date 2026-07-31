@@ -180,7 +180,7 @@ Ed25519 verification **from scratch** in `packages/core/src/kote/`, adding `@nob
 - Upstream release workflow: `.github/workflows/publish.yml`. It remains guarded for
   `anomalyco/opencode` and is not KoteCode's release path.
 - KoteCode uses `.github/workflows/kotecode-release.yml` for tests, native CLI and
-  Windows/Linux Desktop builds, checksums, updater metadata, and a draft Release.
+  Windows/Linux/macOS Desktop builds, checksums, updater metadata, and a draft Release.
 - `.github/workflows/kotecode-publish.yml` is a separately confirmed, environment-gated
   publication path for GitHub, npm OIDC, and the Homebrew PR.
 - **Upstream pipeline does not transfer to a fork** (Blacksmith runners, Azure/Apple signing,
