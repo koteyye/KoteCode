@@ -439,7 +439,11 @@ jobs:
           node-version: "22"
 
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        shell: bash
+        run: |
+          set -euo pipefail
+          export npm_config_nodedir="$(cd "$(dirname "$(command -v node)")/.." && pwd)"
+          bun install --frozen-lockfile
 
       - name: Prepare Desktop
         working-directory: packages/desktop
