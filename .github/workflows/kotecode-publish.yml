@@ -29,6 +29,9 @@ jobs:
     name: Validate approval and draft
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      # Draft releases are only visible to tokens with push access.
+      contents: write
     outputs:
       version: ${{ steps.release.outputs.version }}
       tag: ${{ steps.release.outputs.tag }}
@@ -59,7 +62,7 @@ jobs:
           test "$GITHUB_REPOSITORY" = "koteyye/KoteCode"
           test "$CONFIRMATION" = "PUBLISH $TAG"
           bun run scripts/release/validate.ts "$TAG"
-          test "$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" --jq .draft)" = "true"
+          test "$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft)" = "true"
 
   publish-release:
     name: Publish GitHub Release
