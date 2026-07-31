@@ -196,7 +196,7 @@ jobs:
           KOTECODE_CHANNEL: ${{ needs.validate.outputs.channel }}
         run: |
           set -euo pipefail
-          args=(--single)
+          args=(--single --skip-install)
           if [ "${{ matrix.baseline }}" = "true" ]; then args+=(--baseline); fi
           bun run packages/opencode/script/build.ts "${args[@]}"
 
@@ -452,6 +452,7 @@ jobs:
       - name: Build Desktop
         working-directory: packages/desktop
         env:
+          NODE_OPTIONS: --max-old-space-size=4096
           OPENCODE_CHANNEL: ${{ needs.validate.outputs.channel == 'latest' && 'prod' || 'beta' }}
         run: bun run build
 
