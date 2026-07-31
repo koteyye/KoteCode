@@ -77,7 +77,7 @@ jobs:
         run: gh release edit "$TAG" --draft=false --repo "$GITHUB_REPOSITORY"
 
   publish-npm:
-    name: Publish npm packages with OIDC
+    name: Publish npm packages
     needs:
       - validate
       - publish-release
@@ -86,6 +86,11 @@ jobs:
     permissions:
       contents: read
       id-token: write
+    env:
+      # First-package bootstrap may use a short-lived granular token because npm
+      # requires a package to exist before Trusted Publishing can be configured.
+      # Delete the secret after bootstrap; an empty value falls back to OIDC.
+      NODE_AUTH_TOKEN: ${{ secrets.NPM_BOOTSTRAP_TOKEN }}
     steps:
       - uses: actions/checkout@v4
         with:
