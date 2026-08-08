@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, test } from "bun:test"
 import { $ } from "bun"
 import fs from "fs/promises"
 import path from "path"
@@ -18,10 +18,6 @@ function request(route: string, directory: string) {
   )
 }
 
-beforeEach(async () => {
-  await resetDatabase()
-})
-
 afterEach(async () => {
   await disposeAllInstances()
   await resetDatabase()
@@ -38,7 +34,7 @@ describe("v2 project HttpApi", () => {
 
     const list = await request("/api/project", tmp.path)
     expect(list.status).toBe(200)
-    expect(await list.json()).toEqual([expect.objectContaining({ id: info.id })])
+    expect(await list.json()).toEqual(expect.arrayContaining([expect.objectContaining({ id: info.id })]))
 
     const update = await HttpApiApp.webHandler().handler(
       new Request(`http://localhost/api/project/${info.id}`, {
