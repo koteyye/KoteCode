@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test"
+import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { $ } from "bun"
 import fs from "fs/promises"
 import path from "path"
@@ -17,6 +17,10 @@ function request(route: string, directory: string) {
     context,
   )
 }
+
+beforeEach(async () => {
+  await resetDatabase()
+})
 
 afterEach(async () => {
   await disposeAllInstances()

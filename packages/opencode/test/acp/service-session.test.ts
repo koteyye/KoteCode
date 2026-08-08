@@ -174,6 +174,7 @@ describe("ACP service sessions", () => {
             data: [
               { name: "build", mode: "primary", permission: [], options: {} },
               { name: "plan", mode: "primary", description: "Plan first", permission: [], options: {} },
+              { name: "review", mode: "primary", permission: [], options: {} },
               { name: "hidden", mode: "primary", hidden: true, permission: [], options: {} },
             ],
           }),
@@ -751,11 +752,11 @@ describe("ACP service sessions", () => {
       service.setSessionConfigOption({
         sessionId: session.sessionId,
         configId: "mode",
-        value: "plan",
+        value: "review",
       }),
     )
 
-    expect(select(updated, "mode")?.currentValue).toBe("plan")
+    expect(select(updated, "mode")?.currentValue).toBe("review")
   })
 
   it("maps invalid model effort mode and config id to invalid params", async () => {
@@ -980,7 +981,7 @@ describe("ACP service sessions", () => {
       service.setSessionConfigOption({
         sessionId: session.sessionId,
         configId: "mode",
-        value: "plan",
+        value: "review",
       }),
     )
 
@@ -998,7 +999,7 @@ describe("ACP service sessions", () => {
         model: { providerID, modelID },
         variant: "high",
         parts: [{ type: "text", text: "hello" }],
-        agent: "plan",
+        agent: "review",
         directory: "/workspace",
       },
     ])
