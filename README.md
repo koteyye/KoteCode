@@ -14,7 +14,8 @@ KoteCode is an independent fork of [OpenCode](https://github.com/anomalyco/openc
 **not** affiliated with, endorsed by, or an official product of the OpenCode team. It is a
 separate project that builds on OpenCode's MIT-licensed source code.
 
-> **Status:** preparing `v0.1.0`, the first public KoteCode release. Based on OpenCode `1.18.5`.
+> **Status:** public releases are available from [GitHub Releases](https://github.com/koteyye/KoteCode/releases).
+> Fork base: OpenCode `1.18.5`.
 
 ---
 
@@ -129,7 +130,7 @@ bun run packages/opencode/script/build.ts --single # produces dist/kotecode-*/bi
 | CLI       | Windows x64; Linux x64/ARM64; macOS Intel/Apple Silicon                                         |
 | Desktop   | Windows x64; Linux x64 (`AppImage`, `.deb`, `.rpm`); macOS Intel/Apple Silicon (`.dmg`, `.zip`) |
 
-Windows ARM64 and Linux ARM64 Desktop are not included in `v0.1.0`.
+Windows ARM64 CLI and Windows/Linux ARM64 Desktop builds are not currently published.
 
 > **Unsigned Desktop builds:** Windows shows an unknown publisher and SmartScreen may warn.
 > Smart App Control or corporate policy can block execution. macOS Gatekeeper may also block
