@@ -1,5 +1,6 @@
 import {
   createEffect,
+  createMemo,
   createSignal,
   For,
   onCleanup,
@@ -18,23 +19,14 @@ import { useLanguage } from "@/context/language"
 import { displayName, getProjectAvatarSource } from "@/pages/layout/helpers"
 import { pathKey } from "@/utils/path-key"
 import { handleDocumentSearchKeydown } from "@/utils/search-keydown"
+import {
+  findPromptProject,
+  promptProjectOptions,
+  type PromptProject,
+  type PromptProjectControls,
+} from "./prompt-project"
 
-export type PromptProject = {
-  name?: string
-  id?: string
-  worktree: string
-  sandboxes?: string[]
-  icon?: { color?: string; url?: string; override?: string }
-  server?: { key: string; name: string }
-}
-
-export type PromptProjectControls = {
-  available: PromptProject[]
-  directory: string
-  server?: string
-  select: (worktree: string, server?: string) => void
-  add: (title: string, server?: string) => void
-}
+export type { PromptProject, PromptProjectControls } from "./prompt-project"
 
 const actionPrefix = "action:"
 const projectPrefix = "project:"
@@ -53,23 +45,15 @@ export function createPromptProjectController(input: {
 }) {
   const language = useLanguage()
   const [store, setStore] = createStore({ open: false, search: "", active: "" })
+  const available = createMemo(() => promptProjectOptions(input.controls().available))
   let searchRef: HTMLInputElement | undefined
 
-  const current = () => {
-    const key = pathKey(input.controls().directory)
-    return input
-      .controls()
-      .available.find(
-        (project) =>
-          (!project.server || project.server.key === input.controls().server) &&
-          (pathKey(project.worktree) === key || project.sandboxes?.some((sandbox) => pathKey(sandbox) === key)),
-      )
-  }
-  const selected = () => current() ?? input.controls().available[0]
+  const current = () => findPromptProject(available(), input.controls().directory, input.controls().server)
+  const selected = () => current() ?? available()[0]
   const projects = () => {
     const search = store.search.trim().toLowerCase()
-    if (!search) return input.controls().available
-    return input.controls().available.filter((project) => displayName(project).toLowerCase().includes(search))
+    if (!search) return available()
+    return available().filter((project) => displayName(project).toLowerCase().includes(search))
   }
   const servers = () =>
     input
@@ -114,9 +98,7 @@ export function createPromptProjectController(input: {
   }
   const setSearch = (value: string) => {
     const search = value.trim().toLowerCase()
-    const first = input
-      .controls()
-      .available.find((project) => !search || displayName(project).toLowerCase().includes(search))
+    const first = available().find((project) => !search || displayName(project).toLowerCase().includes(search))
     setStore({
       search: value,
       active: first ? projectKey(first) : actionKey(servers().length > 1 ? undefined : servers()[0]?.key),
@@ -125,7 +107,7 @@ export function createPromptProjectController(input: {
 
   return {
     selected,
-    empty: () => input.controls().available.length === 0,
+    empty: () => available().length === 0,
     projects,
     servers,
     projectKey,
