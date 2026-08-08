@@ -69,6 +69,7 @@ import {
   createSessionComposerRegionController,
   SessionComposerRegion,
 } from "@/pages/session/composer"
+import { SessionProjectIndicator } from "@/pages/session/composer/session-project-indicator"
 import { createOpenReviewFile, createSessionTabs, createSizing, shouldShowFileTree } from "@/pages/session/helpers"
 import { MessageTimeline } from "@/pages/session/timeline/message-timeline"
 import { createTimelineModel } from "@/pages/session/timeline/model"
@@ -2231,6 +2232,9 @@ export default function Page() {
                         borderUnderlay
                         edit={editingFollowup()}
                         onEditLoaded={clearFollowupEdit}
+                        projectControl={
+                          <SessionProjectIndicator project={() => sync().project} directory={() => sdk().directory} />
+                        }
                       />
                     )
                   }}

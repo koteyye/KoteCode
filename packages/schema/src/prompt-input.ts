@@ -23,4 +23,5 @@ export const Prompt = Schema.Struct({
   text: Schema.String,
   files: Schema.Array(FileAttachment).pipe(optional),
   agents: Schema.Array(AgentAttachment).pipe(optional),
+  tools: Schema.Record(Schema.String, Schema.Boolean).pipe(optional),
 }).annotate({ identifier: "PromptInput" })

@@ -865,6 +865,11 @@ export const dict = {
   "settings.section.server": "Server",
   "settings.tab.general": "General",
   "settings.tab.shortcuts": "Shortcuts",
+  "settings.plugins.title": "Plugins",
+  "settings.plugins.row.planning.title": "Automatic planning",
+  "settings.plugins.row.planning.description":
+    "Let the agent suggest Plan mode for complex tasks and ask for approval before implementation",
+  "sidebar.projectGroup.all": "Entire group",
   "settings.gateway.title": "Gateway",
   "settings.gateway.description":
     "Requests from every provider configured to use a gateway are sent through the selected route.",

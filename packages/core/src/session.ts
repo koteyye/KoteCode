@@ -5,6 +5,7 @@ import { DateTime, Effect, Layer, Schema, Context, Stream } from "effect"
 import { ListAnchor } from "@opencode-ai/schema/session"
 import { and, asc, desc, eq, gt, like, lt, or, type SQL } from "drizzle-orm"
 import { ProjectV2 } from "./project"
+import { ProjectTable } from "./project/sql"
 import { WorkspaceV2 } from "./workspace"
 import { ModelV2 } from "./model"
 import { Location } from "./location"
@@ -21,7 +22,6 @@ import { AgentV2 } from "./agent"
 import { SessionV1 } from "./v1/session"
 import { InstallationVersion } from "./installation/version"
 import { Slug } from "./util/slug"
-import { ProjectTable } from "./project/sql"
 import path from "path"
 import { fromRow } from "./session/info"
 import { SessionRunner } from "./session/runner/index"
@@ -209,13 +209,15 @@ const layer = Layer.effect(
         const sessionID = input.id ?? SessionSchema.ID.create()
         const recorded = yield* store.get(sessionID)
         if (recorded) return recorded
-        const project = yield* projects.resolve(input.location.directory)
+        const project = yield* projects.open(input.location.directory)
         yield* db
           .insert(ProjectTable)
           .values({ id: project.id, worktree: project.directory, vcs: project.vcs?.type, sandboxes: [] })
           .onConflictDoNothing()
           .run()
           .pipe(Effect.orDie)
+        const openedProject = (yield* projects.list()).find((item) => item.id === project.id)
+        if (openedProject) yield* events.publish(ProjectV2.Event.Updated, openedProject)
         const now = Date.now()
         const info = SessionV1.SessionInfo.make({
           id: sessionID,
@@ -391,7 +393,8 @@ const layer = Layer.effect(
         return yield* new OperationUnavailableError({ operation: "skill" })
       }),
       switchAgent: Effect.fn("V2Session.switchAgent")(function* (input) {
-        yield* result.get(input.sessionID)
+        const session = yield* result.get(input.sessionID)
+        if (session.agent === input.agent) return
         yield* events.publish(SessionEvent.AgentSwitched, {
           sessionID: input.sessionID,
           messageID: SessionMessage.ID.create(),
@@ -460,15 +463,20 @@ const layer = Layer.effect(
 const resolvePrompt = (input: PromptInput.Prompt) =>
   Prompt.make({
     text: input.text,
-    agents: input.agents,
-    files: input.files?.map((file) => {
-      const dataMime = file.uri.match(/^data:([^;,]+)[;,]/i)?.[1]
-      const target = URL.canParse(file.uri) ? new URL(file.uri).pathname : (file.name ?? file.uri)
-      return {
-        ...file,
-        mime: dataMime ?? (target.endsWith("/") ? "application/x-directory" : FSUtil.mimeType(target)),
-      }
-    }),
+    ...(input.agents === undefined ? {} : { agents: input.agents }),
+    ...(input.tools === undefined ? {} : { tools: input.tools }),
+    ...(input.files === undefined
+      ? {}
+      : {
+          files: input.files.map((file) => {
+            const dataMime = file.uri.match(/^data:([^;,]+)[;,]/i)?.[1]
+            const target = URL.canParse(file.uri) ? new URL(file.uri).pathname : (file.name ?? file.uri)
+            return {
+              ...file,
+              mime: dataMime ?? (target.endsWith("/") ? "application/x-directory" : FSUtil.mimeType(target)),
+            }
+          }),
+        }),
   })
 
 export const node = makeGlobalNode({

@@ -546,7 +546,7 @@ export function createServerSyncContextInner(serverSDK: ServerSDK) {
         project: globalStore.project,
         refresh: () => {
           if (recent) return
-          bootstrap.refetch()
+          queue.refresh()
         },
         setGlobalProject: setProjects,
       })
@@ -556,7 +556,7 @@ export function createServerSyncContextInner(serverSDK: ServerSDK) {
         eventType === "agent.updated" ||
         eventType === "project.directories.updated"
       )
-        bootstrap.refetch()
+        if (!recent) queue.refresh()
       if (eventType === "server.connected" || eventType === "global.disposed") {
         if (recent) return
         for (const directory of Object.keys(children.children)) {

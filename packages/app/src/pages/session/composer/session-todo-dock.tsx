@@ -7,7 +7,7 @@ import { useSpring } from "@opencode-ai/ui/motion-spring"
 import { TextReveal } from "@opencode-ai/ui/text-reveal"
 import { TextStrikethrough } from "@opencode-ai/ui/text-strikethrough"
 import { createResizeObserver } from "@solid-primitives/resize-observer"
-import { Index, createEffect, createMemo } from "solid-js"
+import { Index, createEffect, createMemo, onCleanup } from "solid-js"
 import { Dynamic } from "solid-js/web"
 import { createStore } from "solid-js/store"
 import { useLanguage } from "@/context/language"
@@ -86,11 +86,19 @@ export function SessionTodoDock(props: {
   createEffect(() => {
     const el = contentRef
     if (!el) return
+    // rAF-deferred: store.height feeds full() which sets this element's ancestor max-height (line 107),
+    // so a synchronous write would retrigger the observer and loop.
+    let raf: number | undefined
+    const measure = () => setStore("height", (height) => Math.max(height, el.scrollHeight))
     const update = () => {
-      setStore("height", (height) => Math.max(height, el.scrollHeight))
+      if (raf !== undefined) cancelAnimationFrame(raf)
+      raf = requestAnimationFrame(measure)
     }
     update()
     createResizeObserver(el, update)
+    onCleanup(() => {
+      if (raf !== undefined) cancelAnimationFrame(raf)
+    })
   })
 
   return (

@@ -1,8 +1,12 @@
 import { describe, expect } from "bun:test"
+import path from "path"
 import { Effect, Exit, Scope } from "effect"
 import { AgentV2 } from "@opencode-ai/core/agent"
 import { AppNodeBuilder } from "@opencode-ai/core/effect/app-node-builder"
+import { Global } from "@opencode-ai/core/global"
 import { Location } from "@opencode-ai/core/location"
+import { PermissionV2 } from "@opencode-ai/core/permission"
+import { Project } from "@opencode-ai/core/project"
 import { AgentPlugin } from "@opencode-ai/core/plugin/agent"
 import { AbsolutePath } from "@opencode-ai/core/schema"
 import { location } from "./fixture/location"
@@ -126,6 +130,55 @@ describe("AgentV2", () => {
       for (const item of agents) {
         expect(item.permissions.some((rule) => rule.action === "bash" && rule.effect !== "deny")).toBe(false)
       }
+      const plan = agents.find((item) => item.id === AgentV2.ID.make("plan"))
+      expect(
+        PermissionV2.evaluate(
+          "edit",
+          path.join(Global.Path.data, "plans", "implementation.md"),
+          plan?.permissions ?? [],
+        ).effect,
+      ).toBe("allow")
+    }),
+  )
+
+  it.effect("allows only the project plan directory from a nested Location", () =>
+    Effect.gen(function* () {
+      const agent = yield* AgentV2.Service
+      const projectDirectory = AbsolutePath.make(path.resolve("/project"))
+      yield* AgentPlugin.Plugin.effect(host({ agent: agentHost(agent) })).pipe(
+        Effect.provideService(
+          Location.Service,
+          Location.Service.of(
+            location(
+              { directory: AbsolutePath.make(path.join(projectDirectory, "packages", "app")) },
+              {
+                projectDirectory,
+                vcs: { type: "git", store: AbsolutePath.make(path.join(projectDirectory, ".git")) },
+              },
+            ),
+          ),
+        ),
+      )
+
+      const plan = yield* agent.get(AgentV2.ID.make("plan"))
+      expect(plan).toBeDefined()
+      expect(
+        PermissionV2.evaluate(
+          "external_directory",
+          path.join(projectDirectory, ".opencode", "plans", "*"),
+          plan?.permissions ?? [],
+        ).effect,
+      ).toBe("allow")
+      expect(
+        PermissionV2.evaluate(
+          "edit",
+          path.join(projectDirectory, ".opencode", "plans", "implementation.md"),
+          plan?.permissions ?? [],
+        ).effect,
+      ).toBe("allow")
+      expect(
+        PermissionV2.evaluate("edit", path.join(projectDirectory, "src", "index.ts"), plan?.permissions ?? []).effect,
+      ).toBe("deny")
     }),
   )
 })

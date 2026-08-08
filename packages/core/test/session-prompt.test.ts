@@ -269,6 +269,29 @@ describe("SessionV2.prompt", () => {
     }),
   )
 
+  it.effect("accepts an exact retry when tool override keys are reordered", () =>
+    Effect.gen(function* () {
+      yield* setup
+      const session = yield* SessionV2.Service
+      const first = yield* session.prompt({
+        sessionID,
+        id: messageID,
+        prompt: Prompt.make({ text: "Fix the failing tests", tools: { read: true, bash: false } }),
+        resume: false,
+      })
+
+      const retried = yield* session.prompt({
+        sessionID,
+        id: messageID,
+        prompt: Prompt.make({ text: "Fix the failing tests", tools: { bash: false, read: true } }),
+        resume: false,
+      })
+
+      expect(retried).toEqual(first)
+      expect(yield* admittedCount).toBe(1)
+    }),
+  )
+
   it.effect("wakes execution when an exact prompt retry recovers a committed message", () =>
     Effect.gen(function* () {
       yield* setup

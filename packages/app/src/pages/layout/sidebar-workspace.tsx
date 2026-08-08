@@ -486,3 +486,132 @@ export const LocalWorkspace = (props: {
     </div>
   )
 }
+
+const GroupDirectory = (props: {
+  ctx: WorkspaceSidebarContext
+  directory: string
+  label: string
+  sortNow: Accessor<number>
+  mobile?: boolean
+  group: boolean
+}): JSX.Element => {
+  const navigate = useNavigate()
+  const params = useParams()
+  const serverSync = useServerSync()
+  const queryOptions = useQueryOptions()
+  const language = useLanguage()
+  const [store, setStore] = serverSync().child(props.directory, { bootstrap: false })
+  const slug = createMemo(() => base64Encode(props.directory))
+  const sessions = createMemo(() => sortedRootSessions(store, props.sortNow()))
+  const open = createMemo(() => props.ctx.workspaceExpanded(props.directory, props.group))
+  const active = createMemo(() => pathKey(props.ctx.currentDir()) === pathKey(props.directory))
+  const count = createMemo(() => sessions().length)
+  const fetching = useIsFetching(() => queryOptions().sessions(pathKey(props.directory)))
+  const loading = () => fetching() > 0 && count() === 0
+  const hasMore = createMemo(() => store.sessionTotal > count())
+  const busy = createMemo(() => props.ctx.isBusy(props.directory))
+  const loadMore = async () => {
+    setStore("limit", (limit) => (limit ?? 0) + 5)
+    await serverSync().project.loadSessions(props.directory)
+  }
+
+  createEffect(() => {
+    if (!open() && !active()) return
+    serverSync().child(props.directory, { bootstrap: true })
+  })
+
+  return (
+    <Collapsible
+      variant="ghost"
+      open={open()}
+      class="shrink-0"
+      onOpenChange={(value) => props.ctx.setWorkspaceExpanded(props.directory, value)}
+    >
+      <div class="group/workspace relative py-1" data-component="project-group-directory">
+        <Collapsible.Trigger
+          class="flex w-full items-center gap-1 rounded-md py-1.5 pl-2 pr-10 hover:bg-surface-raised-base-hover"
+          data-action="project-group-directory-toggle"
+          data-directory={base64Encode(props.directory)}
+        >
+          <span class="flex size-6 shrink-0 items-center justify-center">
+            <Show when={busy()} fallback={<Icon name={props.group ? "folder" : "branch"} size="small" />}>
+              <Spinner class="size-[15px]" />
+            </Show>
+          </span>
+          <span class="min-w-0 flex-1 truncate text-left text-14-medium text-text-base">{props.label}</span>
+          <Icon name={open() ? "chevron-down" : "chevron-right"} size="small" class="text-icon-base" />
+        </Collapsible.Trigger>
+        <Tooltip value={language.t("command.session.new")} placement="top">
+          <IconButtonV2
+            icon={<IconV2 name="edit" size="small" />}
+            variant="ghost"
+            size="small"
+            class={`absolute right-1 top-1/2 size-6 -translate-y-1/2 rounded-md ${
+              props.mobile
+                ? "opacity-100"
+                : "opacity-0 group-hover/workspace:opacity-100 group-focus-within/workspace:opacity-100"
+            }`}
+            data-action="project-group-new-session"
+            data-directory={base64Encode(props.directory)}
+            aria-label={language.t("command.session.new")}
+            onClick={(event) => {
+              event.preventDefault()
+              event.stopPropagation()
+              props.ctx.clearHoverProjectSoon()
+              navigate(`/${slug()}/session`)
+            }}
+          />
+        </Tooltip>
+      </div>
+      <Collapsible.Content>
+        <WorkspaceSessionList
+          slug={slug}
+          mobile={props.mobile}
+          ctx={props.ctx}
+          showNew={() => !loading() && count() === 0 && active() && !params.id}
+          loading={loading}
+          sessions={sessions}
+          hasMore={hasMore}
+          loadMore={loadMore}
+          language={language}
+        />
+      </Collapsible.Content>
+    </Collapsible>
+  )
+}
+
+export const ProjectGroupWorkspace = (props: {
+  ctx: WorkspaceSidebarContext
+  project: LocalProject
+  sortNow: Accessor<number>
+  mobile?: boolean
+}): JSX.Element => {
+  const language = useLanguage()
+  return (
+    <div
+      ref={(element) => props.ctx.setScrollContainerRef(element, props.mobile)}
+      class="size-full min-h-0 overflow-y-auto py-2 no-scrollbar [overflow-anchor:none]"
+    >
+      <GroupDirectory
+        ctx={props.ctx}
+        directory={props.project.worktree}
+        label={language.t("sidebar.projectGroup.all")}
+        sortNow={props.sortNow}
+        mobile={props.mobile}
+        group
+      />
+      <For each={props.project.repositories ?? []}>
+        {(directory) => (
+          <GroupDirectory
+            ctx={props.ctx}
+            directory={directory}
+            label={getFilename(directory)}
+            sortNow={props.sortNow}
+            mobile={props.mobile}
+            group={false}
+          />
+        )}
+      </For>
+    </div>
+  )
+}

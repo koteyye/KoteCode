@@ -5,12 +5,13 @@ import { Persist, persisted } from "@/utils/persist"
 import { pathKey } from "@/utils/path-key"
 import { ServerScope } from "@/utils/server-scope"
 
-type StoredProject = { worktree: string; expanded: boolean }
+export type StoredProject = { worktree: string; expanded: boolean; repositories?: string[] }
+type StoredClosedProject = string | StoredProject
 type StoredServer = string | ServerConnection.HttpBase | ServerConnection.Http
 type ServerProjectState = {
   projects: Record<string, StoredProject[]>
   lastProject: Record<string, string>
-  recentlyClosed: Record<string, string[]>
+  recentlyClosed: Record<string, StoredClosedProject[]>
 }
 const HEALTH_POLL_INTERVAL_MS = 10_000
 // The store retains more history than is displayed. Consumers filter recently closed entries
@@ -19,6 +20,19 @@ const HEALTH_POLL_INTERVAL_MS = 10_000
 // filtered out do not evict still-visible ones from the persisted store.
 const RECENTLY_CLOSED_HISTORY_LIMIT = 16
 export const RECENTLY_CLOSED_DISPLAY_LIMIT = 5
+
+const closedProject = (project: StoredClosedProject): StoredProject =>
+  typeof project === "string" ? { worktree: project, expanded: false } : { ...project, expanded: false }
+
+export function visibleRecentlyClosed(input: {
+  recentlyClosed: readonly StoredProject[]
+  projects: readonly { worktree: string }[]
+}) {
+  const known = new Set(input.projects.map((project) => pathKey(project.worktree)))
+  return input.recentlyClosed
+    .filter((project) => (project.repositories?.length ?? 0) >= 2 || known.has(pathKey(project.worktree)))
+    .slice(0, RECENTLY_CLOSED_DISPLAY_LIMIT)
+}
 
 export function normalizeServerUrl(input: string) {
   const trimmed = input.trim()
@@ -83,53 +97,74 @@ export function createServerProjects<T extends ServerProjectState>(input: {
 }) {
   const setStore = input.setStore as unknown as SetStoreFunction<ServerProjectState>
   const current = () => input.store.projects[input.scope()] ?? []
-  const currentClosed = () => input.store.recentlyClosed?.[input.scope()] ?? []
+  const currentClosed = () => (input.store.recentlyClosed?.[input.scope()] ?? []).map(closedProject)
   const remove = (directory: string) => {
+    const key = pathKey(directory)
     setStore(
       "projects",
       input.scope(),
-      current().filter((project) => project.worktree !== directory),
+      current().filter((project) => pathKey(project.worktree) !== key),
     )
   }
   return {
     list: current,
     recentlyClosed: currentClosed,
     remove,
-    open(directory: string) {
+    open(directory: string, repositories?: string[]) {
       const scope = input.scope()
       const key = pathKey(directory)
       const closed = currentClosed()
-      if (closed.some((worktree) => pathKey(worktree) === key)) {
+      const remembered = closed.find((project) => pathKey(project.worktree) === key)
+      if (remembered) {
         setStore(
           "recentlyClosed",
           scope,
-          closed.filter((worktree) => pathKey(worktree) !== key),
+          closed.filter((project) => pathKey(project.worktree) !== key),
         )
       }
-      if (current().some((project) => project.worktree === directory)) return
-      setStore("projects", scope, [{ worktree: directory, expanded: true }, ...current()])
+      const index = current().findIndex((project) => pathKey(project.worktree) === key)
+      if (index !== -1) {
+        if (repositories) setStore("projects", scope, index, "repositories", repositories)
+        return
+      }
+      const nextRepositories = repositories ?? remembered?.repositories
+      setStore("projects", scope, [
+        nextRepositories === undefined
+          ? { worktree: directory, expanded: true }
+          : { worktree: directory, expanded: true, repositories: nextRepositories },
+        ...current(),
+      ])
+    },
+    setRepositories(directory: string, repositories: string[]) {
+      const key = pathKey(directory)
+      const index = current().findIndex((project) => pathKey(project.worktree) === key)
+      if (index !== -1) setStore("projects", input.scope(), index, "repositories", repositories)
     },
     // User-initiated close: removes the project and records it in recently closed.
     // Internal, non-user removals (e.g. sandbox/worktree normalization) should use remove().
     close(directory: string) {
-      remove(directory)
       const key = pathKey(directory)
-      const closed = [directory, ...currentClosed().filter((worktree) => pathKey(worktree) !== key)].slice(
-        0,
-        RECENTLY_CLOSED_HISTORY_LIMIT,
-      )
+      const project = current().find((item) => pathKey(item.worktree) === key)
+      remove(directory)
+      const closed = [
+        closedProject(project ?? directory),
+        ...currentClosed().filter((item) => pathKey(item.worktree) !== key),
+      ].slice(0, RECENTLY_CLOSED_HISTORY_LIMIT)
       setStore("recentlyClosed", input.scope(), closed)
     },
     expand(directory: string) {
-      const index = current().findIndex((project) => project.worktree === directory)
+      const key = pathKey(directory)
+      const index = current().findIndex((project) => pathKey(project.worktree) === key)
       if (index !== -1) setStore("projects", input.scope(), index, "expanded", true)
     },
     collapse(directory: string) {
-      const index = current().findIndex((project) => project.worktree === directory)
+      const key = pathKey(directory)
+      const index = current().findIndex((project) => pathKey(project.worktree) === key)
       if (index !== -1) setStore("projects", input.scope(), index, "expanded", false)
     },
     move(directory: string, toIndex: number) {
-      const fromIndex = current().findIndex((project) => project.worktree === directory)
+      const key = pathKey(directory)
+      const fromIndex = current().findIndex((project) => pathKey(project.worktree) === key)
       if (fromIndex === -1 || fromIndex === toIndex) return
       const next = [...current()]
       const [item] = next.splice(fromIndex, 1)
@@ -269,7 +304,7 @@ export const { use: useServer, provider: ServerProvider } = createSimpleContext(
         list: [] as StoredServer[],
         projects: {} as Record<string, StoredProject[]>,
         lastProject: {} as Record<string, string>,
-        recentlyClosed: {} as Record<string, string[]>,
+        recentlyClosed: {} as Record<string, StoredClosedProject[]>,
       }),
     )
 

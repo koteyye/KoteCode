@@ -146,6 +146,7 @@ export interface Interface {
     model: { providerID: ProviderV2.ID; modelID: ModelV2.ID }
     auto: boolean
     overflow?: boolean
+    tools?: SessionV1.User["tools"]
   }) => Effect.Effect<void>
 }
 
@@ -477,6 +478,7 @@ const layer = Layer.effect(
               time: { created: Date.now() },
               agent: userMessage.agent,
               model: userMessage.model,
+              tools: userMessage.tools,
             })
             const text =
               (input.overflow
@@ -516,6 +518,7 @@ const layer = Layer.effect(
       model: { providerID: ProviderV2.ID; modelID: ModelV2.ID }
       auto: boolean
       overflow?: boolean
+      tools?: SessionV1.User["tools"]
     }) {
       const msg = yield* session.updateMessage({
         id: MessageID.ascending(),
@@ -523,6 +526,7 @@ const layer = Layer.effect(
         model: input.model,
         sessionID: input.sessionID,
         agent: input.agent,
+        tools: input.tools,
         time: { created: Date.now() },
       })
       yield* session.updatePart({

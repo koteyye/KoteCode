@@ -1,4 +1,5 @@
-import type { OpenCodeEvent, SessionMessageInfo, SessionPendingMessage } from "@opencode-ai/client/promise"
+import type { JsonValue, SessionMessageInfo, SessionPendingMessage } from "@opencode-ai/client/promise"
+import type { CompatibleOpenCodeEvent } from "@/utils/server-event"
 
 type Assistant = Extract<SessionMessageInfo, { type: "assistant" }>
 type Compaction = Extract<SessionMessageInfo, { type: "compaction" }>
@@ -13,10 +14,15 @@ export type V2SessionReduction = {
 
 export function createV2SessionReducer() {
   const pending = new Map<string, SessionPendingMessage>()
+  const contentOrdinals = new Map<string, number>()
 
-  const reduce = (source: readonly SessionMessageInfo[], event: OpenCodeEvent): V2SessionReduction | undefined => {
+  const reduce = (
+    source: readonly SessionMessageInfo[],
+    event: CompatibleOpenCodeEvent,
+  ): V2SessionReduction | undefined => {
     if (!("data" in event) || !("sessionID" in event.data) || typeof event.data.sessionID !== "string") return
     const sessionID = event.data.sessionID
+    const metadata = event.metadata as Record<string, JsonValue> | undefined
     const result = (messages: SessionMessageInfo[], touched: string[] = []): V2SessionReduction => ({
       sessionID,
       messages,
@@ -24,6 +30,17 @@ export function createV2SessionReducer() {
     })
     const append = (message: SessionMessageInfo) =>
       result(source.some((item) => item.id === message.id) ? [...source] : [...source, message], [message.id])
+    const registerOrdinal = (messageID: string, type: "text" | "reasoning", contentID: string) => {
+      const id = contentKey(sessionID, messageID, type, contentID)
+      const current = contentOrdinals.get(id)
+      if (current !== undefined) return current
+      const assistant = source.find((item): item is Assistant => item.type === "assistant" && item.id === messageID)
+      const ordinal = assistant?.content.filter((item) => item.type === type).length ?? 0
+      contentOrdinals.set(id, ordinal)
+      return ordinal
+    }
+    const findOrdinal = (messageID: string, type: "text" | "reasoning", contentID: string) =>
+      contentOrdinals.get(contentKey(sessionID, messageID, type, contentID))
 
     switch (event.type) {
       case "session.input.admitted":
@@ -53,24 +70,72 @@ export function createV2SessionReducer() {
         })
       }
       case "session.agent.selected":
+      case "session.next.agent.switched":
         return append({
-          id: messageID(event.id),
+          id: event.type === "session.next.agent.switched" ? event.data.messageID : messageID(event.id),
           type: "agent-switched",
-          metadata: event.metadata,
+          metadata,
           agent: event.data.agent,
-          time: { created: event.created },
+          time: { created: event.type === "session.next.agent.switched" ? event.data.timestamp : event.created },
         })
       case "session.model.selected":
+      case "session.next.model.switched":
         return append({
-          id: messageID(event.id),
+          id: event.type === "session.next.model.switched" ? event.data.messageID : messageID(event.id),
           type: "model-switched",
-          metadata: event.metadata,
+          metadata,
           model: event.data.model,
           previous: source.findLast(
             (item): item is Extract<SessionMessageInfo, { type: "model-switched" | "assistant" }> =>
               item.type === "model-switched" || item.type === "assistant",
           )?.model,
-          time: { created: event.created },
+          time: { created: event.type === "session.next.model.switched" ? event.data.timestamp : event.created },
+        })
+      case "session.next.moved":
+      case "session.next.prompt.admitted":
+      case "session.next.retried":
+      case "session.next.revert.staged":
+      case "session.next.revert.cleared":
+      case "session.next.revert.committed":
+        return
+      case "session.next.prompted":
+        return append({
+          id: event.data.messageID,
+          type: "user",
+          metadata,
+          text: event.data.prompt.text,
+          files: event.data.prompt.files?.map((file) => {
+            const inline = /^data:[^,]*;base64,(.*)$/s.exec(file.uri)
+            return {
+              data: inline?.[1] ?? "",
+              mime: file.mime,
+              name: file.name,
+              description: file.description,
+              source: inline ? ({ type: "inline" } as const) : ({ type: "uri", uri: file.uri } as const),
+              mention: file.source,
+            }
+          }),
+          agents: event.data.prompt.agents?.map((agent) => ({
+            name: agent.name,
+            mention: agent.source,
+          })),
+          time: { created: event.data.timestamp },
+        })
+      case "session.next.context.updated":
+        return append({
+          id: event.data.messageID,
+          type: "system",
+          metadata,
+          text: event.data.text,
+          time: { created: event.data.timestamp },
+        })
+      case "session.next.synthetic":
+        return append({
+          id: event.data.messageID,
+          type: "synthetic",
+          metadata,
+          text: event.data.text,
+          time: { created: event.data.timestamp },
         })
       case "session.synthetic":
         return append({
@@ -85,17 +150,44 @@ export function createV2SessionReducer() {
         return append({
           id: messageID(event.id),
           type: "skill",
-          metadata: event.metadata,
+          metadata,
           skill: event.data.id,
           name: event.data.name,
           text: event.data.text,
           time: { created: event.created },
         })
+      case "session.next.shell.started":
+        return append({
+          id: event.data.messageID,
+          type: "shell",
+          metadata,
+          shellID: event.data.callID,
+          command: event.data.command,
+          status: "running",
+          time: { created: event.data.timestamp },
+        })
+      case "session.next.shell.ended":
+        return updateMessage<Shell>(
+          source,
+          (item): item is Shell => item.type === "shell" && item.shellID === event.data.callID,
+          (item) => ({
+            ...item,
+            status: "exited",
+            output: {
+              output: event.data.output,
+              cursor: event.data.output.length,
+              size: event.data.output.length,
+              truncated: false,
+            },
+            time: { ...item.time, completed: event.data.timestamp },
+          }),
+          sessionID,
+        )
       case "session.shell.started":
         return append({
           id: messageID(event.id),
           type: "shell",
-          metadata: event.metadata,
+          metadata,
           shellID: event.data.shell.id,
           command: event.data.shell.command,
           status: event.data.shell.status,
@@ -115,13 +207,15 @@ export function createV2SessionReducer() {
           }),
           sessionID,
         )
-      case "session.step.started": {
+      case "session.step.started":
+      case "session.next.step.started": {
+        const timestamp = event.type === "session.next.step.started" ? event.data.timestamp : event.created
         const current = source.findLast((item): item is Assistant => item.type === "assistant" && !item.time.completed)
         const completed =
           current && current.id !== event.data.assistantMessageID
             ? update(source, current.id, (item) =>
                 item.type === "assistant"
-                  ? { ...item, retry: undefined, time: { ...item.time, completed: event.created } }
+                  ? { ...item, retry: undefined, time: { ...item.time, completed: timestamp } }
                   : item,
               )
             : [...source]
@@ -150,95 +244,143 @@ export function createV2SessionReducer() {
             {
               id: event.data.assistantMessageID,
               type: "assistant",
-              metadata: event.metadata,
+              metadata,
               agent: event.data.agent,
               model: event.data.model,
               content: [],
               snapshot: event.data.snapshot ? { start: event.data.snapshot } : undefined,
-              time: { created: event.created },
+              time: { created: timestamp },
             },
           ],
           current ? [current.id, event.data.assistantMessageID] : [event.data.assistantMessageID],
         )
       }
       case "session.step.ended":
+      case "session.next.step.ended":
         return updateAssistant(source, event.data.assistantMessageID, sessionID, (item) => ({
           ...item,
-          finish: event.data.finish,
+          finish: event.data.finish as Assistant["finish"],
           cost: event.data.cost,
           tokens: event.data.tokens,
           snapshot:
             event.data.snapshot || event.data.files
               ? { ...item.snapshot, end: event.data.snapshot, files: event.data.files }
               : item.snapshot,
-          time: { ...item.time, completed: event.created },
+          time: {
+            ...item.time,
+            completed: event.type === "session.next.step.ended" ? event.data.timestamp : event.created,
+          },
         }))
       case "session.step.failed":
+      case "session.next.step.failed":
         return updateAssistant(source, event.data.assistantMessageID, sessionID, (item) => ({
           ...item,
           finish: "error",
           error: event.data.error,
           retry: undefined,
-          cost: event.data.cost ?? item.cost,
-          tokens: event.data.tokens ?? item.tokens,
+          cost: event.type === "session.step.failed" ? (event.data.cost ?? item.cost) : item.cost,
+          tokens: event.type === "session.step.failed" ? (event.data.tokens ?? item.tokens) : item.tokens,
           snapshot:
-            event.data.snapshot || event.data.files
+            event.type === "session.step.failed" && (event.data.snapshot || event.data.files)
               ? { ...item.snapshot, end: event.data.snapshot, files: event.data.files }
               : item.snapshot,
-          time: { ...item.time, completed: event.created },
+          time: {
+            ...item.time,
+            completed: event.type === "session.next.step.failed" ? event.data.timestamp : event.created,
+          },
         }))
       case "session.text.started":
+      case "session.next.text.started": {
+        const ordinal =
+          event.type === "session.next.text.started"
+            ? registerOrdinal(event.data.assistantMessageID, "text", event.data.textID)
+            : event.data.ordinal
         return updateAssistant(source, event.data.assistantMessageID, sessionID, (item) => ({
           ...item,
-          content: insertOrdinal(item.content, "text", event.data.ordinal, { type: "text", text: "" }),
+          content: insertOrdinal(item.content, "text", ordinal, { type: "text", text: "" }),
         }))
+      }
       case "session.text.delta":
-        return updateContent(source, event.data.assistantMessageID, sessionID, "text", event.data.ordinal, (item) => ({
+      case "session.next.text.delta": {
+        const ordinal =
+          event.type === "session.next.text.delta"
+            ? findOrdinal(event.data.assistantMessageID, "text", event.data.textID)
+            : event.data.ordinal
+        if (ordinal === undefined) return
+        return updateContent(source, event.data.assistantMessageID, sessionID, "text", ordinal, (item) => ({
           ...item,
           text: item.text + event.data.delta,
         }))
+      }
       case "session.text.ended":
-        return updateContent(source, event.data.assistantMessageID, sessionID, "text", event.data.ordinal, (item) => ({
+      case "session.next.text.ended": {
+        const ordinal =
+          event.type === "session.next.text.ended"
+            ? findOrdinal(event.data.assistantMessageID, "text", event.data.textID)
+            : event.data.ordinal
+        if (ordinal === undefined) return
+        return updateContent(source, event.data.assistantMessageID, sessionID, "text", ordinal, (item) => ({
           ...item,
           text: event.data.text,
         }))
+      }
       case "session.reasoning.started":
+      case "session.next.reasoning.started": {
+        const ordinal =
+          event.type === "session.next.reasoning.started"
+            ? registerOrdinal(event.data.assistantMessageID, "reasoning", event.data.reasoningID)
+            : event.data.ordinal
         return updateAssistant(source, event.data.assistantMessageID, sessionID, (item) => ({
           ...item,
-          content: insertOrdinal(item.content, "reasoning", event.data.ordinal, {
+          content: insertOrdinal(item.content, "reasoning", ordinal, {
             type: "reasoning",
             text: "",
-            state: event.data.state,
-            time: { created: event.created },
+            state:
+              event.type === "session.next.reasoning.started"
+                ? (event.data.providerMetadata as Record<string, JsonValue> | undefined)
+                : event.data.state,
+            time: {
+              created: event.type === "session.next.reasoning.started" ? event.data.timestamp : event.created,
+            },
           }),
         }))
+      }
       case "session.reasoning.delta":
-        return updateContent(
-          source,
-          event.data.assistantMessageID,
-          sessionID,
-          "reasoning",
-          event.data.ordinal,
-          (item) => ({
-            ...item,
-            text: item.text + event.data.delta,
-          }),
-        )
+      case "session.next.reasoning.delta": {
+        const ordinal =
+          event.type === "session.next.reasoning.delta"
+            ? findOrdinal(event.data.assistantMessageID, "reasoning", event.data.reasoningID)
+            : event.data.ordinal
+        if (ordinal === undefined) return
+        return updateContent(source, event.data.assistantMessageID, sessionID, "reasoning", ordinal, (item) => ({
+          ...item,
+          text: item.text + event.data.delta,
+        }))
+      }
       case "session.reasoning.ended":
-        return updateContent(
-          source,
-          event.data.assistantMessageID,
-          sessionID,
-          "reasoning",
-          event.data.ordinal,
-          (item) => ({
-            ...item,
-            text: event.data.text,
-            state: event.data.state ?? item.state,
-            time: { created: item.time?.created ?? event.created, completed: event.created },
-          }),
-        )
+      case "session.next.reasoning.ended": {
+        const ordinal =
+          event.type === "session.next.reasoning.ended"
+            ? findOrdinal(event.data.assistantMessageID, "reasoning", event.data.reasoningID)
+            : event.data.ordinal
+        if (ordinal === undefined) return
+        return updateContent(source, event.data.assistantMessageID, sessionID, "reasoning", ordinal, (item) => ({
+          ...item,
+          text: event.data.text,
+          state:
+            (event.type === "session.next.reasoning.ended"
+              ? (event.data.providerMetadata as Record<string, JsonValue> | undefined)
+              : event.data.state) ?? item.state,
+          time: {
+            created:
+              item.time?.created ??
+              (event.type === "session.next.reasoning.ended" ? event.data.timestamp : event.created),
+            completed: event.type === "session.next.reasoning.ended" ? event.data.timestamp : event.created,
+          },
+        }))
+      }
       case "session.tool.input.started":
+      case "session.next.tool.input.started":
         return updateAssistant(source, event.data.assistantMessageID, sessionID, (item) => ({
           ...item,
           content: item.content.some((content) => content.type === "tool" && content.id === event.data.callID)
@@ -250,67 +392,110 @@ export function createV2SessionReducer() {
                   id: event.data.callID,
                   name: event.data.name,
                   state: { status: "streaming", input: "" },
-                  time: { created: event.created },
+                  time: {
+                    created: event.type === "session.next.tool.input.started" ? event.data.timestamp : event.created,
+                  },
                 },
               ],
         }))
       case "session.tool.input.delta":
+      case "session.next.tool.input.delta":
         return updateTool(source, event.data.assistantMessageID, event.data.callID, sessionID, (tool) =>
           tool.state.status === "streaming"
             ? { ...tool, state: { ...tool.state, input: tool.state.input + event.data.delta } }
             : tool,
         )
       case "session.tool.input.ended":
+      case "session.next.tool.input.ended":
         return updateTool(source, event.data.assistantMessageID, event.data.callID, sessionID, (tool) =>
           tool.state.status === "streaming" ? { ...tool, state: { ...tool.state, input: event.data.text } } : tool,
         )
       case "session.tool.called":
+      case "session.next.tool.called":
         return updateTool(source, event.data.assistantMessageID, event.data.callID, sessionID, (tool) => ({
           ...tool,
-          executed: event.data.executed,
-          providerState: event.data.state,
-          state: { status: "running", input: event.data.input, structured: {}, content: [] },
-          time: { ...tool.time, ran: event.created },
+          name: event.type === "session.next.tool.called" ? event.data.tool : tool.name,
+          executed: event.type === "session.next.tool.called" ? event.data.provider.executed : event.data.executed,
+          providerState:
+            event.type === "session.next.tool.called"
+              ? (event.data.provider.metadata as Record<string, JsonValue> | undefined)
+              : event.data.state,
+          state: {
+            status: "running",
+            input: event.data.input as Record<string, JsonValue>,
+            structured: {},
+            content: [],
+          },
+          time: {
+            ...tool.time,
+            ran: event.type === "session.next.tool.called" ? event.data.timestamp : event.created,
+          },
         }))
       case "session.tool.progress":
+      case "session.next.tool.progress":
         return updateTool(source, event.data.assistantMessageID, event.data.callID, sessionID, (tool) =>
           tool.state.status === "running"
-            ? { ...tool, state: { ...tool.state, structured: event.data.structured, content: event.data.content } }
+            ? {
+                ...tool,
+                state: {
+                  ...tool.state,
+                  structured: event.data.structured as Record<string, JsonValue>,
+                  content: event.data.content,
+                },
+              }
             : tool,
         )
       case "session.tool.success":
+      case "session.next.tool.success":
         return updateTool(source, event.data.assistantMessageID, event.data.callID, sessionID, (tool) => {
           if (tool.state.status !== "running") return tool
           return {
             ...tool,
-            executed: event.data.executed || tool.executed === true,
-            providerResultState: event.data.resultState,
+            executed:
+              (event.type === "session.next.tool.success" ? event.data.provider.executed : event.data.executed) ||
+              tool.executed === true,
+            providerResultState:
+              event.type === "session.next.tool.success"
+                ? (event.data.provider.metadata as Record<string, JsonValue> | undefined)
+                : event.data.resultState,
             state: {
               status: "completed",
               input: tool.state.input,
-              structured: event.data.structured,
+              structured: event.data.structured as Record<string, JsonValue>,
               content: event.data.content,
-              result: event.data.result,
+              result: event.data.result as JsonValue | undefined,
             },
-            time: { ...tool.time, completed: event.created },
+            time: {
+              ...tool.time,
+              completed: event.type === "session.next.tool.success" ? event.data.timestamp : event.created,
+            },
           }
         })
       case "session.tool.failed":
+      case "session.next.tool.failed":
         return updateTool(source, event.data.assistantMessageID, event.data.callID, sessionID, (tool) => {
           if (tool.state.status !== "streaming" && tool.state.status !== "running") return tool
           return {
             ...tool,
-            executed: event.data.executed || tool.executed === true,
-            providerResultState: event.data.resultState,
+            executed:
+              (event.type === "session.next.tool.failed" ? event.data.provider.executed : event.data.executed) ||
+              tool.executed === true,
+            providerResultState:
+              event.type === "session.next.tool.failed"
+                ? (event.data.provider.metadata as Record<string, JsonValue> | undefined)
+                : event.data.resultState,
             state: {
               status: "error",
               input: typeof tool.state.input === "string" ? {} : tool.state.input,
               structured: tool.state.status === "running" ? tool.state.structured : {},
               content: tool.state.status === "running" ? tool.state.content : [],
               error: event.data.error,
-              result: event.data.result,
+              result: event.data.result as JsonValue | undefined,
             },
-            time: { ...tool.time, completed: event.created },
+            time: {
+              ...tool.time,
+              completed: event.type === "session.next.tool.failed" ? event.data.timestamp : event.created,
+            },
           }
         })
       case "session.retry.scheduled":
@@ -326,21 +511,30 @@ export function createV2SessionReducer() {
         return updateAssistant(source, current.id, sessionID, (item) => ({ ...item, retry: undefined }))
       }
       case "session.compaction.started":
+      case "session.next.compaction.started":
         return append({
-          id: event.data.inputID ?? messageID(event.id),
+          id:
+            event.type === "session.next.compaction.started"
+              ? event.data.messageID
+              : (event.data.inputID ?? messageID(event.id)),
           type: "compaction",
           status: "running",
-          metadata: event.metadata,
+          metadata,
           reason: event.data.reason,
           summary: "",
-          recent: event.data.recent,
-          time: { created: event.created },
+          recent: event.type === "session.next.compaction.started" ? "" : event.data.recent,
+          time: {
+            created: event.type === "session.next.compaction.started" ? event.data.timestamp : event.created,
+          },
         })
       case "session.compaction.delta":
+      case "session.next.compaction.delta":
         return updateMessage<Extract<Compaction, { status: "running" }>>(
           source,
           (item): item is Extract<Compaction, { status: "running" }> =>
-            item.type === "compaction" && item.status === "running",
+            item.type === "compaction" &&
+            item.status === "running" &&
+            (event.type !== "session.next.compaction.delta" || item.id === event.data.messageID),
           (item) => ({
             ...item,
             summary: item.summary + event.data.text,
@@ -362,6 +556,33 @@ export function createV2SessionReducer() {
             summary: event.data.text,
             recent: event.data.recent,
             time: { created: event.created },
+          })
+        return result(
+          update(source, current.id, () => ({
+            ...current,
+            status: "completed",
+            reason: event.data.reason,
+            summary: event.data.text,
+            recent: event.data.recent,
+          })),
+          [current.id],
+        )
+      }
+      case "session.next.compaction.ended": {
+        const current = source.find(
+          (item): item is Extract<Compaction, { status: "running" }> =>
+            item.type === "compaction" && item.status === "running" && item.id === event.data.messageID,
+        )
+        if (!current)
+          return append({
+            id: event.data.messageID,
+            type: "compaction",
+            status: "completed",
+            metadata,
+            reason: event.data.reason,
+            summary: event.data.text,
+            recent: event.data.recent,
+            time: { created: event.data.timestamp },
           })
         return result(
           update(source, current.id, () => ({
@@ -405,12 +626,19 @@ export function createV2SessionReducer() {
       for (const id of pending.keys()) {
         if (id.startsWith(`${sessionID}:`)) pending.delete(id)
       }
+      for (const id of contentOrdinals.keys()) {
+        if (id.startsWith(`${sessionID}:`)) contentOrdinals.delete(id)
+      }
     },
   }
 }
 
 function key(sessionID: string, inputID: string) {
   return `${sessionID}:${inputID}`
+}
+
+function contentKey(sessionID: string, messageID: string, type: "text" | "reasoning", contentID: string) {
+  return `${sessionID}:${messageID}:${type}:${contentID}`
 }
 
 function messageID(eventID: string) {

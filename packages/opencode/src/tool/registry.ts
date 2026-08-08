@@ -1,7 +1,7 @@
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { httpClient } from "@opencode-ai/core/effect/app-node-platform"
 import { Ripgrep } from "@opencode-ai/core/ripgrep"
-import { PlanExitTool } from "./plan"
+import { PlanEnterTool, PlanExitTool } from "./plan"
 import { Session } from "@/session/session"
 import { QuestionTool } from "./question"
 import { ShellTool } from "./shell"
@@ -78,6 +78,7 @@ export interface Interface {
     modelID: ModelV2.ID
     agent: Agent.Info
     permission?: PermissionV1.Ruleset
+    builtinOnly?: boolean
   }) => Effect.Effect<Tool.Def[]>
 }
 
@@ -99,7 +100,8 @@ const layer = Layer.effect(
     const question = yield* QuestionTool
     const todo = yield* TodoWriteTool
     const lsptool = yield* LspTool
-    const plan = yield* PlanExitTool
+    const planEnter = yield* PlanEnterTool
+    const planExit = yield* PlanExitTool
     const webfetch = yield* WebFetchTool
     const websearch = yield* WebSearchTool
     const shell = yield* ShellTool
@@ -217,7 +219,8 @@ const layer = Layer.effect(
           patch: Tool.init(patchtool),
           question: Tool.init(question),
           lsp: Tool.init(lsptool),
-          plan: Tool.init(plan),
+          planEnter: Tool.init(planEnter),
+          planExit: Tool.init(planExit),
           ...(codeModeTool ? { execute: Tool.init(codeModeTool) } : {}),
         })
 
@@ -225,7 +228,7 @@ const layer = Layer.effect(
           custom,
           builtin: [
             tool.invalid,
-            ...(questionEnabled ? [tool.question] : []),
+            ...(questionEnabled ? [tool.question, tool.planEnter, tool.planExit] : []),
             tool.shell,
             tool.read,
             tool.glob,
@@ -240,7 +243,6 @@ const layer = Layer.effect(
             tool.patch,
             ...(tool.execute ? [tool.execute] : []),
             ...(flags.experimentalLspTool ? [tool.lsp] : []),
-            ...(flags.experimentalPlanMode && flags.client === "cli" ? [tool.plan] : []),
           ],
           task: tool.task,
           read: tool.read,
@@ -284,18 +286,28 @@ const layer = Layer.effect(
     })
 
     const tools: Interface["tools"] = Effect.fn("ToolRegistry.tools")(function* (input) {
-      const filtered = (yield* all()).filter((tool) => {
-        if (tool.id === WebSearchTool.id) {
-          return webSearchEnabled(input.providerID, { exa: flags.enableExa, parallel: flags.enableParallel })
-        }
-
-        const usePatch =
-          input.modelID.includes("gpt-") && !input.modelID.includes("oss") && !input.modelID.includes("gpt-4")
-        if (tool.id === ApplyPatchTool.id) return usePatch
-        if (tool.id === EditTool.id || tool.id === WriteTool.id) return !usePatch
-
-        return true
+      const current = yield* InstanceState.get(state)
+      const [planAgent, buildAgent] = yield* Effect.all([agents.get("plan"), agents.get("build")], {
+        concurrency: "unbounded",
       })
+      const available = (target: Agent.Info | undefined) =>
+        target !== undefined && target.mode !== "subagent" && !target.hidden
+      const filtered = (input.builtinOnly ? current.builtin : [...current.builtin, ...current.custom]).filter(
+        (tool) => {
+          if (tool.id === PlanEnterTool.id) return available(planAgent)
+          if (tool.id === PlanExitTool.id) return available(buildAgent)
+          if (tool.id === WebSearchTool.id) {
+            return webSearchEnabled(input.providerID, { exa: flags.enableExa, parallel: flags.enableParallel })
+          }
+
+          const usePatch =
+            input.modelID.includes("gpt-") && !input.modelID.includes("oss") && !input.modelID.includes("gpt-4")
+          if (tool.id === ApplyPatchTool.id) return usePatch
+          if (tool.id === EditTool.id || tool.id === WriteTool.id) return !usePatch
+
+          return true
+        },
+      )
 
       const codeModeDescription = filtered.some((tool) => tool.id === "execute")
         ? yield* describeCodeMode(input)

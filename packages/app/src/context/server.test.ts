@@ -7,6 +7,7 @@ import {
   nextServerAfterRemoval,
   resolveServerList,
   ServerConnection,
+  visibleRecentlyClosed,
 } from "./server"
 import { ServerScope } from "@/utils/server-scope"
 
@@ -96,6 +97,47 @@ test("active server removal falls back across built-in and persisted servers", (
 })
 
 describe("createServerProjects", () => {
+  test("stores discovered repositories on a project group", () => {
+    createRoot((dispose) => {
+      const scope = () => "local" as ServerScope
+      const [store, setStore] = createStore({ projects: {}, lastProject: {}, recentlyClosed: {} })
+      const projects = createServerProjects({ scope, store, setStore })
+
+      projects.open("/workspace")
+      projects.setRepositories("/workspace", ["/workspace/api", "/workspace/web"])
+
+      expect(projects.list()).toEqual([
+        {
+          worktree: "/workspace",
+          expanded: true,
+          repositories: ["/workspace/api", "/workspace/web"],
+        },
+      ])
+      dispose()
+    })
+  })
+
+  test("updates project state through normalized path keys", () => {
+    createRoot((dispose) => {
+      const scope = () => "local" as ServerScope
+      const [store, setStore] = createStore({ projects: {}, lastProject: {}, recentlyClosed: {} })
+      const projects = createServerProjects({ scope, store, setStore })
+
+      projects.open("C:\\Workspace\\")
+      projects.setRepositories("C:\\Workspace", ["C:\\Workspace\\api", "C:\\Workspace\\web"])
+      projects.collapse("C:\\Workspace")
+
+      expect(projects.list()).toEqual([
+        {
+          worktree: "C:\\Workspace\\",
+          expanded: false,
+          repositories: ["C:\\Workspace\\api", "C:\\Workspace\\web"],
+        },
+      ])
+      dispose()
+    })
+  })
+
   test("keeps active and explicit server buckets in one reactive store", () => {
     createRoot((dispose) => {
       const [scope] = createSignal(ServerScope.local)
@@ -125,13 +167,16 @@ describe("createServerProjects", () => {
       projects.open("/a")
       projects.open("/b")
       projects.close("/a")
-      expect(projects.recentlyClosed()).toEqual(["/a"])
+      expect(projects.recentlyClosed()).toEqual([{ worktree: "/a", expanded: false }])
 
       projects.close("/b")
-      expect(projects.recentlyClosed()).toEqual(["/b", "/a"])
+      expect(projects.recentlyClosed()).toEqual([
+        { worktree: "/b", expanded: false },
+        { worktree: "/a", expanded: false },
+      ])
 
       projects.open("/a")
-      expect(projects.recentlyClosed()).toEqual(["/b"])
+      expect(projects.recentlyClosed()).toEqual([{ worktree: "/b", expanded: false }])
       expect(projects.list()).toEqual([{ worktree: "/a", expanded: true }])
       dispose()
     })
@@ -163,7 +208,7 @@ describe("createServerProjects", () => {
         projects.open(dir)
         projects.close(dir)
       }
-      expect(projects.recentlyClosed()).toEqual(["/6", "/5", "/4", "/3", "/2", "/1"])
+      expect(projects.recentlyClosed().map((project) => project.worktree)).toEqual(["/6", "/5", "/4", "/3", "/2", "/1"])
       dispose()
     })
   })
@@ -179,8 +224,8 @@ describe("createServerProjects", () => {
         projects.close(`/p${i}`)
       }
       expect(projects.recentlyClosed()).toHaveLength(16)
-      expect(projects.recentlyClosed()[0]).toBe("/p20")
-      expect(projects.recentlyClosed().at(-1)).toBe("/p5")
+      expect(projects.recentlyClosed()[0]?.worktree).toBe("/p20")
+      expect(projects.recentlyClosed().at(-1)?.worktree).toBe("/p5")
       dispose()
     })
   })
@@ -193,7 +238,68 @@ describe("createServerProjects", () => {
 
       projects.close("/repo")
       projects.close("/repo/")
-      expect(projects.recentlyClosed()).toEqual(["/repo/"])
+      expect(projects.recentlyClosed()).toEqual([{ worktree: "/repo/", expanded: false }])
+      dispose()
+    })
+  })
+
+  test("retains repository group metadata when closed and reopened", () => {
+    createRoot((dispose) => {
+      const scope = () => ServerScope.local
+      const [store, setStore] = createStore({ projects: {}, lastProject: {}, recentlyClosed: {} })
+      const projects = createServerProjects({ scope, store, setStore })
+
+      projects.open("/workspace", ["/workspace/api", "/workspace/web"])
+      projects.close("/workspace")
+      expect(projects.recentlyClosed()).toEqual([
+        {
+          worktree: "/workspace",
+          expanded: false,
+          repositories: ["/workspace/api", "/workspace/web"],
+        },
+      ])
+      expect(
+        visibleRecentlyClosed({
+          recentlyClosed: projects.recentlyClosed(),
+          projects: [{ worktree: "/workspace/api" }, { worktree: "/workspace/web" }],
+        }).map((project) => project.worktree),
+      ).toEqual(["/workspace"])
+
+      projects.open("/workspace")
+      expect(projects.list()).toEqual([
+        {
+          worktree: "/workspace",
+          expanded: true,
+          repositories: ["/workspace/api", "/workspace/web"],
+        },
+      ])
+      dispose()
+    })
+  })
+
+  test("normalizes persisted string history and keeps explicit groups visible", () => {
+    createRoot((dispose) => {
+      const scope = () => ServerScope.local
+      const [store, setStore] = createStore({
+        projects: {},
+        lastProject: {},
+        recentlyClosed: { local: ["/known", "/missing"] },
+      })
+      const projects = createServerProjects({ scope, store, setStore })
+
+      expect(projects.recentlyClosed()).toEqual([
+        { worktree: "/known", expanded: false },
+        { worktree: "/missing", expanded: false },
+      ])
+      expect(
+        visibleRecentlyClosed({
+          recentlyClosed: [
+            ...projects.recentlyClosed(),
+            { worktree: "/group", expanded: false, repositories: ["/group/api", "/group/web"] },
+          ],
+          projects: [{ worktree: "/known" }],
+        }).map((project) => project.worktree),
+      ).toEqual(["/known", "/group"])
       dispose()
     })
   })

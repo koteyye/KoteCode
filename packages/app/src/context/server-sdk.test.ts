@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { adaptServerEvent, coalesceServerEvents, enqueueServerEvent, resumeStreamAfterPageShow } from "./server-sdk"
 import type { OpenCodeEvent } from "@opencode-ai/client/promise"
 import type { Event } from "@opencode-ai/sdk/v2/client"
+import type { CompatibleOpenCodeEvent } from "@/utils/server-event"
 
 describe("resumeStreamAfterPageShow", () => {
   test("restarts a stream only after a back-forward cache restore", () => {
@@ -68,6 +69,25 @@ describe("coalesceServerEvents", () => {
 
     expect(result).toHaveLength(1)
     expect(result[0]?.payload.current).toMatchObject({ id: "evt_2", data: { delta: "hello world" } })
+  })
+
+  test("merges adjacent canonical text deltas by content ID", () => {
+    const current = (id: string, textID: string, value: string) =>
+      adaptServerEvent({
+        id,
+        type: "session.next.text.delta",
+        location: { directory: "/repo" },
+        data: { timestamp: 1, sessionID: "ses", assistantMessageID: "msg", textID, delta: value },
+      } as CompatibleOpenCodeEvent)
+    const result = coalesceServerEvents([
+      { directory: "/repo", payload: current("evt_1", "text_1", "hello ") },
+      { directory: "/repo", payload: current("evt_2", "text_1", "world") },
+      { directory: "/repo", payload: current("evt_3", "text_2", "separate") },
+    ])
+
+    expect(result).toHaveLength(2)
+    expect(result[0]?.payload.current).toMatchObject({ id: "evt_2", data: { delta: "hello world" } })
+    expect(result[1]?.payload.current).toMatchObject({ id: "evt_3", data: { delta: "separate" } })
   })
 
   test("preserves event boundaries and distinct fields", () => {

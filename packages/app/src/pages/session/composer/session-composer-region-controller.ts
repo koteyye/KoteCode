@@ -95,9 +95,19 @@ export function createSessionComposerRegionController(input: {
   createEffect(() => {
     const el = store.body
     if (!el) return
-    const update = () => setStore("height", el.getBoundingClientRect().height)
+    // rAF-deferred: store.height drives dockHeight() which constrains the dock body containing el,
+    // so a synchronous write would retrigger the observer and loop.
+    let raf: number | undefined
+    const measure = () => setStore("height", el.getBoundingClientRect().height)
+    const update = () => {
+      if (raf !== undefined) cancelAnimationFrame(raf)
+      raf = requestAnimationFrame(measure)
+    }
     createResizeObserver(el, update)
     update()
+    onCleanup(() => {
+      if (raf !== undefined) cancelAnimationFrame(raf)
+    })
   })
 
   onCleanup(clear)

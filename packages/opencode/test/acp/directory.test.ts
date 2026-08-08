@@ -155,18 +155,33 @@ describe("ACP directory snapshot", () => {
     }).pipe(Effect.provide(fakeLayer([]))),
   )
 
-  it.effect("commands and modes are included", () =>
+  it.effect("commands are included and plan is not selectable", () =>
     Effect.gen(function* () {
       const directory = yield* Directory.Service
       const alpha = yield* directory.get("alpha")
 
       expect(alpha.availableCommands.map((item) => item.name)).toEqual(["init-alpha", "review-alpha"])
-      expect(alpha.availableModes).toEqual([
-        { id: "build", name: "build-alpha" },
-        { id: "plan", name: "plan-alpha", description: "plan first" },
-      ])
+      expect(alpha.availableModes).toEqual([{ id: "build", name: "build-alpha" }])
       expect(alpha.defaultModeID).toBe("build")
     }).pipe(Effect.provide(fakeLayer([]))),
+  )
+
+  it.effect("falls back from plan as the default mode", () =>
+    Effect.sync(() => {
+      const result = Directory.build({
+        directory: "alpha",
+        providers: {},
+        modes: [
+          { id: "plan", name: "Plan" },
+          { id: "build", name: "Build" },
+        ],
+        defaultModeID: "plan",
+        commands: [],
+      })
+
+      expect(result.availableModes).toEqual([{ id: "build", name: "Build" }])
+      expect(result.defaultModeID).toBe("build")
+    }),
   )
 
   it.effect("falls back when the default mode is not available", () =>

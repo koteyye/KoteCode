@@ -1,4 +1,5 @@
 import { Schema } from "effect"
+import { Project } from "@opencode-ai/schema/project"
 
 export class InvalidRequestError extends Schema.TaggedErrorClass<InvalidRequestError>()(
   "InvalidRequestError",
@@ -56,6 +57,15 @@ export class SessionNotFoundError extends Schema.TaggedErrorClass<SessionNotFoun
   "SessionNotFoundError",
   {
     sessionID: Schema.String,
+    message: Schema.String,
+  },
+  { httpApiStatus: 404 },
+) {}
+
+export class ProjectNotFoundError extends Schema.TaggedErrorClass<ProjectNotFoundError>()(
+  "ProjectNotFoundError",
+  {
+    projectID: Project.ID,
     message: Schema.String,
   },
   { httpApiStatus: 404 },

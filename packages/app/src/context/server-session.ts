@@ -1,6 +1,6 @@
 import { Binary } from "@opencode-ai/core/util/binary"
 import { retry } from "@opencode-ai/core/util/retry"
-import type { MessageApi, OpenCodeEvent, SessionApi, SessionMessageInfo } from "@opencode-ai/client/promise"
+import type { MessageApi, SessionApi, SessionMessageInfo } from "@opencode-ai/client/promise"
 import type {
   Message,
   OpencodeClient,
@@ -21,6 +21,7 @@ import { normalizeSessionInfo } from "@/utils/session"
 import { normalizeSessionMessages } from "@/utils/session-message"
 import { dropSessionCaches, pickSessionCacheEvictions, SESSION_CACHE_LIMIT } from "./global-sync/session-cache"
 import { createV2SessionReducer, type V2SessionReduction } from "./server-session-v2-reducer"
+import type { CompatibleOpenCodeEvent } from "@/utils/server-event"
 
 const cmp = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0)
 const cmpMessage = (a: Message, b: Message) => a.time.created - b.time.created || cmp(a.id, b.id)
@@ -178,6 +179,76 @@ function reconcileFetched<T extends { id: string }>(
   }
   for (const id of options.removed ?? emptyIDs) result.delete(id)
   return [...result.values()].sort((a, b) => cmp(a.id, b.id))
+}
+
+function isV2Parent(message: SessionMessageInfo) {
+  return message.type === "user" || (message.type === "synthetic" && !!message.description?.trim())
+}
+
+function focusedV2Source(event: CompatibleOpenCodeEvent, source: readonly SessionMessageInfo[]) {
+  let targetID: string | undefined
+  switch (event.type) {
+    case "session.text.started":
+    case "session.text.delta":
+    case "session.text.ended":
+    case "session.reasoning.started":
+    case "session.reasoning.delta":
+    case "session.reasoning.ended":
+    case "session.tool.input.started":
+    case "session.tool.input.delta":
+    case "session.tool.input.ended":
+    case "session.tool.called":
+    case "session.tool.progress":
+    case "session.tool.success":
+    case "session.tool.failed":
+    case "session.next.text.started":
+    case "session.next.text.delta":
+    case "session.next.text.ended":
+    case "session.next.reasoning.started":
+    case "session.next.reasoning.delta":
+    case "session.next.reasoning.ended":
+    case "session.next.tool.input.started":
+    case "session.next.tool.input.delta":
+    case "session.next.tool.input.ended":
+    case "session.next.tool.called":
+    case "session.next.tool.progress":
+    case "session.next.tool.success":
+    case "session.next.tool.failed":
+    case "session.retry.scheduled":
+      targetID = event.data.assistantMessageID
+      break
+    case "session.shell.ended":
+      targetID = event.data.shell.id
+      break
+    case "session.next.shell.ended":
+      targetID = event.data.callID
+      break
+    case "session.next.compaction.delta":
+    case "session.next.compaction.ended":
+      targetID = event.data.messageID
+      break
+    case "session.compaction.delta":
+    case "session.compaction.ended":
+    case "session.compaction.failed":
+      targetID = source.findLast((message) => message.type === "compaction" && message.status === "running")?.id
+      break
+    default:
+      return
+  }
+
+  if (!targetID) return
+  const targetIndex = source.findLastIndex((message) => message.id === targetID)
+  if (targetIndex === -1) return
+  const target = source[targetIndex]
+  if (!target) return
+  if (target.type === "shell") return [target]
+
+  const boundary = source.findLast(
+    (message, index) => index < targetIndex && (message.type === "shell" || isV2Parent(message)),
+  )
+  if (!boundary || boundary.type === "shell") return
+  const parent = boundary
+  return [parent, target]
 }
 
 type ServerSessionOptions = { retry?: typeof retry; protocol?: Promise<"v1" | "v2"> }
@@ -878,25 +949,32 @@ export function createServerSession(
       return properties.part.sessionID
   }
 
-  const projectV2 = (reduction: V2SessionReduction) => {
+  const projectV2 = (reduction: V2SessionReduction, event?: CompatibleOpenCodeEvent) => {
     reduction.touched.forEach((messageID) => messageLoads.get(reduction.sessionID)?.touchedSource.add(messageID))
     setData("session_message", reduction.sessionID, reconcile(reduction.messages))
     if (reduction.touched.length === 0) return
 
     const touched = new Set(reduction.touched)
-    let parentID: string | undefined
-    for (const message of reduction.messages) {
-      if (message.type === "user" || (message.type === "synthetic" && message.description?.trim()))
-        parentID = message.id
+    for (const messageID of reduction.touched) {
+      const index = reduction.messages.findLastIndex((message) => message.id === messageID)
+      const message = index === -1 ? undefined : reduction.messages[index]
+      if (!message) continue
       if (message.type === "shell") {
-        if (touched.has(message.id)) touched.add(`${message.id}:assistant`)
-        parentID = undefined
+        touched.add(`${message.id}:assistant`)
+        continue
       }
-      if (message.type === "assistant" && touched.has(message.id) && parentID) touched.add(parentID)
-      if (message.type === "compaction" && touched.has(message.id) && parentID) touched.add(parentID)
+      if (message.type !== "assistant" && message.type !== "compaction") continue
+      const boundary = reduction.messages.findLast(
+        (item, itemIndex) => itemIndex < index && (item.type === "shell" || isV2Parent(item)),
+      )
+      if (!boundary || boundary.type === "shell") continue
+      touched.add(boundary.id)
     }
 
-    const normalized = normalizeSessionMessages(reduction.sessionID, reduction.messages)
+    const normalized = normalizeSessionMessages(
+      reduction.sessionID,
+      event ? (focusedV2Source(event, reduction.messages) ?? reduction.messages) : reduction.messages,
+    )
     batch(() => {
       for (const message of normalized.messages) {
         if (!touched.has(message.id)) continue
@@ -931,16 +1009,34 @@ export function createServerSession(
       .catch(() => {})
   }
 
-  const applyV2 = (event: OpenCodeEvent) => {
+  const applyV2 = (event: CompatibleOpenCodeEvent) => {
     if (!("data" in event) || !("sessionID" in event.data) || typeof event.data.sessionID !== "string") return
     const sessionID = event.data.sessionID
     const reduction = v2.reduce(data.session_message[sessionID] ?? [], event)
     if (reduction) {
-      projectV2(reduction)
+      projectV2(reduction, event)
       if (reduction.missing) hydrateV2Message(sessionID, reduction.missing)
     }
 
     const info = data.info[sessionID]
+    if ((event.type === "session.agent.selected" || event.type === "session.next.agent.switched") && info)
+      remember({
+        ...info,
+        agent: event.data.agent,
+        time: {
+          ...info.time,
+          updated: event.type === "session.next.agent.switched" ? event.data.timestamp : event.created,
+        },
+      })
+    if ((event.type === "session.model.selected" || event.type === "session.next.model.switched") && info)
+      remember({
+        ...info,
+        model: event.data.model,
+        time: {
+          ...info.time,
+          updated: event.type === "session.next.model.switched" ? event.data.timestamp : event.created,
+        },
+      })
     if (event.type === "session.renamed" && info)
       remember({ ...info, title: event.data.title, time: { ...info.time, updated: event.created } })
     if (event.type === "session.moved" && info)

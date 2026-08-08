@@ -39,6 +39,7 @@ function normalizeToolMetadata(name: string, metadata: Record<string, unknown>) 
 
 export function normalizeSessionMessages(sessionID: string, source: readonly SessionMessageInfo[]) {
   const messages: Message[] = []
+  const messagesByID = new Map<string, Message>()
   const parts = new Map<string, Part[]>()
   let agent = ""
   let model = emptyModel
@@ -55,20 +56,24 @@ export function normalizeSessionMessages(sessionID: string, source: readonly Ses
     }
     if (message.type === "user") {
       parentID = message.id
-      messages.push(userMessage(sessionID, message, agent, model))
+      const next = userMessage(sessionID, message, agent, model)
+      messages.push(next)
+      messagesByID.set(next.id, next)
       parts.set(message.id, userParts(sessionID, message))
       return
     }
     if (message.type === "synthetic" && message.description?.trim()) {
       parentID = message.id
-      messages.push({
+      const next = {
         id: message.id,
         sessionID,
         role: "user",
         time: message.time,
         agent,
         model: { providerID: model.providerID, modelID: model.id, variant: model.variant },
-      })
+      } satisfies Message
+      messages.push(next)
+      messagesByID.set(next.id, next)
       parts.set(message.id, [textPart(sessionID, message.id, 0, message.description, true)])
       return
     }
@@ -83,7 +88,7 @@ export function normalizeSessionMessages(sessionID: string, source: readonly Ses
       agent = message.agent
       model = message.model
       if (!parentID) return
-      const parent = messages.findLast((item) => item.id === parentID)
+      const parent = messagesByID.get(parentID)
       if (parent?.role === "user") {
         parent.agent = message.agent
         parent.model = {

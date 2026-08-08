@@ -29,6 +29,7 @@ import { SessionCompaction } from "../compaction"
 import { SessionEvent } from "../event"
 import { SessionHistory } from "../history"
 import { SessionInput } from "../input"
+import { SessionPlan } from "../plan"
 import { SessionSchema } from "../schema"
 import { SessionStore } from "../store"
 import { type RunError, Service } from "./index"
@@ -185,9 +186,12 @@ const layer = Layer.effect(
       if (session.location.directory !== location.directory || session.location.workspaceID !== location.workspaceID)
         return yield* Effect.interrupt
       const agent = yield* agents.select(session.agent)
+      if (session.agent !== undefined && !agent.info) return yield* Effect.die(`Agent is unavailable: ${agent.id}`)
       const initialized = yield* SessionContextEpoch.initialize(db, loadSystemContext(agent), session.id)
       const toolFibers = yield* FiberSet.make<void, ToolOutputStore.Error>()
       let needsContinuation = false
+      let transitionBarrier = false
+      let ordinaryToolCall = false
       let currentStep = step
       if (promotion) {
         const cutoff = yield* EventV2.latestSequence(db, session.id)
@@ -219,15 +223,43 @@ const layer = Layer.effect(
               resolveProxy({ customUrl: Gateway.customProxyUrl(Config.latest(configEntries, "gateway")) }),
             )
       const fetch = proxyFetch(globalThis.fetch, transport)
-      const entries = yield* SessionHistory.entriesForRunner(db, session.id, system.baselineSeq)
+      const [entries, toolOverrides] = yield* Effect.all(
+        [
+          SessionHistory.entriesForRunner(db, session.id, system.baselineSeq),
+          SessionHistory.latestUserTools(db, session.id),
+        ],
+        { concurrency: "unbounded" },
+      )
       const context = entries.map((entry) => entry.message)
       const isLastStep = agent.info?.steps !== undefined && currentStep >= agent.info.steps
-      const toolMaterialization = isLastStep ? undefined : yield* tools.materialize(agent.info?.permissions)
+      const [planAgent, buildAgent] = yield* Effect.all(
+        [agents.get(AgentV2.ID.make("plan")), agents.get(AgentV2.ID.make("build"))],
+        { concurrency: "unbounded" },
+      )
+      const available = (target: AgentV2.Info | undefined) =>
+        target !== undefined && target.mode !== "subagent" && !target.hidden
+      const disabledTools = new Set([
+        ...Object.entries(toolOverrides ?? {}).flatMap(([name, enabled]) => (enabled ? [] : [name])),
+        ...(available(planAgent) ? [] : ["plan_enter"]),
+        ...(available(buildAgent) ? [] : ["plan_exit"]),
+      ])
+      const toolMaterialization = isLastStep
+        ? undefined
+        : yield* tools.materialize(agent.info?.permissions, {
+            disabled: disabledTools,
+            allowed: agent.id === AgentV2.ID.make("plan") ? SessionPlan.allowedTools : undefined,
+          })
       const promptCacheKey = /^ses_[0-9a-f]{64}$/.test(session.id) ? session.id.slice(4) : session.id
       const request = LLM.request({
         model,
         providerOptions: { openai: { promptCacheKey } },
-        system: [agent.info?.system, system.baseline]
+        system: [
+          agent.info?.system,
+          agent.id === AgentV2.ID.make("plan")
+            ? SessionPlan.instructions(SessionPlan.file(session, location))
+            : undefined,
+          system.baseline,
+        ]
           .filter((part): part is string => part !== undefined && part.length > 0)
           .map(SystemPart.make),
         messages: [...toLLMMessages(context, model), ...(isLastStep ? [Message.assistant(MAX_STEPS_PROMPT)] : [])],
@@ -250,6 +282,14 @@ const layer = Layer.effect(
       const withPublication = Semaphore.makeUnsafe(1).withPermit
       const publish = (event: LLMEvent, outputPaths: ReadonlyArray<string> = []) =>
         withPublication(publisher.publish(event, outputPaths))
+      const failTool = (event: Extract<LLMEvent, { readonly type: "tool-call" }>, message: string) =>
+        publish(
+          LLMEvent.toolResult({
+            id: event.id,
+            name: event.name,
+            result: { type: "error", value: message },
+          }),
+        )
       let overflowFailure: ProviderErrorEvent | undefined
       const providerStream = llm.stream(request).pipe(
         Stream.provideService(FetchHttpClient.Fetch, fetch),
@@ -263,14 +303,28 @@ const layer = Layer.effect(
               }
             }
             yield* publish(event)
-            if (event.type !== "tool-call" || event.providerExecuted) return
+            if (event.type !== "tool-call") return
+            if (event.providerExecuted) {
+              ordinaryToolCall = true
+              return
+            }
             if (!toolMaterialization) {
               yield* withPublication(publisher.failUnsettledTools("Tools are disabled after the maximum agent steps"))
               return
             }
             needsContinuation = true
+            if (transitionBarrier) {
+              yield* failTool(event, "Agent transition requires a new provider turn")
+              return
+            }
+            const transition = event.name === "plan_enter" || event.name === "plan_exit"
+            if (transition && ordinaryToolCall) {
+              transitionBarrier = true
+              yield* failTool(event, "Agent transition tools must run alone")
+              return
+            }
             const assistantMessageID = yield* publisher.assistantMessageID(event.id)
-            yield* Effect.uninterruptibleMask((restore) =>
+            const settlement = Effect.uninterruptibleMask((restore) =>
               restore(
                 toolMaterialization.settle({
                   sessionID: session.id,
@@ -279,7 +333,7 @@ const layer = Layer.effect(
                   call: event,
                 }),
               ).pipe(
-                Effect.flatMap((settlement) =>
+                Effect.tap((settlement) =>
                   publish(
                     LLMEvent.toolResult({
                       id: event.id,
@@ -291,7 +345,14 @@ const layer = Layer.effect(
                   ),
                 ),
               ),
-            ).pipe(FiberSet.run(toolFibers))
+            )
+            if (transition) {
+              yield* settlement
+              transitionBarrier = true
+              return
+            }
+            ordinaryToolCall = true
+            yield* settlement.pipe(Effect.asVoid, FiberSet.run(toolFibers))
           }),
         ),
         Effect.ensuring(withPublication(publisher.flush())),
@@ -317,7 +378,10 @@ const layer = Layer.effect(
           }
           if (stream._tag === "Failure" && Cause.hasInterrupts(stream.cause)) yield* FiberSet.clear(toolFibers)
           const settled = yield* restore(awaitToolFibers(toolFibers)).pipe(Effect.exit)
-          if (settled._tag === "Failure" && isUserDeclined(settled.cause)) {
+          if (
+            (stream._tag === "Failure" && isUserDeclined(stream.cause)) ||
+            (settled._tag === "Failure" && isUserDeclined(settled.cause))
+          ) {
             yield* FiberSet.clear(toolFibers)
             yield* withPublication(publisher.failUnsettledTools("Tool execution interrupted"))
             return yield* Effect.interrupt

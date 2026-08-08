@@ -948,11 +948,12 @@ it.instance("subtask child inherits parent session external_directory allow", ()
   }),
 )
 
-noLLMServer.instance("prompt tools replace previous prompt tool rules", () =>
+noLLMServer.instance("prompt tools do not replace session permission rules", () =>
   Effect.gen(function* () {
     const prompt = yield* SessionPrompt.Service
     const sessions = yield* Session.Service
-    const session = yield* sessions.create({ title: "Prompt tools" })
+    const permission = [{ permission: "external_directory", pattern: "/tmp/allowed/*", action: "allow" as const }]
+    const session = yield* sessions.create({ title: "Prompt tools", permission })
 
     yield* prompt.prompt({
       sessionID: session.id,
@@ -970,8 +971,7 @@ noLLMServer.instance("prompt tools replace previous prompt tool rules", () =>
     })
 
     const reloaded = yield* sessions.get(session.id)
-    expect(reloaded.permission).toEqual([{ permission: "read", pattern: "*", action: "allow" }])
-    expect(Permission.evaluate("bash", "anything", reloaded.permission ?? []).action).toBe("ask")
+    expect(reloaded.permission).toEqual(permission)
   }),
 )
 

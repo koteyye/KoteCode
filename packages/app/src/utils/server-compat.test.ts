@@ -35,6 +35,19 @@ function setup(
           delivery: "steer",
         })
       }
+      if (request.method === "POST" && request.url.endsWith("/command")) {
+        return Response.json({
+          data: {
+            admittedSeq: 1,
+            id: "msg_1",
+            sessionID: "ses_1",
+            timeCreated: 1,
+            type: "user",
+            data: { text: "review" },
+            delivery: "steer",
+          },
+        })
+      }
       if (request.method === "GET" && new URL(request.url).pathname === "/vcs")
         return Response.json(responses?.vcs ?? {})
       if (request.method === "GET") return Response.json([])
@@ -72,6 +85,7 @@ describe("createCompatibleApi", () => {
       text: "hello @src/index.ts",
       agent: "build",
       model: { providerID: "provider", modelID: "model" },
+      tools: { plan_enter: false },
       files: [
         { uri: "file:///repo/src/index.ts", name: "index.ts", mention: { text: "@src/index.ts", start: 6, end: 19 } },
         { uri: "data:text/plain;base64,aGVsbG8=", name: "notes.txt" },
@@ -84,6 +98,7 @@ describe("createCompatibleApi", () => {
       messageID: "msg_1",
       agent: "build",
       model: { providerID: "provider", modelID: "model" },
+      tools: { plan_enter: false },
       parts: [
         { type: "text", text: "hello @src/index.ts" },
         {
@@ -133,6 +148,39 @@ describe("createCompatibleApi", () => {
 
     expect(new URL(requests[0]!.url).pathname).toBe("/api/session/ses_1/archive")
     expect(requests[0]!.method).toBe("POST")
+  })
+
+  test("synchronizes the selected V2 agent before prompting", async () => {
+    const { api, requests } = setup("v2")
+    await api.session.prompt({
+      sessionID: "ses_1",
+      id: "msg_1",
+      text: "hello",
+      agent: "plan",
+      tools: { plan_enter: false },
+    })
+
+    expect(requests.map((request) => new URL(request.url).pathname)).toEqual([
+      "/api/session/ses_1/agent",
+      "/api/session/ses_1/prompt",
+    ])
+    expect(await requests[0]!.json()).toEqual({ agent: "plan" })
+    expect(await requests[1]!.json()).toMatchObject({
+      prompt: { text: "hello", tools: { plan_enter: false } },
+    })
+  })
+
+  test("preserves tool overrides for V2 slash commands", async () => {
+    const { api, requests } = setup("v2")
+    await api.session.command({
+      sessionID: "ses_1",
+      command: "review",
+      arguments: "",
+      tools: { plan_enter: false },
+    })
+
+    expect(new URL(requests[0]!.url).pathname).toBe("/session/ses_1/command")
+    expect(await requests[0]!.json()).toMatchObject({ tools: { plan_enter: false } })
   })
 
   test("resolves protocol detection once across implementation methods", async () => {

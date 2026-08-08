@@ -583,6 +583,13 @@ const events = {
     schema: {
       sessionID: SessionID,
       info: SessionInfo,
+      transition: optional(
+        Schema.Struct({
+          message: User,
+          part: TextPart,
+          time: Schema.Finite,
+        }),
+      ),
     },
   }),
   Deleted: define({

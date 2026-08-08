@@ -2,6 +2,8 @@ Use this tool when you have completed the planning phase and are ready to exit p
 
 This tool will ask the user if they want to switch to build agent to start implementing the plan.
 
+Call this tool by itself. Do not emit other tool calls in the same response.
+
 Call this tool:
 - After you have written a complete plan to the plan file
 - After you have clarified any questions with the user

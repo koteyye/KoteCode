@@ -3,7 +3,7 @@ import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { expect } from "bun:test"
 import { Effect } from "effect"
 import { Agent } from "../../src/agent/agent"
-import { deriveSubagentSessionPermission } from "../../src/agent/subagent-permissions"
+import { deriveSubagentSessionPermission, hasPlanModeCeiling } from "../../src/agent/subagent-permissions"
 import { Permission } from "../../src/permission"
 import { testEffect } from "../lib/effect"
 
@@ -156,5 +156,25 @@ it.effect("subagent inherits parent session deny rules as hard runtime ceilings"
     )
 
     expect(Permission.evaluate("bash", "git status", effective).action).toBe("deny")
+  }),
+)
+
+it.effect("plan mode marks subagent sessions with a durable tool ceiling", () =>
+  Effect.sync(() => {
+    const explore = testAgent({
+      name: "explore",
+      mode: "subagent",
+      permission: { read: "allow", bash: "allow" },
+    })
+    const permission = deriveSubagentSessionPermission({
+      parentSessionPermission: [],
+      subagent: explore,
+      planMode: true,
+    })
+
+    expect(hasPlanModeCeiling(permission)).toBe(true)
+    const effective = Permission.merge(explore.permission, permission)
+    expect(Permission.evaluate("bash", "git status", effective).action).toBe("deny")
+    expect(Permission.evaluate("edit", "src/index.ts", effective).action).toBe("deny")
   }),
 )

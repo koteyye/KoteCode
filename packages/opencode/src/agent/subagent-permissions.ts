@@ -1,6 +1,14 @@
 import { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import type { Agent } from "./agent"
 
+export const planModeCeilingPermission = "__plan_mode_ceiling"
+
+export function hasPlanModeCeiling(ruleset: PermissionV1.Ruleset) {
+  return ruleset.some(
+    (rule) => rule.permission === planModeCeilingPermission && rule.pattern === "*" && rule.action === "deny",
+  )
+}
+
 /**
  * Build the `permission` ruleset for a subagent's session when it's spawned
  * via the task tool. Combines:
@@ -14,6 +22,7 @@ import type { Agent } from "./agent"
 export function deriveSubagentSessionPermission(input: {
   parentSessionPermission: PermissionV1.Ruleset
   subagent: Agent.Info
+  planMode?: boolean
 }): PermissionV1.Ruleset {
   const canTask = input.subagent.permission.some((rule) => rule.permission === "task")
   const canTodo = input.subagent.permission.some((rule) => rule.permission === "todowrite")
@@ -23,5 +32,12 @@ export function deriveSubagentSessionPermission(input: {
     ),
     ...(canTodo ? [] : [{ permission: "todowrite" as const, pattern: "*" as const, action: "deny" as const }]),
     ...(canTask ? [] : [{ permission: "task" as const, pattern: "*" as const, action: "deny" as const }]),
+    ...(input.planMode
+      ? [
+          { permission: planModeCeilingPermission, pattern: "*" as const, action: "deny" as const },
+          { permission: "bash", pattern: "*" as const, action: "deny" as const },
+          { permission: "edit", pattern: "*" as const, action: "deny" as const },
+        ]
+      : []),
   ]
 }

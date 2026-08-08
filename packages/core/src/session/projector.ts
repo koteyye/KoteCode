@@ -109,6 +109,37 @@ function applyUsage(
     .pipe(Effect.orDie)
 }
 
+function projectMessage(db: DatabaseService, info: (typeof SessionV1.Event.MessageUpdated.Type)["data"]["info"]) {
+  const data = messageData(info)
+  return db
+    .insert(MessageTable)
+    .values({ id: info.id, session_id: info.sessionID, time_created: info.time.created, data })
+    .onConflictDoUpdate({ target: MessageTable.id, set: { data } })
+    .run()
+    .pipe(Effect.orDie)
+}
+
+function projectPart(
+  db: DatabaseService,
+  part: (typeof SessionV1.Event.PartUpdated.Type)["data"]["part"],
+  time: number,
+) {
+  return Effect.gen(function* () {
+    const data = partData(part)
+    const row = yield* db.select().from(PartTable).where(eq(PartTable.id, part.id)).get().pipe(Effect.orDie)
+    yield* db
+      .insert(PartTable)
+      .values({ id: part.id, message_id: part.messageID, session_id: part.sessionID, time_created: time, data })
+      .onConflictDoUpdate({ target: PartTable.id, set: { data } })
+      .run()
+      .pipe(Effect.orDie)
+    const previous = row && usage(row.data)
+    const next = usage(part)
+    if (previous) yield* applyUsage(db, row.session_id, previous, -1)
+    if (next) yield* applyUsage(db, part.sessionID, next)
+  })
+}
+
 function run(db: DatabaseService, event: SessionEvent.Event) {
   return Effect.gen(function* () {
     const decodeRow = (row: typeof SessionMessageTable.$inferSelect) =>
@@ -233,12 +264,17 @@ const layer = Layer.effectDiscard(
       }),
     )
     yield* events.project(SessionV1.Event.Updated, (event) =>
-      db
-        .update(SessionTable)
-        .set(sessionRow(event.data.info))
-        .where(eq(SessionTable.id, event.data.sessionID))
-        .run()
-        .pipe(Effect.orDie),
+      Effect.gen(function* () {
+        yield* db
+          .update(SessionTable)
+          .set(sessionRow(event.data.info))
+          .where(eq(SessionTable.id, event.data.sessionID))
+          .run()
+          .pipe(Effect.orDie)
+        if (!event.data.transition) return
+        yield* projectMessage(db, event.data.transition.message)
+        yield* projectPart(db, event.data.transition.part, event.data.transition.time)
+      }),
     )
     yield* events.project(SessionEvent.Moved, (event) =>
       Effect.gen(function* () {
@@ -259,20 +295,7 @@ const layer = Layer.effectDiscard(
     yield* events.project(SessionV1.Event.Deleted, (event) =>
       db.delete(SessionTable).where(eq(SessionTable.id, event.data.sessionID)).run().pipe(Effect.orDie),
     )
-    yield* events.project(SessionV1.Event.MessageUpdated, (event) =>
-      Effect.gen(function* () {
-        const time_created = event.data.info.time.created
-        const id = event.data.info.id
-        const sessionID = event.data.info.sessionID
-        const data = messageData(event.data.info)
-        yield* db
-          .insert(MessageTable)
-          .values({ id, session_id: sessionID, time_created, data })
-          .onConflictDoUpdate({ target: MessageTable.id, set: { data } })
-          .run()
-          .pipe(Effect.orDie)
-      }),
-    )
+    yield* events.project(SessionV1.Event.MessageUpdated, (event) => projectMessage(db, event.data.info))
     yield* events.project(SessionV1.Event.MessageRemoved, (event) =>
       Effect.gen(function* () {
         const rows = yield* db
@@ -309,25 +332,7 @@ const layer = Layer.effectDiscard(
           .pipe(Effect.orDie)
       }),
     )
-    yield* events.project(SessionV1.Event.PartUpdated, (event) =>
-      Effect.gen(function* () {
-        const id = event.data.part.id
-        const messageID = event.data.part.messageID
-        const sessionID = event.data.part.sessionID
-        const data = partData(event.data.part)
-        const row = yield* db.select().from(PartTable).where(eq(PartTable.id, id)).get().pipe(Effect.orDie)
-        yield* db
-          .insert(PartTable)
-          .values({ id, message_id: messageID, session_id: sessionID, time_created: event.data.time, data })
-          .onConflictDoUpdate({ target: PartTable.id, set: { data } })
-          .run()
-          .pipe(Effect.orDie)
-        const previous = row && usage(row.data)
-        const next = usage(event.data.part)
-        if (previous) yield* applyUsage(db, row.session_id, previous, -1)
-        if (next) yield* applyUsage(db, sessionID, next)
-      }),
-    )
+    yield* events.project(SessionV1.Event.PartUpdated, (event) => projectPart(db, event.data.part, event.data.time))
     yield* events.project(SessionEvent.AgentSwitched, (event) =>
       db
         .update(SessionTable)

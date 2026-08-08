@@ -101,7 +101,8 @@ export const Plugin = define({
   id: "agent",
   effect: Effect.fn(function* (ctx) {
     const location = yield* Location.Service
-    const worktree = location.directory
+    const projectPlans = path.join(location.project.directory, ".opencode", "plans")
+    const globalPlans = path.join(Global.Path.data, "plans")
     const whitelistedDirs = [TRUNCATION_GLOB, path.join(Global.Path.tmp, "*")]
     const readonlyExternalDirectory: PermissionV2.Ruleset = [
       { action: "external_directory", resource: "*", effect: "ask" },
@@ -141,14 +142,13 @@ export const Plugin = define({
           ...PermissionV2.merge(defaults, [
             { action: "question", resource: "*", effect: "allow" },
             { action: "plan_exit", resource: "*", effect: "allow" },
-            { action: "external_directory", resource: path.join(Global.Path.data, "plans", "*"), effect: "allow" },
+            { action: "bash", resource: "*", effect: "deny" },
+            { action: "external_directory", resource: path.join(projectPlans, "*"), effect: "allow" },
+            { action: "external_directory", resource: path.join(globalPlans, "*"), effect: "allow" },
             { action: "edit", resource: "*", effect: "deny" },
             { action: "edit", resource: path.join(".opencode", "plans", "*.md"), effect: "allow" },
-            {
-              action: "edit",
-              resource: path.relative(worktree, path.join(Global.Path.data, "plans", "*.md")),
-              effect: "allow",
-            },
+            { action: "edit", resource: path.join(projectPlans, "*.md"), effect: "allow" },
+            { action: "edit", resource: path.join(globalPlans, "*.md"), effect: "allow" },
           ]),
         )
       })

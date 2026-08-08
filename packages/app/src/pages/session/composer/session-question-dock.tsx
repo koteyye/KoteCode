@@ -201,9 +201,19 @@ export const SessionQuestionDock: Component<{ request: QuestionRequest; onSubmit
   createEffect(() => {
     const el = optionsRef
     if (!el) return
-    const update = () => setStore("optionsHeight", (height) => Math.max(height, el.scrollHeight))
+    // rAF-deferred: setting optionsHeight feeds this element's own max-height (line 543),
+    // so a synchronous write would retrigger the observer and loop.
+    let raf: number | undefined
+    const measure = () => setStore("optionsHeight", (height) => Math.max(height, el.scrollHeight))
+    const update = () => {
+      if (raf !== undefined) cancelAnimationFrame(raf)
+      raf = requestAnimationFrame(measure)
+    }
     update()
     createResizeObserver(el, update)
+    onCleanup(() => {
+      if (raf !== undefined) cancelAnimationFrame(raf)
+    })
   })
 
   onCleanup(() => {

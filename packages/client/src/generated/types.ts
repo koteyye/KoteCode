@@ -101,6 +101,14 @@ export type ProjectCopyError = {
 export const isProjectCopyError = (value: unknown): value is ProjectCopyError =>
   typeof value === "object" && value !== null && "name" in value && value["name"] === "ProjectCopyError"
 
+export type ProjectNotFoundError = {
+  readonly _tag: "ProjectNotFoundError"
+  readonly projectID: string
+  readonly message: string
+}
+export const isProjectNotFoundError = (value: unknown): value is ProjectNotFoundError =>
+  typeof value === "object" && value !== null && "_tag" in value && value["_tag"] === "ProjectNotFoundError"
+
 export type HealthGetOutput = { readonly healthy: true }
 
 export type LocationGetInput = {
@@ -397,6 +405,7 @@ export type SessionsPromptInput = {
         readonly name: string
         readonly source?: { readonly start: number; readonly end: number; readonly text: string }
       }>
+      readonly tools?: { readonly [x: string]: boolean }
     }
     readonly delivery?: "steer" | "queue" | null
     readonly resume?: boolean | null
@@ -415,6 +424,7 @@ export type SessionsPromptInput = {
         readonly name: string
         readonly source?: { readonly start: number; readonly end: number; readonly text: string }
       }>
+      readonly tools?: { readonly [x: string]: boolean }
     }
     readonly delivery?: "steer" | "queue" | null
     readonly resume?: boolean | null
@@ -433,6 +443,7 @@ export type SessionsPromptInput = {
         readonly name: string
         readonly source?: { readonly start: number; readonly end: number; readonly text: string }
       }>
+      readonly tools?: { readonly [x: string]: boolean }
     }
     readonly delivery?: "steer" | "queue" | null
     readonly resume?: boolean | null
@@ -451,6 +462,7 @@ export type SessionsPromptInput = {
         readonly name: string
         readonly source?: { readonly start: number; readonly end: number; readonly text: string }
       }>
+      readonly tools?: { readonly [x: string]: boolean }
     }
     readonly delivery?: "steer" | "queue" | null
     readonly resume?: boolean | null
@@ -475,6 +487,7 @@ export type SessionsPromptOutput = {
         readonly name: string
         readonly source?: { readonly start: number; readonly end: number; readonly text: string }
       }>
+      readonly tools?: { readonly [x: string]: boolean }
     }
     readonly delivery: "steer" | "queue"
     readonly timeCreated: number
@@ -554,6 +567,7 @@ export type SessionsContextOutput = {
           readonly name: string
           readonly source?: { readonly start: number; readonly end: number; readonly text: string }
         }>
+        readonly tools?: { readonly [x: string]: boolean }
         readonly type: "user"
       }
     | {
@@ -746,6 +760,7 @@ export type SessionsHistoryOutput = {
               readonly name: string
               readonly source?: { readonly start: number; readonly end: number; readonly text: string }
             }>
+            readonly tools?: { readonly [x: string]: boolean }
           }
           readonly delivery: "steer" | "queue"
         }
@@ -773,6 +788,7 @@ export type SessionsHistoryOutput = {
               readonly name: string
               readonly source?: { readonly start: number; readonly end: number; readonly text: string }
             }>
+            readonly tools?: { readonly [x: string]: boolean }
           }
           readonly delivery: "steer" | "queue"
         }
@@ -1204,6 +1220,7 @@ export type SessionsEventsOutput =
             readonly name: string
             readonly source?: { readonly start: number; readonly end: number; readonly text: string }
           }>
+          readonly tools?: { readonly [x: string]: boolean }
         }
         readonly delivery: "steer" | "queue"
       }
@@ -1231,6 +1248,7 @@ export type SessionsEventsOutput =
             readonly name: string
             readonly source?: { readonly start: number; readonly end: number; readonly text: string }
           }>
+          readonly tools?: { readonly [x: string]: boolean }
         }
         readonly delivery: "steer" | "queue"
       }
@@ -1632,6 +1650,7 @@ export type SessionsMessageOutput = {
           readonly name: string
           readonly source?: { readonly start: number; readonly end: number; readonly text: string }
         }>
+        readonly tools?: { readonly [x: string]: boolean }
         readonly type: "user"
       }
     | {
@@ -1804,6 +1823,7 @@ export type MessagesListOutput = {
           readonly name: string
           readonly source?: { readonly start: number; readonly end: number; readonly text: string }
         }>
+        readonly tools?: { readonly [x: string]: boolean }
         readonly type: "user"
       }
     | {
@@ -2805,3 +2825,69 @@ export type ProjectCopiesRefreshInput = {
 }
 
 export type ProjectCopiesRefreshOutput = void
+
+export type ProjectsListOutput = ReadonlyArray<{
+  readonly id: string
+  readonly worktree: string
+  readonly vcs?: "git"
+  readonly name?: string
+  readonly icon?: { readonly url?: string; readonly override?: string; readonly color?: string }
+  readonly commands?: { readonly start?: string }
+  readonly time: { readonly created: number; readonly updated: number; readonly initialized?: number }
+  readonly sandboxes: ReadonlyArray<string>
+}>
+
+export type ProjectsUpdateInput = {
+  readonly projectID: { readonly projectID: string }["projectID"]
+  readonly name?: {
+    readonly name?: string
+    readonly icon?: { readonly url?: string; readonly override?: string; readonly color?: string }
+    readonly commands?: { readonly start?: string }
+  }["name"]
+  readonly icon?: {
+    readonly name?: string
+    readonly icon?: { readonly url?: string; readonly override?: string; readonly color?: string }
+    readonly commands?: { readonly start?: string }
+  }["icon"]
+  readonly commands?: {
+    readonly name?: string
+    readonly icon?: { readonly url?: string; readonly override?: string; readonly color?: string }
+    readonly commands?: { readonly start?: string }
+  }["commands"]
+}
+
+export type ProjectsUpdateOutput = {
+  readonly id: string
+  readonly worktree: string
+  readonly vcs?: "git"
+  readonly name?: string
+  readonly icon?: { readonly url?: string; readonly override?: string; readonly color?: string }
+  readonly commands?: { readonly start?: string }
+  readonly time: { readonly created: number; readonly updated: number; readonly initialized?: number }
+  readonly sandboxes: ReadonlyArray<string>
+}
+
+export type ProjectsCurrentInput = {
+  readonly location?: {
+    readonly location?: { readonly directory?: string | undefined; readonly workspace?: string | undefined } | undefined
+  }["location"]
+}
+
+export type ProjectsCurrentOutput = { readonly id: string; readonly directory: string }
+
+export type ProjectsDirectoriesInput = {
+  readonly projectID: { readonly projectID: string }["projectID"]
+  readonly location?: {
+    readonly location?: { readonly directory?: string | undefined; readonly workspace?: string | undefined } | undefined
+  }["location"]
+}
+
+export type ProjectsDirectoriesOutput = ReadonlyArray<{ readonly directory: string; readonly strategy?: string }>
+
+export type ProjectsRepositoriesInput = {
+  readonly location?: {
+    readonly location?: { readonly directory?: string | undefined; readonly workspace?: string | undefined } | undefined
+  }["location"]
+}
+
+export type ProjectsRepositoriesOutput = ReadonlyArray<{ readonly id: string; readonly directory: string }>

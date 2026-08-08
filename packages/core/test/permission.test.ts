@@ -18,11 +18,11 @@ import { SessionStore } from "@opencode-ai/core/session/store"
 import { eq } from "drizzle-orm"
 import { location } from "./fixture/location"
 import { testEffect } from "./lib/effect"
+import { SessionPlan } from "@opencode-ai/core/session/plan"
+import path from "path"
 
-const current = Layer.succeed(
-  Location.Service,
-  Location.Service.of(location({ directory: AbsolutePath.make("/project") })),
-)
+const locationInfo = location({ directory: AbsolutePath.make("/project") })
+const current = Layer.succeed(Location.Service, Location.Service.of(locationInfo))
 const it = testEffect(
   AppNodeBuilder.build(
     LayerNode.group([
@@ -226,6 +226,42 @@ describe("PermissionV2", () => {
       yield* setRules([])
       expect(yield* service.ask(bash)).toEqual({ id: PermissionV2.ID.create("per_test"), effect: "ask" })
       expect(yield* service.get(PermissionV2.ID.create("per_test"))).toBeDefined()
+    }),
+  )
+
+  it.effect("enforces the plan agent mutation ceiling after configured and saved allows", () =>
+    Effect.gen(function* () {
+      yield* setup()
+      const { db } = yield* Database.Service
+      const agents = yield* AgentV2.Service
+      yield* agents.transform((editor) =>
+        editor.update(AgentV2.ID.make("plan"), (agent) => {
+          agent.permissions = [{ action: "*", resource: "*", effect: "allow" }]
+        }),
+      )
+      yield* db
+        .update(SessionTable)
+        .set({ agent: "plan" })
+        .where(eq(SessionTable.id, SessionV2.ID.make("ses_test")))
+        .run()
+        .pipe(Effect.orDie)
+      const saved = yield* PermissionSaved.Service
+      yield* saved.add({ projectID: Project.ID.global, action: "edit", resources: ["*"] })
+      const sessions = yield* SessionStore.Service
+      const session = yield* sessions.get(SessionV2.ID.make("ses_test"))
+      if (!session) return yield* Effect.die("session not found")
+      const plan = SessionPlan.file(session, locationInfo).replaceAll("\\", "/")
+      const relative = path.relative(locationInfo.directory, plan).replaceAll("\\", "/")
+      const service = yield* PermissionV2.Service
+
+      expect(yield* service.ask(assertion({ action: "bash", resources: ["pwd"] }))).toMatchObject({ effect: "deny" })
+      expect(yield* service.ask(assertion({ action: "edit", resources: ["src/index.ts"] }))).toMatchObject({
+        effect: "deny",
+      })
+      expect(yield* service.ask(assertion({ action: "edit", resources: [plan] }))).toMatchObject({ effect: "allow" })
+      expect(yield* service.ask(assertion({ action: "edit", resources: [relative] }))).toMatchObject({
+        effect: "allow",
+      })
     }),
   )
 

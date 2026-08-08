@@ -10,6 +10,8 @@ import { SessionV2 } from "./session"
 import { SessionStore } from "./session/store"
 import { Wildcard } from "./util/wildcard"
 import { PermissionSaved } from "./permission/saved"
+import { SessionPlan } from "./session/plan"
+import path from "path"
 
 export { Effect, Rule, Ruleset } from "@opencode-ai/schema/permission"
 const missingAgentPermissions: Permission.Ruleset = [{ action: "*", resource: "*", effect: "deny" }]
@@ -141,7 +143,18 @@ const layer = Layer.effect(
       const session = yield* sessions.get(sessionID)
       if (!session) return yield* new SessionV2.NotFoundError({ sessionID })
       const agent = yield* agents.resolve(agentID ?? session.agent)
-      return agent?.permissions ?? missingAgentPermissions
+      if (!agent) return missingAgentPermissions
+      if (agent.id !== AgentV2.ID.make("plan")) return agent.permissions
+      const plan = SessionPlan.file(session, location)
+      const resources = [plan, path.relative(location.directory, plan)].map((resource) =>
+        resource.replaceAll("\\", "/"),
+      )
+      return [
+        ...agent.permissions,
+        { action: "bash", resource: "*", effect: "deny" as const },
+        { action: "edit", resource: "*", effect: "deny" as const },
+        ...resources.map((resource) => ({ action: "edit", resource, effect: "allow" as const })),
+      ]
     })
 
     function denied(input: AssertInput, rules: Permission.Ruleset) {

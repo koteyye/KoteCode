@@ -12,13 +12,17 @@ const ref = { directory: AbsolutePath.make("/repo/packages/app"), workspaceID }
 const projectLayer = Layer.succeed(
   Project.Service,
   Project.Service.of({
+    list: () => Effect.succeed([]),
     directories: () => Effect.succeed([]),
+    repositories: () => Effect.succeed([]),
+    update: () => Effect.die("unused"),
     resolve: () =>
       Effect.succeed({
         id: Project.ID.make("project"),
         directory: AbsolutePath.make("/repo"),
         vcs: { type: "git", store: AbsolutePath.make("/repo/.git") },
       }),
+    open: () => Effect.die("unused"),
     commit: () => Effect.void,
   }),
 )

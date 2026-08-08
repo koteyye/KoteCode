@@ -1057,15 +1057,6 @@ const layer = Layer.effect(
       const message = yield* createUserMessage(input)
       yield* sessions.touch(input.sessionID)
 
-      const permissions: PermissionV1.Rule[] = []
-      for (const [t, enabled] of Object.entries(input.tools ?? {})) {
-        permissions.push({ permission: t, action: enabled ? "allow" : "deny", pattern: "*" })
-      }
-      if (permissions.length > 0) {
-        session.permission = permissions
-        yield* sessions.setPermission({ sessionID: session.id, permission: permissions })
-      }
-
       if (input.noReply === true) return message
       return yield* loop({ sessionID: input.sessionID })
     })
@@ -1163,7 +1154,13 @@ const layer = Layer.effect(
             lastFinished.summary !== true &&
             (yield* compaction.isOverflow({ tokens: lastFinished.tokens, model }))
           ) {
-            yield* compaction.create({ sessionID, agent: lastUser.agent, model: lastUser.model, auto: true })
+            yield* compaction.create({
+              sessionID,
+              agent: lastUser.agent,
+              model: lastUser.model,
+              auto: true,
+              tools: lastUser.tools,
+            })
             continue
           }
 
@@ -1223,7 +1220,7 @@ const layer = Layer.effect(
             const bypassAgentCheck = lastUserMsg?.parts.some((p) => p.type === "agent") ?? false
             const promptOps = yield* ops()
 
-            const tools = yield* SessionTools.resolve({
+            const availableTools = yield* SessionTools.resolve({
               agent,
               session,
               model,
@@ -1241,13 +1238,14 @@ const layer = Layer.effect(
             )
 
             if (lastUser.format?.type === "json_schema") {
-              tools["StructuredOutput"] = createStructuredOutputTool({
+              availableTools["StructuredOutput"] = createStructuredOutputTool({
                 schema: lastUser.format.schema,
                 onSuccess(output) {
                   structured = output
                 },
               })
             }
+            const tools = SessionTools.isolateTransitions(availableTools)
 
             if (step === 1)
               yield* summary.summarize({ sessionID, messageID: lastUser.id }).pipe(Effect.ignore, Effect.forkIn(scope))
@@ -1324,6 +1322,7 @@ const layer = Layer.effect(
                 model: lastUser.model,
                 auto: true,
                 overflow: !handle.message.finish,
+                tools: lastUser.tools,
               })
             }
             return "continue" as const
@@ -1469,6 +1468,7 @@ const layer = Layer.effect(
         model: userModel,
         agent: userAgent,
         parts,
+        tools: input.tools,
         variant: input.variant,
       })
       yield* events.publish(Command.Event.Executed, {
@@ -1540,6 +1540,7 @@ export const CommandInput = Schema.Struct({
   model: Schema.optional(Schema.String),
   arguments: Schema.String,
   command: Schema.String,
+  tools: Schema.optional(Schema.Record(Schema.String, Schema.Boolean)),
   variant: Schema.optional(Schema.String),
   // Inlined (no identifier annotation) to keep the original SDK output — the
   // PromptInput call site below references FilePartInput by ref via the

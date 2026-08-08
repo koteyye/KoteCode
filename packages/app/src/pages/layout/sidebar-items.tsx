@@ -27,7 +27,11 @@ export const ProjectIcon = (props: {
   const serverSync = useServerSync()
   const notification = useNotification()
   const permission = usePermission()
-  const dirs = createMemo(() => [props.project.worktree, ...(props.project.sandboxes ?? [])])
+  const dirs = createMemo(() => [
+    props.project.worktree,
+    ...(props.project.repositories ?? []),
+    ...(props.project.sandboxes ?? []),
+  ])
   const unseenCount = createMemo(() =>
     dirs().reduce((total, directory) => total + notification.project.unseenCount(directory), 0),
   )

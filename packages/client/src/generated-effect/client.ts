@@ -681,6 +681,51 @@ const adaptGroup17 = (raw: RawClient["server.projectCopy"]) => ({
   refresh: Endpoint17_2(raw),
 })
 
+const Endpoint18_0 = (raw: RawClient["server.project"]) => () =>
+  raw["project.list"]({}).pipe(Effect.mapError(mapClientError))
+
+type Endpoint18_1Request = Parameters<RawClient["server.project"]["project.update"]>[0]
+type Endpoint18_1Input = {
+  readonly projectID: Endpoint18_1Request["params"]["projectID"]
+  readonly name?: Endpoint18_1Request["payload"]["name"]
+  readonly icon?: Endpoint18_1Request["payload"]["icon"]
+  readonly commands?: Endpoint18_1Request["payload"]["commands"]
+}
+const Endpoint18_1 = (raw: RawClient["server.project"]) => (input: Endpoint18_1Input) =>
+  raw["project.update"]({
+    params: { projectID: input["projectID"] },
+    payload: { name: input["name"], icon: input["icon"], commands: input["commands"] },
+  }).pipe(Effect.mapError(mapClientError))
+
+type Endpoint18_2Request = Parameters<RawClient["server.project"]["project.current"]>[0]
+type Endpoint18_2Input = { readonly location?: Endpoint18_2Request["query"]["location"] }
+const Endpoint18_2 = (raw: RawClient["server.project"]) => (input?: Endpoint18_2Input) =>
+  raw["project.current"]({ query: { location: input?.["location"] } }).pipe(Effect.mapError(mapClientError))
+
+type Endpoint18_3Request = Parameters<RawClient["server.project"]["project.directories"]>[0]
+type Endpoint18_3Input = {
+  readonly projectID: Endpoint18_3Request["params"]["projectID"]
+  readonly location?: Endpoint18_3Request["query"]["location"]
+}
+const Endpoint18_3 = (raw: RawClient["server.project"]) => (input: Endpoint18_3Input) =>
+  raw["project.directories"]({
+    params: { projectID: input["projectID"] },
+    query: { location: input["location"] },
+  }).pipe(Effect.mapError(mapClientError))
+
+type Endpoint18_4Request = Parameters<RawClient["server.project"]["project.repositories"]>[0]
+type Endpoint18_4Input = { readonly location?: Endpoint18_4Request["query"]["location"] }
+const Endpoint18_4 = (raw: RawClient["server.project"]) => (input?: Endpoint18_4Input) =>
+  raw["project.repositories"]({ query: { location: input?.["location"] } }).pipe(Effect.mapError(mapClientError))
+
+const adaptGroup18 = (raw: RawClient["server.project"]) => ({
+  list: Endpoint18_0(raw),
+  update: Endpoint18_1(raw),
+  current: Endpoint18_2(raw),
+  directories: Endpoint18_3(raw),
+  repositories: Endpoint18_4(raw),
+})
+
 const adaptClient = (raw: RawClient) => ({
   health: adaptGroup0(raw["server.health"]),
   location: adaptGroup1(raw["server.location"]),
@@ -700,6 +745,7 @@ const adaptClient = (raw: RawClient) => ({
   questions: adaptGroup15(raw["server.question"]),
   references: adaptGroup16(raw["server.reference"]),
   projectCopies: adaptGroup17(raw["server.projectCopy"]),
+  projects: adaptGroup18(raw["server.project"]),
 })
 
 export const make = (options?: { readonly baseUrl?: URL | string }) =>

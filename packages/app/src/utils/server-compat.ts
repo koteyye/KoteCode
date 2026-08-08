@@ -1,4 +1,4 @@
-import type { ServerApi } from "./server"
+import type { CurrentServerApi, ServerApi } from "./server"
 import type { ServerProtocol } from "./server-protocol"
 import type { AgentPartInput, FilePartInput, OpencodeClient, Session, TextPartInput } from "@opencode-ai/sdk/v2/client"
 import type {
@@ -23,7 +23,7 @@ type CompatibleSessionApi = Omit<
   "prompt" | "command" | "shell" | "compact" | "rename" | "archive" | "remove"
 > & {
   prompt: (input: SessionPromptInput & LegacyPrompt) => Promise<SessionPromptOutput>
-  command: (input: SessionCommandInput) => Promise<SessionCommandOutput>
+  command: (input: SessionCommandInput & { tools?: Record<string, boolean> }) => Promise<SessionCommandOutput>
   shell: (input: SessionShellInput & LegacyPrompt) => Promise<SessionShellOutput>
   compact: (input: SessionCompactInput & { model?: LegacyPrompt["model"] }) => Promise<SessionCompactOutput>
   rename: (input: Parameters<SessionApi["rename"]>[0] & LegacyLocation) => ReturnType<SessionApi["rename"]>
@@ -35,20 +35,22 @@ type CompatiblePermissionApi = Omit<ServerApi["permission"], "reply"> & {
     input: Parameters<ServerApi["permission"]["reply"]>[0] & { location?: { directory?: string } },
   ) => ReturnType<ServerApi["permission"]["reply"]>
 }
-export type CompatibleApi = Omit<ServerApi, "session" | "permission"> & {
+export type CompatibleApi = Omit<ServerApi, "session" | "permission" | "project"> & {
   readonly session: CompatibleSessionApi
   readonly permission: CompatiblePermissionApi
+  readonly project: ServerApi["project"]
 }
 type LegacyPrompt = {
   agent?: string
   model?: { providerID: string; modelID: string }
   variant?: string
+  tools?: Record<string, boolean>
   legacyParts?: (TextPartInput | FilePartInput | AgentPartInput)[]
 }
 type LegacyLocation = { directory?: string }
 type CompatibleInput = {
   protocol: Promise<ServerProtocol>
-  current: ServerApi
+  current: CurrentServerApi
   legacy: LegacyFor
   directory?: string
 }
@@ -85,10 +87,50 @@ function sessionInfo(session: Session): SessionInfo {
 
 export function createCompatibleApi(input: CompatibleInput): CompatibleApi {
   const v1 = createV1Api(input)
+  const current = createCurrentApi(input.current, v1.session.command)
   return lazyApi(
-    input.protocol.then((protocol) => (protocol === "v1" ? v1 : input.current)),
-    input.current,
+    input.protocol.then((protocol) => (protocol === "v1" ? v1 : current)),
+    current,
   )
+}
+
+function createCurrentApi(api: CurrentServerApi, legacyCommand: CompatibleSessionApi["command"]): CompatibleApi {
+  const promptQueues = new Map<string, Promise<unknown>>()
+  return {
+    ...api,
+    session: {
+      ...api.session,
+      async prompt(value: SessionPromptInput & LegacyPrompt) {
+        const previous = promptQueues.get(value.sessionID) ?? Promise.resolve()
+        const next = previous.catch(() => undefined).then(() =>
+          Promise.all([
+            value.agent ? api.session.switchAgent({ sessionID: value.sessionID, agent: value.agent }) : undefined,
+            value.model
+              ? api.session.switchModel({
+                  sessionID: value.sessionID,
+                  model: { id: value.model.modelID, providerID: value.model.providerID, variant: value.variant },
+                })
+              : undefined,
+          ]).then(() => api.session.promptCurrent(value)),
+        )
+        promptQueues.set(value.sessionID, next)
+        void next.then(
+          () => {
+            if (promptQueues.get(value.sessionID) === next) promptQueues.delete(value.sessionID)
+          },
+          () => {
+            if (promptQueues.get(value.sessionID) === next) promptQueues.delete(value.sessionID)
+          },
+        )
+        return next
+      },
+      async command(value: SessionCommandInput & { tools?: Record<string, boolean> }) {
+        // The current HttpApi has no command endpoint yet. Keep slash commands
+        // working through the legacy route until that contract is published.
+        return legacyCommand(value)
+      },
+    },
+  }
 }
 
 function lazyApi<T extends object>(implementation: Promise<T>, shape: T): T {
@@ -204,6 +246,7 @@ function createV1Api(input: CompatibleInput): CompatibleApi {
           agent: value.agent,
           model: value.model,
           variant: value.variant,
+          tools: value.tools,
           parts: value.legacyParts ?? [
             { type: "text", text: value.text },
             ...(value.files ?? []).map((file) => ({
@@ -238,11 +281,12 @@ function createV1Api(input: CompatibleInput): CompatibleApi {
           delivery: value.delivery ?? "steer",
         }
       },
-      async command(value: SessionCommandInput) {
+      async command(value: SessionCommandInput & { tools?: Record<string, boolean> }) {
         await legacy().session.command({
           sessionID: value.sessionID,
           messageID: value.id ?? undefined,
           command: value.command,
+          tools: value.tools,
           arguments: value.arguments ?? "",
           agent: value.agent ?? undefined,
           model: value.model ? `${value.model.providerID}/${value.model.id}` : undefined,

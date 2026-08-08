@@ -2,7 +2,7 @@ import { useDirectoryPicker } from "@/components/directory-picker"
 import { useServerManagementController } from "@/components/dialog-select-server"
 import { useSettingsCommand } from "@/components/settings-dialog"
 import { DialogServerV2 } from "@/components/settings-v2/dialog-server-v2"
-import { type LocalProject } from "@/context/layout"
+import { projectDirectories, type LocalProject } from "@/context/layout"
 import { useLanguage } from "@/context/language"
 import { useNotification } from "@/context/notification"
 import { usePlatform } from "@/context/platform"
@@ -33,7 +33,7 @@ export function createHomeProjectsController(home: HomeController) {
     { initialValue: _state },
   )
   function directories(project: LocalProject) {
-    return [project.worktree, ...(project.sandboxes ?? [])]
+    return projectDirectories(project)
   }
 
   function canRevealProject(conn: ServerConnection.Any) {
@@ -106,6 +106,14 @@ export function createHomeProjectsController(home: HomeController) {
       },
       move: (conn: ServerConnection.Any, worktree: string, index: number) => {
         home.server.context(conn).projects.move(worktree, index)
+      },
+      toggleExpanded: (conn: ServerConnection.Any, project: LocalProject) => {
+        const projects = home.server.context(conn).projects
+        if (project.expanded) {
+          projects.collapse(project.worktree)
+          return
+        }
+        projects.expand(project.worktree)
       },
       canReveal: canRevealProject,
       reveal: (conn: ServerConnection.Any, project: LocalProject) => {

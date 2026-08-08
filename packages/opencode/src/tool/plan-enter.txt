@@ -4,6 +4,8 @@ If they explicitly mention wanting to create a plan ALWAYS call this tool first.
 
 This tool will ask the user if they want to switch to plan agent.
 
+Call this tool by itself before any implementation tools. Do not emit other tool calls in the same response.
+
 Call this tool when:
 - The user's request is complex and would benefit from planning first
 - You want to research and design before making changes

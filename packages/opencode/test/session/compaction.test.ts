@@ -88,7 +88,7 @@ function createModel(opts: {
 
 const wide = () => ProviderTest.fake({ model: createModel({ context: 100_000, output: 32_000 }) })
 
-function createUserMessage(sessionID: SessionID, text: string) {
+function createUserMessage(sessionID: SessionID, text: string, tools?: Record<string, boolean>) {
   return Effect.gen(function* () {
     const ssn = yield* SessionNs.Service
     const msg = yield* ssn.updateMessage({
@@ -97,6 +97,7 @@ function createUserMessage(sessionID: SessionID, text: string) {
       sessionID,
       agent: "build",
       model: ref,
+      tools,
       time: { created: Date.now() },
     })
     yield* ssn.updatePart({
@@ -895,11 +896,20 @@ describe("session.compaction.process", () => {
     Effect.gen(function* () {
       const ssn = yield* SessionNs.Service
       const session = yield* ssn.create({})
-      const msg = yield* createUserMessage(session.id, "hello")
+      const msg = yield* createUserMessage(session.id, "hello", { plan_enter: false })
+      yield* SessionCompaction.use.create({
+        sessionID: session.id,
+        agent: msg.agent,
+        model: msg.model,
+        auto: true,
+        tools: msg.tools,
+      })
       const msgs = yield* ssn.messages({ sessionID: session.id })
+      const marker = msgs.at(-1)
+      if (!marker || marker.info.role !== "user") throw new Error("compaction marker not found")
 
       const result = yield* SessionCompaction.use.process({
-        parentID: msg.id,
+        parentID: marker.info.id,
         messages: msgs,
         sessionID: session.id,
         auto: true,
@@ -910,6 +920,7 @@ describe("session.compaction.process", () => {
 
       expect(result).toBe("continue")
       expect(last?.info.role).toBe("user")
+      if (last?.info.role === "user") expect(last.info.tools).toEqual({ plan_enter: false })
       expect(last?.parts[0]).toMatchObject({
         type: "text",
         synthetic: true,

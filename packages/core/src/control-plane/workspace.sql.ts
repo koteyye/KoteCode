@@ -1,6 +1,6 @@
 import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core"
 import { ProjectTable } from "../project/sql"
-import { ProjectV2 } from "../project"
+import type { ProjectV2 } from "../project"
 import { WorkspaceV2 } from "../workspace"
 
 export const WorkspaceTable = sqliteTable("workspace", {
