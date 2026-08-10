@@ -31,15 +31,15 @@ environment.
 7. Protect release tags (`v*`) and limit who can create them.
 8. Keep Actions permissions at the workflow defaults. Do not enable broad write permissions globally.
 
-No Windows or Apple signing secret is required for `v0.1.0`.
+No Windows or Apple signing secret is required for `v0.2.0`.
 
 ## 2. Version and channel rules
 
 The Git tag is the single release version source:
 
-- `v0.1.0` → stable GitHub Release, npm tag `latest`, Homebrew PR.
+- `v0.2.0` → stable GitHub Release, npm tag `latest`, Homebrew PR.
 - `v0.2.0-beta.1` → GitHub prerelease, npm tag `beta`, no Homebrew PR.
-- `v0.1.0-test.1` → dry-run/test prerelease; never publish it under npm tag `latest`.
+- `v0.2.0-test.1` → dry-run/test prerelease; never publish it under npm tag `latest`.
 
 The workflow strips `v`, requires exact SemVer, and injects the result into CLI, Desktop, npm manifests,
 GitHub Release metadata, updater metadata, and the generated Homebrew Formula.
@@ -59,8 +59,8 @@ cd ../tui && bun typecheck && bun test --timeout 30000
 Validate release tooling and build the current host CLI:
 
 ```bash
-bun run release:validate 0.1.0-test.1
-KOTECODE_VERSION=0.1.0-test.1 KOTECODE_CHANNEL=beta \
+bun run release:validate 0.2.0-test.1
+KOTECODE_VERSION=0.2.0-test.1 KOTECODE_CHANNEL=beta \
   bun run packages/opencode/script/build.ts --single
 ```
 
@@ -78,22 +78,22 @@ The release workflows set this automatically.
 
 ## 4. CI dry run
 
-Run **KoteCode release candidate** with `workflow_dispatch` and a version such as `0.1.0-test.1`.
+Run **KoteCode release candidate** with `workflow_dispatch` and a version such as `0.2.0-test.1`.
 Manual dispatch performs the full tests and five CLI plus Windows/Linux/macOS Desktop builds, creates
 `SHA256SUMS`, validates the release bundle, and generates a Homebrew Formula artifact. It does not create
 or publish a GitHub Release.
 
 Download and inspect:
 
-- `release-assets-v0.1.0-test.1`
-- `homebrew-formula-v0.1.0-test.1` is intentionally absent because prereleases do not update Homebrew.
+- `release-assets-v0.2.0-test.1`
+- `homebrew-formula-v0.2.0-test.1` is intentionally absent because prereleases do not update Homebrew.
 
-For a stable dry run, dispatch version `0.1.0` before creating the tag; the Formula is generated as a CI
+For a stable dry run, dispatch version `0.2.0` before creating the tag; the Formula is generated as a CI
 artifact but no external repository is changed.
 
 ## 5. Required smoke tests before the real tag
 
-Use two test versions (for example `v0.1.0-test.1` and `v0.1.0-test.2`) without publishing `latest`.
+Use two test versions (for example `v0.2.0-test.1` and `v0.2.0-test.2`) without publishing `latest`.
 Record results for:
 
 - CLI `--version` and `--help` on every supported OS/architecture;
@@ -108,7 +108,7 @@ Record results for:
 - absence of OpenCode update-feed requests.
 
 Windows SmartScreen and enterprise-policy behavior cannot be made reliable without a trusted certificate;
-record the warning or block as an expected `v0.1.0` limitation. Record macOS Gatekeeper behavior as an
+record the warning or block as an expected `v0.2.0` limitation. Record macOS Gatekeeper behavior as an
 expected limitation of the unsigned and unnotarized Desktop build.
 
 ## 6. Create the tag
@@ -116,8 +116,8 @@ expected limitation of the unsigned and unnotarized Desktop build.
 Make sure the intended commit and CI are green, then the owner runs:
 
 ```bash
-git tag v0.1.0
-git push origin v0.1.0
+git tag v0.2.0
+git push origin v0.2.0
 ```
 
 The tag workflow:
@@ -134,8 +134,8 @@ The tag workflow:
 Before approval, show and review:
 
 ```bash
-gh release view v0.1.0 --json isDraft,isPrerelease,assets
-gh release download v0.1.0 --dir artifacts
+gh release view v0.2.0 --json isDraft,isPrerelease,assets
+gh release download v0.2.0 --dir artifacts
 bun run release:verify artifacts
 ```
 
@@ -146,15 +146,15 @@ test results, and acknowledge the unsigned Windows and macOS warnings.
 
 Run **Publish approved KoteCode release** manually with:
 
-- `tag`: `v0.1.0`
-- `confirmation`: `PUBLISH v0.1.0`
+- `tag`: `v0.2.0`
+- `confirmation`: `PUBLISH v0.2.0`
 
 Approve the `release` environment deployment. The workflow then executes, in order:
 
-1. `gh release edit v0.1.0 --draft=false`
+1. `gh release edit v0.2.0 --draft=false`
 2. rebuild and dry-run the npm packages from the tag;
 3. publish platform packages and `kotecode` with npm OIDC/provenance;
-4. smoke-test `npm install -g kotecode@0.1.0`;
+4. smoke-test `npm install -g kotecode@0.2.0`;
 5. for stable releases only, open a PR in `koteyye/homebrew-tap`.
 
 Do not run the publish workflow until the npm scope and Trusted Publisher entries are confirmed.
@@ -172,15 +172,15 @@ brew uninstall koteyye/tap/kotecode
 ```
 
 The Formula uses only KoteCode GitHub Release archives and SHA-256 values from the published
-`SHA256SUMS`. `v0.1.0` has no Homebrew Cask.
+`SHA256SUMS`. `v0.2.0` has no Homebrew Cask.
 
 ## 10. Hotfix
 
 Prepare the fix on the normal branch, repeat dry run and smoke tests, then tag the next patch:
 
 ```bash
-git tag v0.1.1
-git push origin v0.1.1
+git tag v0.2.1
+git push origin v0.2.1
 ```
 
 Never move or reuse a published tag and never overwrite published assets.
@@ -199,7 +199,8 @@ Homebrew job is skipped. Stable clients use `latest` and cannot update to beta.
 
 ## 12. npm dist-tag rollback
 
-Changing a dist-tag is an owner-only recovery action and is not automated:
+Changing a dist-tag is an owner-only recovery action and is not automated. For example, to roll back
+`v0.2.0` to the previous public release:
 
 ```bash
 npm dist-tag ls kotecode
@@ -234,10 +235,10 @@ Do not use a self-signed certificate for a public release.
 
 macOS Desktop is included for Intel and Apple Silicon as unsigned, unnotarized DMG and ZIP downloads with
 the stable bundle ID `ai.kotecode.desktop`. Automatic macOS Desktop updates and a Homebrew Cask are not
-enabled in `v0.1.0`. A future signed release requires an Apple Developer certificate, notarization,
+enabled in `v0.2.0`. A future signed release requires an Apple Developer certificate, notarization,
 `latest-mac.yml`, and signed updater testing before those channels are enabled.
 
-## 14. Expected `v0.1.0` release files
+## 14. Expected `v0.2.0` release files
 
 ```text
 kotecode-windows-x64.zip

@@ -20,6 +20,7 @@ import { ServerRowMenuView, serverMenuLabels } from "@/components/server/server-
 import { ServerHealthIndicator } from "@/components/server/server-row"
 import { type ServerHealth } from "@/utils/server-health"
 import { fileManagerApp } from "@/utils/file-manager"
+import { getFilename } from "@opencode-ai/core/util/path"
 
 const HOME_PROJECT_NAV_LABEL = "min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap"
 
@@ -49,9 +50,10 @@ export type HomeProjectsViewProps = {
   onSetDefaultServer: (server: ServerConnection.Any | undefined) => void
   onRemoveServer: (server: ServerConnection.Any) => void
   onMoveProject: (server: ServerConnection.Any, worktree: string, index: number) => void
+  onToggleProjectExpanded: (server: ServerConnection.Any, project: LocalProject) => void
   onSelectProject: (server: ServerConnection.Any, directory: string) => void
   onAddProjects: (server: ServerConnection.Any, directories: string[]) => void
-  onOpenProjectNewSession: (server: ServerConnection.Any, directory: string) => void
+  onOpenProjectNewSession: (server: ServerConnection.Any, directory: string, projectDirectory?: string) => void
   onEditProject: (server: ServerConnection.Any, project: LocalProject) => void
   onRevealProject: (server: ServerConnection.Any, project: LocalProject) => void
   onClearNotifications: (server: ServerConnection.Any, project: LocalProject) => void
@@ -313,6 +315,9 @@ type HomeProjectListProps = HomeProjectsViewProps &
 
 function HomeProjectList(props: HomeProjectListProps) {
   let listRef!: HTMLDivElement
+  const projectByWorktree = createMemo(
+    () => new Map(props.items.map((project) => [project.worktree, project] as const)),
+  )
 
   return (
     <DragDropProvider
@@ -341,13 +346,15 @@ function HomeProjectList(props: HomeProjectListProps) {
       }}
     >
       <div class="flex min-w-0 flex-col gap-1" ref={listRef}>
-        {/* Keyed on worktree strings: the enriched project objects are
-            recreated on every store or sync update, so iterating them directly
-            remounts all rows — killing any in-flight drag activation (the
-            row's sortable unregisters on unmount) and discarding animations.
-            String keys keep row elements alive and move them on reorder. */}
         <For each={props.items.map((project) => project.worktree)}>
-          {(worktree, index) => <HomeProjectSlot {...props} worktree={worktree} index={index} />}
+          {(worktree, index) => (
+            <HomeProjectSlot
+              {...props}
+              projectByWorktree={projectByWorktree}
+              worktree={worktree}
+              index={index}
+            />
+          )}
         </For>
       </div>
     </DragDropProvider>
@@ -356,11 +363,12 @@ function HomeProjectList(props: HomeProjectListProps) {
 
 function HomeProjectSlot(
   props: HomeProjectListProps & {
+    projectByWorktree: Accessor<Map<string, LocalProject>>
     worktree: string
     index: () => number
   },
 ) {
-  const project = createMemo(() => props.items.find((item) => item.worktree === props.worktree))
+  const project = createMemo(() => props.projectByWorktree().get(props.worktree))
 
   return (
     <Show when={project()}>
@@ -470,114 +478,179 @@ function HomeProjectRow(
     if (props.contextMenuOpen(id)) props.onSetContextMenuOpen(id, false)
   })
   return (
-    <div
-      ref={sortable.ref}
-      class="group/project relative flex h-7 min-w-0 items-center rounded-[6px]"
-      classList={{ "z-10": sortable.isDragSource() }}
-    >
-      <HomeProjectNavButton
-        type="button"
-        data-component="home-project-row"
-        class="pr-16 disabled:opacity-60"
-        classList={{
-          "bg-v2-background-bg-layer-01 text-v2-text-text-base": sortable.isDragSource(),
-          "[box-shadow:inset_0_0_0_0.5px_var(--v2-border-border-muted)]": sortable.isDragSource(),
-        }}
-        data-selected={props.selected ? "" : undefined}
-        aria-current={props.selected ? "page" : undefined}
-        disabled={serverUnreachable()}
-        onPointerDown={(event) => {
-          // Same-server mouse selection happens on pointerdown (like tabs),
-          // but only ever selects; selectProject toggles, and deselecting here
-          // would fire on every drag before the threshold is met. Cross-server
-          // selection waits for click so reordering a remote server's projects
-          // does not focus that server and load its session index. Touch is
-          // excluded so flick-scrolling the list cannot select rows.
-          pointerDownSelected = undefined
-          if (event.button !== 0 || event.pointerType === "touch") return
-          if (!props.serverSelected) return
-          pointerDownSelected = props.selected
-          if (!props.selected) props.onSelectProject(props.server, props.project.worktree)
-        }}
-        onClick={(event) => {
-          // The drag sensor calls preventDefault on post-drag clicks; never
-          // toggle selection as part of a reorder.
-          if (event.defaultPrevented) return
-          // Keyboard activation and touch taps keep the original toggle.
-          if (event.detail === 0 || pointerDownSelected === undefined) {
-            props.onSelectProject(props.server, props.project.worktree)
-            return
-          }
-          // Mouse: pointerdown already selected unselected rows; a plain click
-          // on an already-selected row toggles it off.
-          if (pointerDownSelected) props.onSelectProject(props.server, props.project.worktree)
-          pointerDownSelected = undefined
-        }}
-      >
-        <HomeProjectAvatar project={props.project} />
-        <span class={HOME_PROJECT_NAV_LABEL}>{displayName(props.project)}</span>
-      </HomeProjectNavButton>
+    <>
       <div
-        class={`
+        ref={sortable.ref}
+        class="group/project relative flex h-7 min-w-0 items-center rounded-[6px]"
+        classList={{ "z-10": sortable.isDragSource() }}
+      >
+        <HomeProjectNavButton
+          type="button"
+          data-component="home-project-row"
+          class="pr-16 disabled:opacity-60"
+          classList={{
+            "bg-v2-background-bg-layer-01 text-v2-text-text-base": sortable.isDragSource(),
+            "[box-shadow:inset_0_0_0_0.5px_var(--v2-border-border-muted)]": sortable.isDragSource(),
+          }}
+          data-selected={props.selected ? "" : undefined}
+          aria-current={props.selected ? "page" : undefined}
+          disabled={serverUnreachable()}
+          onPointerDown={(event) => {
+            // Same-server mouse selection happens on pointerdown (like tabs),
+            // but only ever selects; selectProject toggles, and deselecting here
+            // would fire on every drag before the threshold is met. Cross-server
+            // selection waits for click so reordering a remote server's projects
+            // does not focus that server and load its session index. Touch is
+            // excluded so flick-scrolling the list cannot select rows.
+            pointerDownSelected = undefined
+            if (event.button !== 0 || event.pointerType === "touch") return
+            if (!props.serverSelected) return
+            pointerDownSelected = props.selected
+            if (!props.selected) props.onSelectProject(props.server, props.project.worktree)
+          }}
+          onClick={(event) => {
+            // The drag sensor calls preventDefault on post-drag clicks; never
+            // toggle selection as part of a reorder.
+            if (event.defaultPrevented) return
+            // Keyboard activation and touch taps keep the original toggle.
+            if (event.detail === 0 || pointerDownSelected === undefined) {
+              props.onSelectProject(props.server, props.project.worktree)
+              return
+            }
+            // Mouse: pointerdown already selected unselected rows; a plain click
+            // on an already-selected row toggles it off.
+            if (pointerDownSelected) props.onSelectProject(props.server, props.project.worktree)
+            pointerDownSelected = undefined
+          }}
+        >
+          <Show
+            when={(props.project.repositories?.length ?? 0) >= 2}
+            fallback={<span class="pointer-events-none -mr-1.5 size-5 shrink-0" aria-hidden="true" />}
+          >
+            <span
+              class="-mr-1.5 flex size-5 shrink-0 items-center justify-center rounded-[4px] text-v2-icon-icon-muted hover:bg-v2-overlay-simple-overlay-hover"
+              data-action="home-project-group-collapse"
+              aria-expanded={props.project.expanded}
+              onClick={(event) => {
+                event.preventDefault()
+                event.stopPropagation()
+                props.onToggleProjectExpanded(props.server, props.project)
+              }}
+              onPointerDown={(event) => event.stopPropagation()}
+            >
+              <IconV2
+                name="chevron-down"
+                size="small"
+                class="transition-transform duration-150"
+                style={{ transform: `rotate(${props.project.expanded ? 0 : -90}deg)` }}
+              />
+            </span>
+          </Show>
+          <HomeProjectAvatar project={props.project} />
+          <span class={HOME_PROJECT_NAV_LABEL}>{displayName(props.project)}</span>
+        </HomeProjectNavButton>
+        <div
+          class={`
           hover-reveal absolute right-1 top-1/2 flex -translate-y-1/2 items-center gap-1
           group-hover/project:opacity-100 focus-within:opacity-100 data-[menu=true]:opacity-100
         `}
-        data-menu={props.contextMenuOpen(contextMenuID())}
-      >
-        <MenuV2
-          gutter={6}
-          modal={false}
-          placement="bottom-end"
-          open={props.contextMenuOpen(contextMenuID())}
-          onOpenChange={(open) => props.onSetContextMenuOpen(contextMenuID(), open)}
+          data-menu={props.contextMenuOpen(contextMenuID())}
         >
-          <MenuV2.Trigger
-            as={IconButtonV2}
-            data-action="home-project-menu"
+          <MenuV2
+            gutter={6}
+            modal={false}
+            placement="bottom-end"
+            open={props.contextMenuOpen(contextMenuID())}
+            onOpenChange={(open) => props.onSetContextMenuOpen(contextMenuID(), open)}
+          >
+            <MenuV2.Trigger
+              as={IconButtonV2}
+              data-action="home-project-menu"
+              variant="ghost-muted"
+              size="small"
+              icon={<IconV2 name="outline-dots" />}
+              aria-label={props.language.t("common.moreOptions")}
+            />
+            <MenuV2.Portal>
+              <MenuV2.Content>
+                <MenuV2.Item onSelect={() => props.onOpenProjectNewSession(props.server, props.project.worktree)}>
+                  {props.language.t("command.session.new")}
+                </MenuV2.Item>
+                <MenuV2.Item onSelect={() => props.onEditProject(props.server, props.project)}>
+                  {props.language.t("dialog.project.edit.title")}
+                </MenuV2.Item>
+                <Show when={props.canRevealProject(props.server)}>
+                  <MenuV2.Item onSelect={() => props.onRevealProject(props.server, props.project)}>
+                    {props.language.t(
+                      fileManagerApp(platform.platform === "desktop" ? (platform.os ?? "unknown") : "unknown")
+                        .actionLabel,
+                    )}
+                  </MenuV2.Item>
+                </Show>
+                <MenuV2.Item
+                  disabled={props.unseen === 0}
+                  onSelect={() => props.onClearNotifications(props.server, props.project)}
+                >
+                  {props.language.t("sidebar.project.clearNotifications")}
+                </MenuV2.Item>
+                <MenuV2.Separator />
+                <MenuV2.Item onSelect={() => props.onCloseProject(props.server, props.project.worktree)}>
+                  {props.language.t("common.close")}
+                </MenuV2.Item>
+              </MenuV2.Content>
+            </MenuV2.Portal>
+          </MenuV2>
+          <IconButtonV2
+            data-action="home-project-new-session"
             variant="ghost-muted"
             size="small"
-            icon={<IconV2 name="outline-dots" />}
-            aria-label={props.language.t("common.moreOptions")}
+            icon={<IconV2 name="edit" />}
+            aria-label={props.language.t("command.session.new")}
+            onClick={() => props.onOpenProjectNewSession(props.server, props.project.worktree)}
           />
-          <MenuV2.Portal>
-            <MenuV2.Content>
-              <MenuV2.Item onSelect={() => props.onOpenProjectNewSession(props.server, props.project.worktree)}>
-                {props.language.t("command.session.new")}
-              </MenuV2.Item>
-              <MenuV2.Item onSelect={() => props.onEditProject(props.server, props.project)}>
-                {props.language.t("dialog.project.edit.title")}
-              </MenuV2.Item>
-              <Show when={props.canRevealProject(props.server)}>
-                <MenuV2.Item onSelect={() => props.onRevealProject(props.server, props.project)}>
-                  {props.language.t(
-                    fileManagerApp(platform.platform === "desktop" ? (platform.os ?? "unknown") : "unknown")
-                      .actionLabel,
-                  )}
-                </MenuV2.Item>
-              </Show>
-              <MenuV2.Item
-                disabled={props.unseen === 0}
-                onSelect={() => props.onClearNotifications(props.server, props.project)}
-              >
-                {props.language.t("sidebar.project.clearNotifications")}
-              </MenuV2.Item>
-              <MenuV2.Separator />
-              <MenuV2.Item onSelect={() => props.onCloseProject(props.server, props.project.worktree)}>
-                {props.language.t("common.close")}
-              </MenuV2.Item>
-            </MenuV2.Content>
-          </MenuV2.Portal>
-        </MenuV2>
-        <IconButtonV2
-          data-action="home-project-new-session"
-          variant="ghost-muted"
-          size="small"
-          icon={<IconV2 name="edit" />}
-          aria-label={props.language.t("command.session.new")}
-          onClick={() => props.onOpenProjectNewSession(props.server, props.project.worktree)}
-        />
+        </div>
       </div>
-    </div>
+      <Show when={(props.project.repositories?.length ?? 0) >= 2 && props.project.expanded}>
+        <For each={props.project.repositories}>
+          {(directory) => (
+            <HomeGroupRepositoryRow
+              server={props.server}
+              directory={directory}
+              projectDirectory={props.project.worktree}
+              disabled={serverUnreachable()}
+              onOpen={props.onOpenProjectNewSession}
+              language={props.language}
+            />
+          )}
+        </For>
+      </Show>
+    </>
+  )
+}
+
+function HomeGroupRepositoryRow(props: {
+  server: ServerConnection.Any
+  directory: string
+  projectDirectory: string
+  disabled: boolean
+  onOpen: HomeProjectsViewProps["onOpenProjectNewSession"]
+  language: HomeProjectsViewProps["language"]
+}) {
+  return (
+    <TooltipV2 placement="right" value={props.directory}>
+      <HomeProjectNavButton
+        type="button"
+        data-component="home-project-group-repository"
+        class="pl-8 pr-8 disabled:opacity-60"
+        disabled={props.disabled}
+        onClick={() => props.onOpen(props.server, props.directory, props.projectDirectory)}
+      >
+        <IconV2 name="folder" size="small" class="text-v2-icon-icon-muted" />
+        <span class={HOME_PROJECT_NAV_LABEL}>{getFilename(props.directory)}</span>
+        <IconV2 name="edit" size="small" class="ml-auto text-v2-icon-icon-muted" />
+        <span class="sr-only">{props.language.t("command.session.new")}</span>
+      </HomeProjectNavButton>
+    </TooltipV2>
   )
 }
 

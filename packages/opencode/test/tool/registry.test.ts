@@ -94,12 +94,72 @@ const withEmptyCodeMode = testEffect(
   ]),
 )
 const withBrokenPlugin = testEffect(LayerNode.compile(root, [...replacements, [Plugin.node, brokenPluginLayer]]))
+const withoutQuestions = testEffect(
+  LayerNode.compile(root, [
+    [Config.node, configLayer],
+    [RuntimeFlags.node, RuntimeFlags.layer({ client: "acp" })],
+  ]),
+)
+const withoutPlan = testEffect(
+  LayerNode.compile(root, [
+    [
+      Config.node,
+      TestConfig.layer({
+        get: () => Effect.succeed({ agent: { plan: { disable: true } } }),
+        directories: () => InstanceState.directory.pipe(Effect.map((dir) => [path.join(dir, ".opencode")])),
+      }),
+    ],
+    [RuntimeFlags.node, RuntimeFlags.layer()],
+  ]),
+)
 
 afterEach(async () => {
   await disposeAllInstances()
 })
 
 describe("tool.registry", () => {
+  it.instance("keeps planning tools available outside ACP mode selection", () =>
+    Effect.gen(function* () {
+      const registry = yield* ToolRegistry.Service
+      const agents = yield* Agent.Service
+      const build = yield* agents.get("build")
+      if (!build) throw new Error("build agent not found")
+      const tools = yield* registry.tools({
+        providerID: ProviderV2.ID.opencode,
+        modelID: ModelV2.ID.make("test"),
+        agent: build,
+      })
+
+      expect(tools.map((tool) => tool.id)).toContain("plan_enter")
+    }),
+  )
+
+  withoutQuestions.instance("does not expose interactive planning tools to ACP", () =>
+    Effect.gen(function* () {
+      const ids = yield* (yield* ToolRegistry.Service).ids()
+
+      expect(ids).not.toContain("question")
+      expect(ids).not.toContain("plan_enter")
+      expect(ids).not.toContain("plan_exit")
+    }),
+  )
+
+  withoutPlan.instance("does not expose plan entry when the plan agent is disabled", () =>
+    Effect.gen(function* () {
+      const registry = yield* ToolRegistry.Service
+      const agents = yield* Agent.Service
+      const build = yield* agents.get("build")
+      if (!build) throw new Error("build agent not found")
+      const tools = yield* registry.tools({
+        providerID: ProviderV2.ID.opencode,
+        modelID: ModelV2.ID.make("test"),
+        agent: build,
+      })
+
+      expect(tools.map((tool) => tool.id)).not.toContain("plan_enter")
+    }),
+  )
+
   it.instance("does not expose task_status", () =>
     Effect.gen(function* () {
       const registry = yield* ToolRegistry.Service
@@ -269,6 +329,24 @@ describe("tool.registry", () => {
       const ids = yield* registry.ids()
       expect(ids).toContain("read")
       expect(ids).toContain("broken_plugin_tool")
+    }),
+  )
+
+  withBrokenPlugin.instance("excludes plugin tools when only built-ins are requested", () =>
+    Effect.gen(function* () {
+      const registry = yield* ToolRegistry.Service
+      const agents = yield* Agent.Service
+      const plan = yield* agents.get("plan")
+      if (!plan) throw new Error("plan agent not found")
+      const tools = yield* registry.tools({
+        providerID: ProviderV2.ID.opencode,
+        modelID: ModelV2.ID.make("test"),
+        agent: plan,
+        builtinOnly: true,
+      })
+
+      expect(tools.map((tool) => tool.id)).toContain("read")
+      expect(tools.map((tool) => tool.id)).not.toContain("broken_plugin_tool")
     }),
   )
 

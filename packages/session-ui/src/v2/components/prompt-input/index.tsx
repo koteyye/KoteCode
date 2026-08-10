@@ -40,6 +40,7 @@ export type PromptInputV2Props = {
   borderUnderlay?: boolean
   class?: string
   modelControl?: JSX.Element
+  projectControl?: JSX.Element
   attachKeybind?: string[]
   attachShortcut?: string
 }
@@ -252,6 +253,9 @@ export function PromptInputV2(props: PromptInputV2Props) {
               )}
             </Show>
           </div>
+          <Show when={props.projectControl}>
+            <div class="ml-auto">{props.projectControl}</div>
+          </Show>
           <PromptInputV2SubmitButton
             mode={state.mode}
             stopping={view.submit.stopping()}

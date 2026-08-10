@@ -5,7 +5,7 @@ import { createSimpleContext } from "@opencode-ai/ui/context"
 import { makeEventListener } from "@solid-primitives/event-listener"
 import { useServerSync } from "./server-sync"
 import { useServerSDK } from "./server-sdk"
-import { RECENTLY_CLOSED_DISPLAY_LIMIT, ServerConnection, useServer } from "./server"
+import { ServerConnection, type StoredProject, useServer, visibleRecentlyClosed } from "./server"
 import { usePlatform } from "./platform"
 import { Project } from "@opencode-ai/sdk/v2"
 import { normalizeProjectInfo } from "./global-sync/utils"
@@ -82,8 +82,12 @@ type TabHandoff = {
   at: number
 }
 
-export type LocalProject = Partial<Project> & { worktree: string; expanded: boolean }
+export type LocalProject = Partial<Project> & StoredProject
 export type HomeProjectSelection = { server: ServerConnection.Key; directory?: string }
+
+export function projectDirectories(project: LocalProject) {
+  return [project.worktree, ...(project.repositories ?? []), ...(project.sandboxes ?? [])]
+}
 
 export type ReviewDiffStyle = "unified" | "split"
 export type ReviewChangeMode = "git" | "branch" | "turn"
@@ -442,7 +446,7 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
       return available[Math.floor(Math.random() * available.length)]
     }
 
-    function enrich(project: { worktree: string; expanded: boolean }) {
+    function enrich(project: StoredProject) {
       const [childStore] = serverSync().child(project.worktree, { bootstrap: false })
       const projectID = childStore.project
       const metadata = projectID
@@ -495,9 +499,14 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
     createEffect(() => {
       const projects = server.projects.list()
       const seen = new Set(projects.map((project) => project.worktree))
+      const grouped = new Set(projects.flatMap((project) => project.repositories ?? []).map(pathKey))
 
       batch(() => {
         for (const project of projects) {
+          if (grouped.has(pathKey(project.worktree))) {
+            server.projects.remove(project.worktree)
+            continue
+          }
           const root = rootFor(project.worktree)
           if (root === project.worktree) continue
 
@@ -626,14 +635,12 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
       },
       projects: {
         list,
-        recentlyClosed: createMemo(() => {
-          const known = new Set(serverSync().data.project.map((project) => pathKey(project.worktree)))
-          return server.projects
-            .recentlyClosed()
-            .filter((worktree) => known.has(pathKey(worktree)))
-            .slice(0, RECENTLY_CLOSED_DISPLAY_LIMIT)
-            .map((worktree) => enrich({ worktree, expanded: false }))
-        }),
+        recentlyClosed: createMemo(() =>
+          visibleRecentlyClosed({
+            recentlyClosed: server.projects.recentlyClosed(),
+            projects: serverSync().data.project,
+          }).map(enrich),
+        ),
         open(directory: string) {
           const root = rootFor(directory)
           if (server.projects.list().find((x) => x.worktree === root)) return

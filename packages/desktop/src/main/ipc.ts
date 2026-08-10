@@ -9,7 +9,7 @@ import type { FatalRendererError, ServerReadyData, TitlebarTheme } from "../prel
 import { runDesktopMenuAction } from "./desktop-menu-actions"
 import { setForceFocus } from "./debug"
 import { assertAttachmentBudget, createPickedFileAuthorizations } from "./attachment-picker"
-import { getStore, removeStoreFileIfEmpty } from "./store"
+import { getStore, removeStoreFileIfEmpty, withStoreLock } from "./store"
 import { getPinchZoomEnabled, getWindowID, setPinchZoomEnabled, setTitlebar, updateTitlebar } from "./windows"
 import type { UpdaterController } from "./updater-controller"
 import { createUpdaterSubscriptions } from "./updater-subscriptions"
@@ -98,17 +98,21 @@ export function registerIpcHandlers(deps: Deps) {
       return null
     }
   })
-  ipcMain.handle("store-set", (_event: IpcMainInvokeEvent, name: string, key: string, value: string) => {
-    getStore(name).set(key, value)
-  })
-  ipcMain.handle("store-delete", (_event: IpcMainInvokeEvent, name: string, key: string) => {
-    getStore(name).delete(key)
-    void removeStoreFileIfEmpty(name)
-  })
-  ipcMain.handle("store-clear", (_event: IpcMainInvokeEvent, name: string) => {
-    getStore(name).clear()
-    void removeStoreFileIfEmpty(name)
-  })
+  ipcMain.handle("store-set", (_event: IpcMainInvokeEvent, name: string, key: string, value: string) =>
+    withStoreLock(name, () => getStore(name).set(key, value)),
+  )
+  ipcMain.handle("store-delete", (_event: IpcMainInvokeEvent, name: string, key: string) =>
+    withStoreLock(name, async () => {
+      getStore(name).delete(key)
+      await removeStoreFileIfEmpty(name)
+    }),
+  )
+  ipcMain.handle("store-clear", (_event: IpcMainInvokeEvent, name: string) =>
+    withStoreLock(name, async () => {
+      getStore(name).clear()
+      await removeStoreFileIfEmpty(name)
+    }),
+  )
   ipcMain.handle("store-keys", (_event: IpcMainInvokeEvent, name: string) => {
     const store = getStore(name)
     return Object.keys(store.store)

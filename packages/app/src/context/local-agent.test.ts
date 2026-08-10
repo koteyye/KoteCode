@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { hasCustomAgent, resolveAgent } from "./local-agent"
+import { hasCustomAgent, resolveAgent, sameServerAgentState, serverAgentState } from "./local-agent"
 
 describe("hasCustomAgent", () => {
   test("detects explicitly custom agents", () => {
@@ -25,5 +25,44 @@ describe("resolveAgent", () => {
 
   test("uses the first agent when build is unavailable", () => {
     expect(resolveAgent([{ name: "custom" }], "missing")?.name).toBe("custom")
+  })
+})
+
+describe("serverAgentState", () => {
+  test("preserves the active model when only the agent changes", () => {
+    const current = { model: { providerID: "provider", modelID: "active" }, variant: "high" }
+
+    expect(serverAgentState(current, "plan")).toEqual({ agent: "plan", ...current })
+  })
+
+  test("uses the exact server model and clears its default variant", () => {
+    const current = { model: { providerID: "provider", modelID: "old" }, variant: "high" }
+
+    expect(
+      serverAgentState(current, "build", {
+        model: { providerID: "provider", modelID: "active" },
+        variant: undefined,
+      }),
+    ).toEqual({
+      agent: "build",
+      model: { providerID: "provider", modelID: "active" },
+      variant: undefined,
+    })
+  })
+
+  test("recognizes an unchanged server selection without relying on object identity", () => {
+    const current = {
+      agent: "build",
+      model: { providerID: "provider", modelID: "active" },
+      variant: "high",
+    }
+
+    expect(sameServerAgentState(current, serverAgentState(current, "build"))).toBe(true)
+    expect(
+      sameServerAgentState(current, {
+        ...current,
+        model: { providerID: "provider", modelID: "other" },
+      }),
+    ).toBe(false)
   })
 })

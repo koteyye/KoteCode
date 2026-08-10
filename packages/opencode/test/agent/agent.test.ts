@@ -75,6 +75,7 @@ it.instance("plan agent denies edits except .opencode/plans/*", () =>
     expect(plan).toBeDefined()
     // Wildcard is denied
     expect(evalPerm(plan, "edit")).toBe("deny")
+    expect(evalPerm(plan, "bash")).toBe("deny")
     // But specific path is allowed
     expect(Permission.evaluate("edit", ".opencode/plans/foo.md", plan!.permission).action).toBe("allow")
   }),

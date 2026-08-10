@@ -112,6 +112,15 @@ import type {
   ProjectCopiesRemoveOutput,
   ProjectCopiesRefreshInput,
   ProjectCopiesRefreshOutput,
+  ProjectsListOutput,
+  ProjectsUpdateInput,
+  ProjectsUpdateOutput,
+  ProjectsCurrentInput,
+  ProjectsCurrentOutput,
+  ProjectsDirectoriesInput,
+  ProjectsDirectoriesOutput,
+  ProjectsRepositoriesInput,
+  ProjectsRepositoriesOutput,
 } from "./types"
 import { ClientError } from "./client-error"
 
@@ -983,6 +992,61 @@ export function make(options: ClientOptions) {
             successStatus: 204,
             declaredStatuses: [400, 401],
             empty: true,
+          },
+          requestOptions,
+        ),
+    },
+    projects: {
+      list: (requestOptions?: RequestOptions) =>
+        request<ProjectsListOutput>(
+          { method: "GET", path: `/api/project`, successStatus: 200, declaredStatuses: [401, 400], empty: false },
+          requestOptions,
+        ),
+      update: (input: ProjectsUpdateInput, requestOptions?: RequestOptions) =>
+        request<ProjectsUpdateOutput>(
+          {
+            method: "PATCH",
+            path: `/api/project/${encodeURIComponent(input.projectID)}`,
+            body: { name: input["name"], icon: input["icon"], commands: input["commands"] },
+            successStatus: 200,
+            declaredStatuses: [404, 401, 400],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      current: (input?: ProjectsCurrentInput, requestOptions?: RequestOptions) =>
+        request<ProjectsCurrentOutput>(
+          {
+            method: "GET",
+            path: `/api/project/current`,
+            query: { location: input?.["location"] },
+            successStatus: 200,
+            declaredStatuses: [401, 400],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      directories: (input: ProjectsDirectoriesInput, requestOptions?: RequestOptions) =>
+        request<ProjectsDirectoriesOutput>(
+          {
+            method: "GET",
+            path: `/api/project/${encodeURIComponent(input.projectID)}/directories`,
+            query: { location: input["location"] },
+            successStatus: 200,
+            declaredStatuses: [401, 400],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      repositories: (input?: ProjectsRepositoriesInput, requestOptions?: RequestOptions) =>
+        request<ProjectsRepositoriesOutput>(
+          {
+            method: "GET",
+            path: `/api/project/repositories`,
+            query: { location: input?.["location"] },
+            successStatus: 200,
+            declaredStatuses: [401, 400],
+            empty: false,
           },
           requestOptions,
         ),

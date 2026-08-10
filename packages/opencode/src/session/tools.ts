@@ -1,4 +1,5 @@
 import { Agent } from "@/agent/agent"
+import { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import { SessionV1 } from "@opencode-ai/core/v1/session"
 import { Provider } from "@/provider/provider"
 import { ProviderTransform } from "@/provider/transform"
@@ -23,6 +24,52 @@ import { ProviderV2 } from "@opencode-ai/core/provider"
 import { ModelV2 } from "@opencode-ai/core/model"
 import { isRecord } from "@/util/record"
 import { RuntimeFlags } from "@/effect/runtime-flags"
+import { hasPlanModeCeiling } from "@/agent/subagent-permissions"
+import { InstanceState } from "@/effect/instance-state"
+import path from "path"
+
+const PLAN_MODE_TOOLS = new Set([
+  "apply_patch",
+  "edit",
+  "glob",
+  "grep",
+  "list_mcp_resource_templates",
+  "list_mcp_resources",
+  "lsp",
+  "plan_exit",
+  "question",
+  "read",
+  "read_mcp_resource",
+  "skill",
+  "task",
+  "webfetch",
+  "websearch",
+  "write",
+])
+const PLAN_MODE_EDIT_TOOLS = new Set(["apply_patch", "edit", "write"])
+
+export function isolateTransitions(tools: Record<string, AITool>): Record<string, AITool> {
+  let transitionBarrier = false
+  let ordinaryToolCall = false
+  return Object.fromEntries(
+    Object.entries(tools).map(([name, item]) => {
+      if (!item.execute) return [name, item]
+      const execute = item.execute
+      const guarded: NonNullable<AITool["execute"]> = (input, options) => {
+        const transition = name === "plan_enter" || name === "plan_exit"
+        if (transitionBarrier) throw new Error("Agent transition requires a new provider turn")
+        if (transition) {
+          transitionBarrier = true
+          if (ordinaryToolCall) throw new Error("Agent transition tools must run alone")
+          return execute(input, options)
+        }
+        ordinaryToolCall = true
+        return execute(input, options)
+      }
+      return [name, { ...item, execute: guarded }]
+    }),
+  )
+}
 
 const MCP_RESOURCE_TOOLS = {
   list: "list_mcp_resources",
@@ -55,6 +102,43 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
   const mcp = yield* MCP.Service
   const truncate = yield* Truncate.Service
   const flags = yield* RuntimeFlags.Service
+  const inheritedPlanMode = hasPlanModeCeiling(input.session.permission ?? [])
+  const planMode = input.agent.name === "plan" || inheritedPlanMode
+  const lastUser = input.messages.findLast((message) => message.info.role === "user")
+  const toolOverrides = lastUser?.info.role === "user" ? lastUser.info.tools : undefined
+  const promptPermissions = Object.entries(toolOverrides ?? {}).map(
+    ([permission, enabled]): PermissionV1.Rule => ({
+      permission,
+      pattern: "*",
+      action: enabled ? "allow" : "deny",
+    }),
+  )
+  const instance = planMode && !inheritedPlanMode ? yield* InstanceState.context : undefined
+  const primaryPlanModePermissions: PermissionV1.Ruleset = instance
+    ? [
+        { permission: "bash", pattern: "*", action: "deny" },
+        { permission: "edit", pattern: "*", action: "deny" },
+        {
+          permission: "edit",
+          pattern: path.relative(instance.worktree, Session.plan(input.session, instance)),
+          action: "allow",
+        },
+      ]
+    : []
+  const planModePermissions: PermissionV1.Ruleset = !planMode
+    ? []
+    : inheritedPlanMode
+      ? [
+          { permission: "bash", pattern: "*", action: "deny" },
+          { permission: "edit", pattern: "*", action: "deny" },
+        ]
+      : primaryPlanModePermissions
+  const permissions = Permission.merge(
+    input.agent.permission,
+    input.session.permission ?? [],
+    promptPermissions,
+    planModePermissions,
+  )
 
   const context = (args: Record<string, unknown>, options: ToolExecutionOptions): Tool.Context => ({
     sessionID: input.session.id,
@@ -79,21 +163,26 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
         }
       }),
     ask: (req) =>
-      permission
-        .ask({
-          ...req,
-          sessionID: input.session.id,
-          tool: { messageID: input.processor.message.id, callID: options.toolCallId },
-          ruleset: Permission.merge(input.agent.permission, input.session.permission ?? []),
-        })
-        .pipe(Effect.orDie),
+      (planModePermissions.length > 0 &&
+      req.patterns.some(
+        (pattern) => Permission.evaluate(req.permission, pattern, planModePermissions).action === "deny",
+      )
+        ? Effect.fail(new PermissionV1.DeniedError({ ruleset: planModePermissions }))
+        : permission.ask({
+            ...req,
+            sessionID: input.session.id,
+            tool: { messageID: input.processor.message.id, callID: options.toolCallId },
+            ruleset: permissions,
+          })
+      ).pipe(Effect.orDie),
   })
 
   for (const item of yield* registry.tools({
     modelID: ModelV2.ID.make(input.model.api.id),
     providerID: input.model.providerID,
     agent: input.agent,
-    permission: input.session.permission,
+    permission: Permission.merge(input.session.permission ?? [], promptPermissions, planModePermissions),
+    builtinOnly: planMode,
   })) {
     const schema = ProviderTransform.schema(input.model, ToolJsonSchema.fromTool(item))
     tools[item.id] = tool({
@@ -385,7 +474,7 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
     })
   }
 
-  if (flags.experimentalCodeMode) return tools
+  if (flags.experimentalCodeMode) return filterPlanModeTools(tools, planMode, inheritedPlanMode)
 
   for (const [key, entry] of Object.entries(yield* mcp.tools())) {
     const item = McpCatalog.convertTool(entry.def, entry.client, entry.timeout)
@@ -489,8 +578,17 @@ export const resolve = Effect.fn("SessionTools.resolve")(function* (input: {
     tools[key] = item
   }
 
-  return tools
+  return filterPlanModeTools(tools, planMode, inheritedPlanMode)
 })
+
+function filterPlanModeTools(tools: Record<string, AITool>, planMode: boolean, inheritedPlanMode: boolean) {
+  if (!planMode) return tools
+  return Object.fromEntries(
+    Object.entries(tools).filter(
+      ([name]) => PLAN_MODE_TOOLS.has(name) && (!inheritedPlanMode || !PLAN_MODE_EDIT_TOOLS.has(name)),
+    ),
+  )
+}
 
 function toRecord(value: unknown) {
   if (isRecord(value)) return value

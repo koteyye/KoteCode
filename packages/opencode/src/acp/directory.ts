@@ -67,6 +67,7 @@ export const build = (input: {
   readonly commands: readonly Command.Info[]
   readonly defaultModel?: DefaultModel
 }): Snapshot => {
+  const modes = input.modes.filter((mode) => mode.id !== "plan")
   const modelOptions = Provider.sort(
     Object.values(input.providers).flatMap((provider) =>
       Object.values(provider.models).map((model) => ({
@@ -95,10 +96,10 @@ export const build = (input: {
         ),
       ),
     ),
-    availableModes: input.modes,
-    defaultModeID: input.modes.some((mode) => mode.id === input.defaultModeID)
+    availableModes: modes,
+    defaultModeID: modes.some((mode) => mode.id === input.defaultModeID)
       ? input.defaultModeID
-      : (input.modes[0]?.id ?? input.defaultModeID),
+      : (modes[0]?.id ?? input.defaultModeID),
     availableCommands: input.commands,
     ...(input.defaultModel ? { defaultModel: input.defaultModel } : {}),
   }

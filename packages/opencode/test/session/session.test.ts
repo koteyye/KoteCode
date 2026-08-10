@@ -1,6 +1,8 @@
 import { describe, expect } from "bun:test"
 import { SessionV1 } from "@opencode-ai/core/v1/session"
 import { EventV2 } from "@opencode-ai/core/event"
+import { EventTable } from "@opencode-ai/core/event/sql"
+import { Database } from "@opencode-ai/core/database/database"
 import { SessionProjector } from "@opencode-ai/core/session/projector"
 import { Deferred, Effect, Exit, Layer } from "effect"
 import { Session as SessionNs } from "@/session/session"
@@ -16,11 +18,15 @@ import { AppNodeBuilder } from "@opencode-ai/core/effect/app-node-builder"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { InstanceStore } from "@/project/instance-store"
 import { InstanceBootstrap } from "@/project/bootstrap"
+import { eq } from "drizzle-orm"
+import { ProviderV2 } from "@opencode-ai/core/provider"
+import { ModelV2 } from "@opencode-ai/core/model"
 
 const it = testEffect(
   AppNodeBuilder.build(
     LayerNode.group([
       SessionNs.node,
+      Database.node,
       EventV2Bridge.node,
       SessionProjector.node,
       CrossSpawnSpawner.node,
@@ -206,6 +212,57 @@ describe("step-finish token propagation via event", () => {
 })
 
 describe("Session", () => {
+  it.instance("atomically persists an agent transition before compatibility events", () =>
+    Effect.gen(function* () {
+      const session = yield* SessionNs.Service
+      const { db } = yield* Database.Service
+      const info = yield* session.create({ title: "transition" })
+      const message: SessionV1.User = {
+        id: MessageID.ascending(),
+        sessionID: info.id,
+        role: "user",
+        time: { created: Date.now() },
+        agent: "plan",
+        model: { providerID: ProviderV2.ID.make("test"), modelID: ModelV2.ID.make("model") },
+      }
+      yield* session.transitionAgent({
+        message,
+        part: {
+          id: PartID.ascending(),
+          messageID: message.id,
+          sessionID: info.id,
+          type: "text",
+          text: "Create the plan",
+          synthetic: true,
+        },
+      })
+
+      expect(yield* session.get(info.id)).toMatchObject({
+        agent: "plan",
+        model: { id: "model", providerID: "test" },
+      })
+      expect(yield* session.messages({ sessionID: info.id })).toMatchObject([
+        { info: { id: message.id, agent: "plan" }, parts: [{ type: "text", text: "Create the plan" }] },
+      ])
+      const events = yield* db
+        .select({ type: EventTable.type, data: EventTable.data })
+        .from(EventTable)
+        .where(eq(EventTable.aggregate_id, info.id))
+        .all()
+        .pipe(Effect.orDie)
+      const transition = events.find((event) => event.type === EventV2.versionedType(SessionNs.Event.Updated.type, 1))
+      expect(transition?.data).toMatchObject({
+        transition: { message: { id: message.id }, part: { messageID: message.id, type: "text" } },
+      })
+      expect(
+        events.filter((event) => event.type === EventV2.versionedType(SessionV1.Event.MessageUpdated.type, 1)),
+      ).toHaveLength(1)
+      expect(
+        events.filter((event) => event.type === EventV2.versionedType(SessionV1.Event.PartUpdated.type, 1)),
+      ).toHaveLength(1)
+    }),
+  )
+
   it.live("remove works without an instance", () =>
     Effect.gen(function* () {
       const session = yield* SessionNs.Service

@@ -2,13 +2,36 @@ export * as Project from "./project"
 
 import { Schema } from "effect"
 import { define, inventory } from "./event"
-import { NonNegativeInt, optional } from "./schema"
+import { AbsolutePath, NonNegativeInt, optional } from "./schema"
 import { ProjectID } from "./project-id"
 
 export const ID = ProjectID
 export type ID = typeof ID.Type
 
 export const Vcs = Schema.Literal("git").annotate({ identifier: "Project.Vcs" })
+export const Current = Schema.Struct({
+  id: ID,
+  directory: AbsolutePath,
+}).annotate({ identifier: "Project.Current" })
+export interface Current extends Schema.Schema.Type<typeof Current> {}
+export const Directory = Schema.Struct({
+  directory: AbsolutePath,
+  strategy: optional(Schema.String),
+}).annotate({ identifier: "Project.Directory" })
+export interface Directory extends Schema.Schema.Type<typeof Directory> {}
+export const DirectoriesInput = Schema.Struct({
+  projectID: ID,
+}).annotate({ identifier: "Project.DirectoriesInput" })
+export interface DirectoriesInput extends Schema.Schema.Type<typeof DirectoriesInput> {}
+export const Directories = Schema.Array(Directory).annotate({ identifier: "Project.Directories" })
+export type Directories = typeof Directories.Type
+export const Repository = Schema.Struct({
+  id: ID,
+  directory: AbsolutePath,
+}).annotate({ identifier: "Project.Repository" })
+export interface Repository extends Schema.Schema.Type<typeof Repository> {}
+export const Repositories = Schema.Array(Repository).annotate({ identifier: "Project.Repositories" })
+export type Repositories = typeof Repositories.Type
 export const Icon = Schema.Struct({
   url: optional(Schema.String),
   override: optional(Schema.String),
@@ -39,6 +62,13 @@ export const Info = Schema.Struct({
   sandboxes: Schema.Array(Schema.String),
 }).annotate({ identifier: "Project" })
 export interface Info extends Schema.Schema.Type<typeof Info> {}
+
+export const UpdateInput = Schema.Struct({
+  name: optional(Schema.String),
+  icon: optional(Icon),
+  commands: optional(Commands),
+}).annotate({ identifier: "Project.UpdateInput" })
+export interface UpdateInput extends Schema.Schema.Type<typeof UpdateInput> {}
 
 const Updated = define({ type: "project.updated", schema: Info.fields })
 export const Event = { Updated, Definitions: inventory(Updated) }

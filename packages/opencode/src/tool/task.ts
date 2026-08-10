@@ -139,6 +139,7 @@ export const TaskTool = Tool.define(
       const childPermission = deriveSubagentSessionPermission({
         parentSessionPermission: parent.permission ?? [],
         subagent: next,
+        planMode: ctx.agent === "plan",
       })
       const childToolDenies = [
         ...(next.permission.some((rule) => rule.permission === "todowrite")

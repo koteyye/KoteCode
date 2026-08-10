@@ -98,4 +98,21 @@ export const entriesForRunner = Effect.fn("SessionHistory.entriesForRunner")(fun
   )
 })
 
+export const latestUserTools = Effect.fn("SessionHistory.latestUserTools")(function* (
+  db: DatabaseService,
+  sessionID: SessionSchema.ID,
+) {
+  const row = yield* db
+    .select()
+    .from(SessionMessageTable)
+    .where(and(eq(SessionMessageTable.session_id, sessionID), eq(SessionMessageTable.type, "user")))
+    .orderBy(desc(SessionMessageTable.seq))
+    .limit(1)
+    .get()
+    .pipe(Effect.orDie)
+  if (!row) return
+  const message = yield* decodeMessageRow(row)
+  if (message.type === "user") return message.tools
+})
+
 export * as SessionHistory from "./history"

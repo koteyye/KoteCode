@@ -436,6 +436,7 @@ export interface Interface {
     model: NonNullable<Info["model"]>
     time: number
   }) => Effect.Effect<void>
+  readonly transitionAgent: (input: { message: SessionV1.User; part: SessionV1.TextPart }) => Effect.Effect<void>
   readonly setPermission: (input: { sessionID: SessionID; permission: PermissionV1.Ruleset }) => Effect.Effect<void>
   readonly setRevert: (input: {
     sessionID: SessionID
@@ -777,6 +778,41 @@ const layer: Layer.Layer<
       }).pipe(Effect.orDie)
     })
 
+    const transitionAgent = Effect.fn("Session.transitionAgent")(function* (input: {
+      message: SessionV1.User
+      part: SessionV1.TextPart
+    }) {
+      if (input.message.sessionID !== input.part.sessionID || input.message.id !== input.part.messageID)
+        return yield* Effect.die("Agent transition message and part do not match")
+      const current = yield* get(input.message.sessionID).pipe(Effect.orDie)
+      const info = {
+        ...current,
+        agent: input.message.agent,
+        model: {
+          id: input.message.model.modelID,
+          providerID: input.message.model.providerID,
+          variant: input.message.model.variant,
+        },
+        time: { ...current.time, updated: input.message.time.created },
+      }
+      yield* events.publish(SessionV1.Event.Updated, {
+        sessionID: input.message.sessionID,
+        info,
+        transition: { message: input.message, part: input.part, time: input.message.time.created },
+      })
+      // The transition event owns the atomic projection. These idempotent events keep
+      // legacy live consumers working until they understand the embedded continuation.
+      yield* events.publish(SessionV1.Event.MessageUpdated, {
+        sessionID: input.message.sessionID,
+        info: input.message,
+      })
+      yield* events.publish(SessionV1.Event.PartUpdated, {
+        sessionID: input.part.sessionID,
+        part: structuredClone(input.part),
+        time: input.message.time.created,
+      })
+    })
+
     const setPermission = Effect.fn("Session.setPermission")(function* (input: {
       sessionID: SessionID
       permission: PermissionV1.Ruleset
@@ -916,6 +952,7 @@ const layer: Layer.Layer<
       setArchived,
       setMetadata,
       setAgentModel,
+      transitionAgent,
       setPermission,
       setRevert,
       clearRevert,

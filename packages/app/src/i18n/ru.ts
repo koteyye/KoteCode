@@ -776,6 +776,11 @@ export const dict = {
   "settings.section.server": "Сервер",
   "settings.tab.general": "Основные",
   "settings.tab.shortcuts": "Горячие клавиши",
+  "settings.plugins.title": "Плагины",
+  "settings.plugins.row.planning.title": "Автоматическое планирование",
+  "settings.plugins.row.planning.description":
+    "Позволять агенту предлагать режим Plan для сложных задач и запрашивать подтверждение перед реализацией",
+  "sidebar.projectGroup.all": "Вся группа",
   "settings.gateway.title": "Сетевая маршрутизация",
   "settings.gateway.description":
     "Запросы всех провайдеров, для которых включён шлюз, отправляются через выбранный маршрут.",

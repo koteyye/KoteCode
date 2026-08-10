@@ -14,7 +14,8 @@ KoteCode — независимый форк [OpenCode](https://github.com/anoma
 с командой OpenCode, не одобрен ею и не является её официальным продуктом. KoteCode развивается
 отдельно на основе исходного кода OpenCode под лицензией MIT.
 
-> **Статус:** подготовка `v0.1.0`, первого публичного релиза KoteCode. Основан на OpenCode `1.18.5`.
+> **Статус:** публичные релизы доступны на странице [GitHub Releases](https://github.com/koteyye/KoteCode/releases).
+> Базовая версия форка: OpenCode `1.18.5`.
 
 ## Возможности
 
@@ -116,17 +117,17 @@ bun run packages/opencode/script/build.ts --single
 
 ### Поддерживаемые платформы
 
-| Компонент | Платформы                                               |
-| --------- | ------------------------------------------------------- |
-| CLI       | Windows x64; Linux x64/ARM64; macOS Intel/Apple Silicon |
-| Desktop   | Windows x64; Linux x64 (`AppImage`, `.deb`, `.rpm`)     |
+| Компонент | Платформы                                                                                       |
+| --------- | ----------------------------------------------------------------------------------------------- |
+| CLI       | Windows x64; Linux x64/ARM64; macOS Intel/Apple Silicon                                         |
+| Desktop   | Windows x64; Linux x64 (`AppImage`, `.deb`, `.rpm`); macOS Intel/Apple Silicon (`.dmg`, `.zip`) |
 
-macOS Desktop и ARM64-сборки Desktop в `v0.1.0` не входят.
+Windows ARM64 CLI и ARM64-сборки Desktop для Windows/Linux пока не публикуются.
 
-> **Windows-сборки не подписаны:** издатель отображается как неизвестный, а SmartScreen может
+> **Desktop-сборки не подписаны:** в Windows издатель отображается как неизвестный, а SmartScreen может
 > показать предупреждение. Smart App Control и корпоративные политики могут полностью
-> заблокировать запуск. MSIX и Microsoft Store не поддерживаются. Проверяйте SHA-256 по
-> файлу `SHA256SUMS`.
+> заблокировать запуск. В macOS Gatekeeper может заблокировать неподписанное и ненотаризованное
+> приложение. MSIX и Microsoft Store не поддерживаются. Проверяйте SHA-256 по файлу `SHA256SUMS`.
 
 ### Обновление и удаление
 

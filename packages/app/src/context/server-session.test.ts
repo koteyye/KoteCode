@@ -3,6 +3,7 @@ import type { retry } from "@opencode-ai/core/util/retry"
 import type { MessageApi, OpenCodeEvent, SessionApi } from "@opencode-ai/client/promise"
 import type { Message, OpencodeClient, Part, Session } from "@opencode-ai/sdk/v2/client"
 import { createServerSession } from "./server-session"
+import type { CompatibleOpenCodeEvent } from "@/utils/server-event"
 
 const session = (id: string, parentID?: string): Session => ({
   id,
@@ -159,6 +160,33 @@ function setup(sessions: Record<string, Session>) {
 }
 
 describe("server session", () => {
+  test("updates session metadata from canonical agent and model switches", () => {
+    const ctx = setup({ child: session("child") })
+    ctx.store.remember(session("child"))
+
+    ctx.store.applyV2({
+      id: "evt_agent",
+      type: "session.next.agent.switched",
+      data: { timestamp: 5, sessionID: "child", messageID: "msg_agent", agent: "plan" },
+    } satisfies CompatibleOpenCodeEvent)
+    ctx.store.applyV2({
+      id: "evt_model",
+      type: "session.next.model.switched",
+      data: {
+        timestamp: 6,
+        sessionID: "child",
+        messageID: "msg_model",
+        model: { id: "sonnet", providerID: "anthropic", variant: "high" },
+      },
+    } satisfies CompatibleOpenCodeEvent)
+
+    expect(ctx.store.data.info.child).toMatchObject({
+      agent: "plan",
+      model: { id: "sonnet", providerID: "anthropic", variant: "high" },
+      time: { updated: 6 },
+    })
+  })
+
   test("projects V2 session events into current and legacy message state", () => {
     const ctx = setup({ child: session("child") })
     ctx.store.remember(session("child"))

@@ -58,6 +58,7 @@ export type Event =
   | EventPermissionV2Asked
   | EventPermissionV2Replied
   | EventPluginAdded
+  | EventProjectUpdated
   | EventProjectDirectoriesUpdated
   | EventFileWatcherUpdated
   | EventPtyCreated
@@ -78,7 +79,6 @@ export type Event =
   | EventMcpToolsChanged
   | EventMcpBrowserOpenFailed
   | EventCommandExecuted
-  | EventProjectUpdated
   | EventSessionStatus
   | EventSessionIdle
   | EventQuestionAsked
@@ -261,6 +261,23 @@ export type UserMessage = {
   }
 }
 
+export type TextPart = {
+  id: string
+  sessionID: string
+  messageID: string
+  type: "text"
+  text: string
+  synthetic?: boolean
+  ignored?: boolean
+  time?: {
+    start: number
+    end?: number
+  }
+  metadata?: {
+    [key: string]: unknown
+  }
+}
+
 export type ProviderAuthError = {
   name: "ProviderAuthError"
   data: {
@@ -374,23 +391,6 @@ export type AssistantMessage = {
 }
 
 export type Message = UserMessage | AssistantMessage
-
-export type TextPart = {
-  id: string
-  sessionID: string
-  messageID: string
-  type: "text"
-  text: string
-  synthetic?: boolean
-  ignored?: boolean
-  time?: {
-    start: number
-    end?: number
-  }
-  metadata?: {
-    [key: string]: unknown
-  }
-}
 
 export type SubtaskPart = {
   id: string
@@ -642,6 +642,9 @@ export type Prompt = {
   text: string
   files?: Array<PromptFileAttachment>
   agents?: Array<PromptAgentAttachment>
+  tools?: {
+    [key: string]: boolean
+  }
 }
 
 export type Pty = {
@@ -774,6 +777,11 @@ export type GlobalEvent = {
         properties: {
           sessionID: string
           info: Session
+          transition?: {
+            message: UserMessage
+            part: TextPart
+            time: number
+          }
         }
       }
     | {
@@ -1286,6 +1294,20 @@ export type GlobalEvent = {
       }
     | {
         id: string
+        type: "project.updated"
+        properties: {
+          id: string
+          worktree: string
+          vcs?: ProjectVcs
+          name?: string
+          icon?: ProjectIcon
+          commands?: ProjectCommands
+          time: ProjectTime
+          sandboxes: Array<string>
+        }
+      }
+    | {
+        id: string
         type: "project.directories.updated"
         properties: {
           projectID: string
@@ -1474,20 +1496,6 @@ export type GlobalEvent = {
           sessionID: string
           arguments: string
           messageID: string
-        }
-      }
-    | {
-        id: string
-        type: "project.updated"
-        properties: {
-          id: string
-          worktree: string
-          vcs?: ProjectVcs
-          name?: string
-          icon?: ProjectIcon
-          commands?: ProjectCommands
-          time: ProjectTime
-          sandboxes: Array<string>
         }
       }
     | {
@@ -2714,6 +2722,9 @@ export type PromptInput = {
   text: string
   files?: Array<PromptInputFileAttachment>
   agents?: Array<PromptAgentAttachment>
+  tools?: {
+    [key: string]: boolean
+  }
 }
 
 export type ConflictError = {
@@ -2911,6 +2922,7 @@ export type V2Event =
   | PermissionV2Asked
   | PermissionV2Replied
   | PluginAdded
+  | ProjectUpdated
   | ProjectDirectoriesUpdated
   | FileWatcherUpdated
   | PtyCreated
@@ -2931,7 +2943,6 @@ export type V2Event =
   | McpToolsChanged
   | McpBrowserOpenFailed
   | CommandExecuted
-  | ProjectUpdated
   | SessionStatus2
   | SessionIdle
   | QuestionAsked
@@ -3132,6 +3143,27 @@ export type PermissionV2Source = {
 
 export type PermissionV2Reply = "once" | "always" | "reject"
 
+export type ProjectVcs = "git"
+
+export type ProjectIcon = {
+  url?: string
+  override?: string
+  color?: string
+}
+
+export type ProjectCommands = {
+  /**
+   * Startup script to run when creating a new workspace (worktree)
+   */
+  start?: string
+}
+
+export type ProjectTime = {
+  created: number
+  updated: number
+  initialized?: number
+}
+
 export type QuestionV2Option = {
   /**
    * Display text (1-5 words, concise)
@@ -3167,27 +3199,6 @@ export type QuestionV2Tool = {
 
 export type QuestionV2Answer = Array<string>
 
-export type ProjectVcs = "git"
-
-export type ProjectIcon = {
-  url?: string
-  override?: string
-  color?: string
-}
-
-export type ProjectCommands = {
-  /**
-   * Startup script to run when creating a new workspace (worktree)
-   */
-  start?: string
-}
-
-export type ProjectTime = {
-  created: number
-  updated: number
-  initialized?: number
-}
-
 export type EventServerInstanceDisposed = {
   id: string
   type: "server.instance.disposed"
@@ -3222,6 +3233,11 @@ export type SyncEventSessionUpdated = {
     data: {
       sessionID: string
       info: Session
+      transition?: {
+        message: UserMessage
+        part: TextPart
+        time: number
+      }
     }
   }
 }
@@ -3849,10 +3865,12 @@ export type ConfigV2ExperimentalPolicy = {
   resource: string
 }
 
-export type ProjectDirectories = Array<{
+export type ProjectDirectory = {
   directory: string
   strategy?: string
-}>
+}
+
+export type ProjectDirectories = Array<ProjectDirectory>
 
 export type PtyTicketConnectToken = {
   ticket: string
@@ -3986,6 +4004,9 @@ export type SessionMessageUser = {
   text: string
   files?: Array<PromptFileAttachment>
   agents?: Array<PromptAgentAttachment>
+  tools?: {
+    [key: string]: boolean
+  }
   type: "user"
 }
 
@@ -5127,6 +5148,11 @@ export type SessionUpdated = {
   data: {
     sessionID: string
     info: Session
+    transition?: {
+      message: UserMessage
+      part: TextPart
+      time: number
+    }
   }
 }
 
@@ -5496,6 +5522,30 @@ export type PluginAdded = {
   location?: LocationRef
   data: {
     id: string
+  }
+}
+
+export type ProjectUpdated = {
+  id: string
+  metadata?: {
+    [key: string]: unknown
+  }
+  type: "project.updated"
+  durable?: {
+    aggregateID: string
+    seq: number
+    version: number
+  }
+  location?: LocationRef
+  data: {
+    id: string
+    worktree: string
+    vcs?: ProjectVcs
+    name?: string
+    icon?: ProjectIcon
+    commands?: ProjectCommands
+    time: ProjectTime
+    sandboxes: Array<string>
   }
 }
 
@@ -5891,30 +5941,6 @@ export type CommandExecuted = {
   }
 }
 
-export type ProjectUpdated = {
-  id: string
-  metadata?: {
-    [key: string]: unknown
-  }
-  type: "project.updated"
-  durable?: {
-    aggregateID: string
-    seq: number
-    version: number
-  }
-  location?: LocationRef
-  data: {
-    id: string
-    worktree: string
-    vcs?: ProjectVcs
-    name?: string
-    icon?: ProjectIcon
-    commands?: ProjectCommands
-    time: ProjectTime
-    sandboxes: Array<string>
-  }
-}
-
 export type SessionIdle = {
   id: string
   metadata?: {
@@ -6156,6 +6182,24 @@ export type ProjectCopyCopy = {
   directory: string
 }
 
+export type ProjectUpdateInput = {
+  name?: string
+  icon?: ProjectIcon
+  commands?: ProjectCommands
+}
+
+export type ProjectCurrent = {
+  id: string
+  directory: string
+}
+
+export type ProjectRepository = {
+  id: string
+  directory: string
+}
+
+export type ProjectRepositories = Array<ProjectRepository>
+
 export type EventModelsDevRefreshed = {
   id: string
   type: "models-dev.refreshed"
@@ -6203,6 +6247,11 @@ export type EventSessionUpdated = {
   properties: {
     sessionID: string
     info: Session
+    transition?: {
+      message: UserMessage
+      part: TextPart
+      time: number
+    }
   }
 }
 
@@ -6761,6 +6810,21 @@ export type EventPluginAdded = {
   }
 }
 
+export type EventProjectUpdated = {
+  id: string
+  type: "project.updated"
+  properties: {
+    id: string
+    worktree: string
+    vcs?: ProjectVcs
+    name?: string
+    icon?: ProjectIcon
+    commands?: ProjectCommands
+    time: ProjectTime
+    sandboxes: Array<string>
+  }
+}
+
 export type EventProjectDirectoriesUpdated = {
   id: string
   type: "project.directories.updated"
@@ -6915,21 +6979,6 @@ export type EventCommandExecuted = {
     sessionID: string
     arguments: string
     messageID: string
-  }
-}
-
-export type EventProjectUpdated = {
-  id: string
-  type: "project.updated"
-  properties: {
-    id: string
-    worktree: string
-    vcs?: ProjectVcs
-    name?: string
-    icon?: ProjectIcon
-    commands?: ProjectCommands
-    time: ProjectTime
-    sandboxes: Array<string>
   }
 }
 
@@ -10199,6 +10248,9 @@ export type SessionCommandData = {
     model?: string
     arguments: string
     command: string
+    tools?: {
+      [key: string]: boolean
+    }
     variant?: string
     parts?: Array<{
       id?: string
@@ -13589,6 +13641,174 @@ export type V2ProjectCopyRefreshResponses = {
 }
 
 export type V2ProjectCopyRefreshResponse = V2ProjectCopyRefreshResponses[keyof V2ProjectCopyRefreshResponses]
+
+export type V2ProjectListData = {
+  body?: never
+  path?: never
+  query?: never
+  url: "/api/project"
+}
+
+export type V2ProjectListErrors = {
+  /**
+   * InvalidRequestError
+   */
+  400: InvalidRequestError
+  /**
+   * UnauthorizedError
+   */
+  401: UnauthorizedError
+}
+
+export type V2ProjectListError = V2ProjectListErrors[keyof V2ProjectListErrors]
+
+export type V2ProjectListResponses = {
+  /**
+   * Success
+   */
+  200: Array<Project>
+}
+
+export type V2ProjectListResponse = V2ProjectListResponses[keyof V2ProjectListResponses]
+
+export type V2ProjectUpdateData = {
+  body: ProjectUpdateInput
+  path: {
+    projectID: string
+  }
+  query?: never
+  url: "/api/project/{projectID}"
+}
+
+export type V2ProjectUpdateErrors = {
+  /**
+   * InvalidRequestError
+   */
+  400: InvalidRequestError
+  /**
+   * UnauthorizedError
+   */
+  401: UnauthorizedError
+  /**
+   * ProjectNotFoundError
+   */
+  404: ProjectNotFoundError
+}
+
+export type V2ProjectUpdateError = V2ProjectUpdateErrors[keyof V2ProjectUpdateErrors]
+
+export type V2ProjectUpdateResponses = {
+  /**
+   * Project
+   */
+  200: Project
+}
+
+export type V2ProjectUpdateResponse = V2ProjectUpdateResponses[keyof V2ProjectUpdateResponses]
+
+export type V2ProjectCurrentData = {
+  body?: never
+  path?: never
+  query?: {
+    location?: {
+      directory?: string
+      workspace?: string
+    }
+  }
+  url: "/api/project/current"
+}
+
+export type V2ProjectCurrentErrors = {
+  /**
+   * InvalidRequestError
+   */
+  400: InvalidRequestError
+  /**
+   * UnauthorizedError
+   */
+  401: UnauthorizedError
+}
+
+export type V2ProjectCurrentError = V2ProjectCurrentErrors[keyof V2ProjectCurrentErrors]
+
+export type V2ProjectCurrentResponses = {
+  /**
+   * Project.Current
+   */
+  200: ProjectCurrent
+}
+
+export type V2ProjectCurrentResponse = V2ProjectCurrentResponses[keyof V2ProjectCurrentResponses]
+
+export type V2ProjectDirectoriesData = {
+  body?: never
+  path: {
+    projectID: string
+  }
+  query?: {
+    location?: {
+      directory?: string
+      workspace?: string
+    }
+  }
+  url: "/api/project/{projectID}/directories"
+}
+
+export type V2ProjectDirectoriesErrors = {
+  /**
+   * InvalidRequestError
+   */
+  400: InvalidRequestError
+  /**
+   * UnauthorizedError
+   */
+  401: UnauthorizedError
+}
+
+export type V2ProjectDirectoriesError = V2ProjectDirectoriesErrors[keyof V2ProjectDirectoriesErrors]
+
+export type V2ProjectDirectoriesResponses = {
+  /**
+   * Project.Directories
+   */
+  200: ProjectDirectories
+}
+
+export type V2ProjectDirectoriesResponse = V2ProjectDirectoriesResponses[keyof V2ProjectDirectoriesResponses]
+
+export type V2ProjectRepositoriesData = {
+  body?: never
+  path?: never
+  query?: {
+    location?: {
+      directory?: string
+      workspace?: string
+    }
+  }
+  url: "/api/project/repositories"
+}
+
+export type V2ProjectRepositoriesErrors = {
+  /**
+   * InvalidRequestError
+   */
+  400: InvalidRequestError
+  /**
+   * UnauthorizedError
+   */
+  401: UnauthorizedError
+}
+
+export type V2ProjectRepositoriesError = V2ProjectRepositoriesErrors[keyof V2ProjectRepositoriesErrors]
+
+export type V2ProjectRepositoriesResponses = {
+  /**
+   * Project.Repositories
+   */
+  200: ProjectRepositories
+}
+
+export type V2ProjectRepositoriesResponse = V2ProjectRepositoriesResponses[keyof V2ProjectRepositoriesResponses]
 
 export type PtyConnectData = {
   body?: never

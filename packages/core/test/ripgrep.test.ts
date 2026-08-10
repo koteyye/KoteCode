@@ -9,8 +9,8 @@ import { tmpdir } from "./fixture/tmpdir"
 import { testEffect } from "./lib/effect"
 
 const it = testEffect(LayerNode.compile(Ripgrep.node))
-// A cold Windows run may download and extract ripgrep before the first assertion.
-const coldStartTimeout = 30_000
+// A cold Windows run downloads and extracts ripgrep while the full suite competes for runner resources.
+const coldStartTimeout = process.platform === "win32" ? 120_000 : 30_000
 
 describe("Ripgrep", () => {
   it.live(

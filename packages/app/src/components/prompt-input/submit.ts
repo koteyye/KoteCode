@@ -22,6 +22,7 @@ import { ScopedKey } from "@/utils/server-scope"
 import { createPromptSubmissionState } from "./submission-state"
 import { normalizeSessionInfo } from "@/utils/session"
 import { Event } from "@opencode-ai/schema/event"
+import { useSettings } from "@/context/settings"
 
 type PendingPrompt = {
   abort: AbortController
@@ -38,6 +39,7 @@ export type FollowupDraft = {
   agent: string
   model: { providerID: string; modelID: string }
   variant?: string
+  tools?: Record<string, boolean>
 }
 
 type FollowupSendInput = {
@@ -89,6 +91,7 @@ export async function sendFollowupDraft(input: FollowupSendInput) {
         id: messageID,
         command: cmd,
         arguments: tail.join(" "),
+        tools: input.draft.tools,
         agent: input.draft.agent,
         model: {
           id: input.draft.model.modelID,
@@ -162,6 +165,7 @@ export async function sendFollowupDraft(input: FollowupSendInput) {
       agent: input.draft.agent,
       model: input.draft.model,
       variant: input.draft.variant,
+      tools: input.draft.tools,
       legacyParts: requestParts,
       text: requestParts.flatMap((part) => (part.type === "text" ? [part.text] : [])).join("\n"),
       files: requestParts.flatMap((part) => {
@@ -235,6 +239,7 @@ export function createPromptSubmit(input: PromptSubmitInput) {
   const params = useParams()
   const [search] = useSearchParams<{ draftId?: string }>()
   const tabs = useTabs()
+  const settings = useSettings()
   const pendingKey = (sessionID: string) => ScopedKey.from(sdk().scope, sessionID)
 
   const errorMessage = (err: unknown) => {
@@ -445,6 +450,7 @@ export function createPromptSubmit(input: PromptSubmitInput) {
       agent,
       model,
       variant,
+      tools: { plan_enter: settings.ready() && settings.plugins.planning() },
     }
 
     const clearInput = () => {
@@ -514,6 +520,7 @@ export function createPromptSubmit(input: PromptSubmitInput) {
             id: messageID,
             command: commandName,
             arguments: args.join(" "),
+            tools: { plan_enter: settings.ready() && settings.plugins.planning() },
             agent,
             model: { id: model.modelID, providerID: model.providerID, variant },
             files: images.map((attachment) => ({

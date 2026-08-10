@@ -338,6 +338,31 @@ const setup = Effect.gen(function* () {
   yield* insertSession(sessionID)
 })
 
+const enablePlanningAgents = Effect.gen(function* () {
+  const agents = yield* AgentV2.Service
+  yield* agents.transform((draft) => {
+    draft.update(AgentV2.ID.make("build"), (agent) => {
+      agent.mode = "primary"
+    })
+    draft.update(AgentV2.ID.make("plan"), (agent) => {
+      agent.mode = "primary"
+    })
+  })
+})
+
+const planTransition = (transitions: string[]) =>
+  Tool.make({
+    description: "Enter plan mode",
+    input: Schema.Struct({}),
+    output: Schema.Struct({ agent: Schema.String }),
+    toModelOutput: ({ output }) => [{ type: "text", text: output.agent }],
+    execute: () =>
+      Effect.sync(() => {
+        transitions.push("plan")
+        return { agent: "plan" }
+      }),
+  })
+
 const providerUnavailable = () =>
   new LLMError({
     module: "test",
@@ -555,9 +580,167 @@ const verifyPartialFlushOnInterruption = (kind: FragmentKind) =>
   })
 
 describe("SessionRunnerLLM", () => {
+  it.effect("treats plan transitions as a barrier to sibling tool calls", () =>
+    Effect.gen(function* () {
+      yield* setup
+      yield* enablePlanningAgents
+      executions.length = 0
+      const transitions: string[] = []
+      const applicationTools = yield* ApplicationTools.Service
+      const session = yield* SessionV2.Service
+      yield* applicationTools.register({
+        plan_enter: planTransition(transitions),
+      })
+      yield* session.prompt({ sessionID, prompt: Prompt.make({ text: "Plan this change" }), resume: false })
+      responses = [
+        [
+          LLMEvent.stepStart({ index: 0 }),
+          LLMEvent.toolCall({ id: "call-plan", name: "plan_enter", input: {} }),
+          LLMEvent.toolCall({ id: "call-edit", name: "echo", input: { text: "mutated" } }),
+          LLMEvent.stepFinish({ index: 0, reason: "tool-calls" }),
+          LLMEvent.finish({ reason: "tool-calls" }),
+        ],
+        [],
+      ]
+
+      yield* session.resume(sessionID)
+
+      expect(transitions).toEqual(["plan"])
+      expect(executions).toEqual([])
+      expect(yield* session.context(sessionID)).toMatchObject([
+        { type: "user" },
+        {
+          type: "assistant",
+          content: [
+            { type: "tool", id: "call-plan", state: { status: "completed" } },
+            { type: "tool", id: "call-edit", state: { status: "error" } },
+          ],
+        },
+      ])
+    }),
+  )
+
+  it.effect("rejects a plan transition emitted after an ordinary tool call", () =>
+    Effect.gen(function* () {
+      yield* setup
+      yield* enablePlanningAgents
+      executions.length = 0
+      const transitions: string[] = []
+      const applicationTools = yield* ApplicationTools.Service
+      const session = yield* SessionV2.Service
+      yield* applicationTools.register({ plan_enter: planTransition(transitions) })
+      yield* session.prompt({ sessionID, prompt: Prompt.make({ text: "Plan this change" }), resume: false })
+      responses = [
+        [
+          LLMEvent.stepStart({ index: 0 }),
+          LLMEvent.toolCall({ id: "call-edit", name: "echo", input: { text: "mutated" } }),
+          LLMEvent.toolCall({ id: "call-plan", name: "plan_enter", input: {} }),
+          LLMEvent.stepFinish({ index: 0, reason: "tool-calls" }),
+          LLMEvent.finish({ reason: "tool-calls" }),
+        ],
+        [],
+      ]
+
+      yield* session.resume(sessionID)
+
+      expect(executions).toEqual(["mutated"])
+      expect(transitions).toEqual([])
+      expect(yield* session.context(sessionID)).toMatchObject([
+        { type: "user" },
+        {
+          type: "assistant",
+          content: [
+            { type: "tool", id: "call-edit", state: { status: "completed" } },
+            { type: "tool", id: "call-plan", state: { status: "error" } },
+          ],
+        },
+      ])
+    }),
+  )
+
+  it.effect("does not advertise plan entry when the target agent is unavailable", () =>
+    Effect.gen(function* () {
+      yield* setup
+      const agents = yield* AgentV2.Service
+      const applicationTools = yield* ApplicationTools.Service
+      const session = yield* SessionV2.Service
+      yield* agents.transform((draft) => draft.remove(AgentV2.ID.make("plan")))
+      yield* applicationTools.register({ plan_enter: planTransition([]) })
+      yield* session.prompt({ sessionID, prompt: Prompt.make({ text: "Implement this" }), resume: false })
+
+      requests.length = 0
+      response = []
+      yield* session.resume(sessionID)
+
+      expect(requests[0]?.tools.map((tool) => tool.name)).not.toContain("plan_enter")
+    }),
+  )
+
+  it.effect("fails closed before streaming when an explicitly selected agent is missing", () =>
+    Effect.gen(function* () {
+      yield* setup
+      const { db } = yield* Database.Service
+      const session = yield* SessionV2.Service
+      yield* db
+        .update(SessionTable)
+        .set({ agent: "missing" })
+        .where(eq(SessionTable.id, sessionID))
+        .run()
+        .pipe(Effect.orDie)
+      yield* session.prompt({ sessionID, prompt: Prompt.make({ text: "Continue" }), resume: false })
+
+      requests.length = 0
+      const exit = yield* session.resume(sessionID).pipe(Effect.exit)
+
+      expect(Exit.isFailure(exit)).toBe(true)
+      if (Exit.isFailure(exit)) expect(String(Cause.squash(exit.cause))).toContain("Agent is unavailable: missing")
+      expect(requests).toEqual([])
+    }),
+  )
+
+  it.effect("does not expose application tools in plan mode", () =>
+    Effect.gen(function* () {
+      yield* setup
+      yield* enablePlanningAgents
+      const applicationTools = yield* ApplicationTools.Service
+      const session = yield* SessionV2.Service
+      const mutations: string[] = []
+      yield* applicationTools.register({
+        mutate_application: Tool.make({
+          description: "Mutate application state",
+          input: Schema.Struct({}),
+          output: Schema.Struct({}),
+          execute: () => Effect.sync(() => mutations.push("mutated")).pipe(Effect.as({})),
+        }),
+      })
+      yield* session.switchAgent({ sessionID, agent: "plan" })
+      yield* session.prompt({ sessionID, prompt: Prompt.make({ text: "Plan safely" }), resume: false })
+      requests.length = 0
+      responses = [
+        [
+          LLMEvent.stepStart({ index: 0 }),
+          LLMEvent.toolCall({ id: "call-mutate", name: "mutate_application", input: {} }),
+          LLMEvent.stepFinish({ index: 0, reason: "tool-calls" }),
+          LLMEvent.finish({ reason: "tool-calls" }),
+        ],
+        [],
+      ]
+
+      yield* session.resume(sessionID)
+
+      expect(requests[0]?.tools.map((tool) => tool.name)).not.toContain("mutate_application")
+      expect(mutations).toEqual([])
+      expect((yield* session.context(sessionID)).at(-1)).toMatchObject({
+        type: "assistant",
+        content: [{ type: "tool", id: "call-mutate", state: { status: "error" } }],
+      })
+    }),
+  )
+
   it.effect("advertises and executes a globally attached application tool", () =>
     Effect.gen(function* () {
       yield* setup
+      requests.length = 0
       const applicationTools = yield* ApplicationTools.Service
       const session = yield* SessionV2.Service
       const contexts: Tool.Context[] = []
@@ -653,6 +836,59 @@ describe("SessionRunnerLLM", () => {
         { role: "user", content: [{ type: "text", text: "Second" }] },
       ])
       expect(yield* session.messages({ sessionID })).toHaveLength(2)
+    }),
+  )
+
+  it.effect("applies durable per-prompt tool overrides", () =>
+    Effect.gen(function* () {
+      yield* setup
+      const session = yield* SessionV2.Service
+      yield* session.prompt({
+        sessionID,
+        prompt: Prompt.make({ text: "Skip echo", tools: { echo: false } }),
+        resume: false,
+      })
+
+      requests.length = 0
+      response = []
+      yield* session.resume(sessionID)
+
+      expect(requests).toHaveLength(1)
+      expect(requests[0]?.tools.map((tool) => tool.name)).toEqual(["defect"])
+      expect((yield* session.messages({ sessionID }))[0]).toMatchObject({
+        type: "user",
+        tools: { echo: false },
+      })
+    }),
+  )
+
+  it.effect("applies exact tool overrides when a tool uses an aliased permission", () =>
+    Effect.gen(function* () {
+      yield* setup
+      const applicationTools = yield* ApplicationTools.Service
+      const session = yield* SessionV2.Service
+      yield* applicationTools.register({
+        write: Tool.withPermission(
+          Tool.make({
+            description: "Write content",
+            input: Schema.Struct({}),
+            output: Schema.Struct({}),
+            execute: () => Effect.succeed({}),
+          }),
+          "edit",
+        ),
+      })
+      yield* session.prompt({
+        sessionID,
+        prompt: Prompt.make({ text: "Do not write", tools: { write: false } }),
+        resume: false,
+      })
+
+      requests.length = 0
+      response = []
+      yield* session.resume(sessionID)
+
+      expect(requests[0]?.tools.map((tool) => tool.name)).not.toContain("write")
     }),
   )
 
@@ -863,6 +1099,15 @@ describe("SessionRunnerLLM", () => {
       yield* setup
       const session = yield* SessionV2.Service
       const events = yield* EventV2.Service
+      const agents = yield* AgentV2.Service
+      yield* agents.transform((draft) => {
+        draft.update(AgentV2.ID.make("build"), (agent) => {
+          agent.mode = "primary"
+        })
+        draft.update(AgentV2.ID.make("reviewer"), (agent) => {
+          agent.mode = "primary"
+        })
+      })
       skillBaselines.set(AgentV2.ID.make("build"), "Build skills")
       yield* session.prompt({ sessionID, prompt: Prompt.make({ text: "First" }), resume: false })
 
@@ -1104,7 +1349,7 @@ describe("SessionRunnerLLM", () => {
       ]
       yield* session.prompt({
         sessionID,
-        prompt: Prompt.make({ text: "Recent exact request ".repeat(180) }),
+        prompt: Prompt.make({ text: "Recent exact request ".repeat(180), tools: { echo: false } }),
         resume: false,
       })
       yield* session.resume(sessionID)
@@ -1114,6 +1359,7 @@ describe("SessionRunnerLLM", () => {
       expect(userTexts(requests[1])).toHaveLength(1)
       expect(userTexts(requests[1])[0]).toContain("<summary>\n## Objective\n- Preserve the task\n</summary>")
       expect(userTexts(requests[1])[0]).toContain(`[User]: ${"Recent exact request ".repeat(180)}`)
+      expect(requests[1]?.tools.map((tool) => tool.name)).toEqual(["defect"])
 
       const context = yield* (yield* SessionStore.Service).context(sessionID)
       expect(context.map((message) => message.type)).toEqual(["compaction", "assistant"])

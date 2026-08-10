@@ -1,13 +1,13 @@
 import { createSimpleContext } from "@opencode-ai/ui/context"
 import { base64Encode } from "@opencode-ai/core/util/encode"
 import { useParams } from "@solidjs/router"
-import { batch, createEffect, createMemo, startTransition } from "solid-js"
+import { batch, createEffect, createMemo, onCleanup, startTransition } from "solid-js"
 import { createStore } from "solid-js/store"
 import { useModels } from "@/context/models"
 import { useSettings } from "@/context/settings"
 import { useProviders } from "@/hooks/use-providers"
 import { Persist, persisted } from "@/utils/persist"
-import { hasCustomAgent, resolveAgent } from "./local-agent"
+import { hasCustomAgent, resolveAgent, sameServerAgentState, serverAgentState } from "./local-agent"
 import { cycleModelVariant, getConfiguredAgentVariant, resolveModelVariant } from "./model-variant"
 import { useSDK } from "./sdk"
 import { useSync } from "./sync"
@@ -180,6 +180,23 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
 
     const fallback = createMemo<ModelKey | undefined>(() => configuredModel() ?? recentModel() ?? defaultModel())
 
+    const syncAgent = (name: string, next?: { model?: ModelKey; variant?: string | null }) => {
+      const item = pickAgent(name)
+      if (!item) return
+      batch(() => {
+        setStore("current", item.name)
+        const prev = scope()
+        const state = serverAgentState(prev, item.name, next) satisfies State
+        if (sameServerAgentState(prev, state)) return
+        const session = id()
+        if (session) {
+          setSaved("session", session, state)
+          return
+        }
+        setStore("draft", state)
+      })
+    }
+
     const agent = {
       list,
       visible: agentsVisible,
@@ -230,6 +247,35 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
         agent.set(item.name)
       },
     }
+
+    createEffect(() => {
+      const server = serverSDK()
+      const stop = server.event.on(sdk().directory, (event) => {
+        const sessionID = id()
+        if (!sessionID) return
+        const current = event.current
+        if (
+          (current?.type === "session.agent.selected" || current?.type === "session.next.agent.switched") &&
+          current.data.sessionID === sessionID
+        ) {
+          syncAgent(current.data.agent)
+          return
+        }
+        if (event.type !== "session.updated") return
+        const info = event.properties.info
+        if (info.id !== sessionID || !info.agent) return
+        syncAgent(
+          info.agent,
+          info.model
+            ? {
+                model: { providerID: info.model.providerID, modelID: info.model.id },
+                variant: info.model.variant === "default" ? undefined : info.model.variant,
+              }
+            : undefined,
+        )
+      })
+      onCleanup(stop)
+    })
 
     const current = () => {
       const item = firstModel(

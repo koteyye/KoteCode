@@ -77,8 +77,12 @@ describe("node build", () => {
       Effect.sync(() => {
         acquisitions++
         return Project.Service.of({
+          list: () => Effect.succeed([]),
           directories: () => Effect.succeed([]),
+          repositories: () => Effect.succeed([]),
+          update: () => Effect.die("unused"),
           resolve: (directory) => Effect.succeed({ id: Project.ID.global, directory }),
+          open: (directory) => Effect.succeed({ id: Project.ID.global, directory }),
           commit: () => Effect.void,
         })
       }),

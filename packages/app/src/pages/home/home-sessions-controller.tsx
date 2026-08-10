@@ -12,7 +12,7 @@ import {
   retainHomeSessions,
   type HomeSessionEvents,
 } from "@/context/global-sync/home-session-index"
-import type { LocalProject } from "@/context/layout"
+import { projectDirectories, type LocalProject } from "@/context/layout"
 import { useLanguage } from "@/context/language"
 import { ServerConnection } from "@/context/server"
 import { sessionHasOpenTab, useTabs } from "@/context/tabs"
@@ -188,6 +188,7 @@ export function createHomeSessionsController(home: HomeController) {
             .find(
               (item) =>
                 pathKey(item.worktree) === directoryKey ||
+                item.repositories?.some((repository) => pathKey(repository) === directoryKey) ||
                 item.sandboxes?.some((sandbox) => pathKey(sandbox) === directoryKey),
             ) ?? projectForSession(session, home.project.list(), projectByID())
         const conn = home.server.focused()
@@ -238,7 +239,7 @@ export function createHomeSessionsController(home: HomeController) {
 }
 
 function directories(project: LocalProject) {
-  return [project.worktree, ...(project.sandboxes ?? [])]
+  return projectDirectories(project)
 }
 
 function buildHomeSessionRecords(input: {
@@ -258,7 +259,9 @@ function buildHomeSessionRecords(input: {
           .projects()
           .find(
             (item) =>
-              pathKey(item.worktree) === directory || item.sandboxes?.some((sandbox) => pathKey(sandbox) === directory),
+              pathKey(item.worktree) === directory ||
+              item.repositories?.some((repository) => pathKey(repository) === directory) ||
+              item.sandboxes?.some((sandbox) => pathKey(sandbox) === directory),
           ) ?? projectForSession(session, input.projects(), input.projectByID())
       if (!project) return []
       return { session, project, projectName: displayName(project) }

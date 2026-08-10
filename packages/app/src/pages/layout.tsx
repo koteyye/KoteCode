@@ -78,6 +78,7 @@ import {
 import { createInlineEditorController } from "./layout/inline-editor"
 import {
   LocalWorkspace,
+  ProjectGroupWorkspace,
   SortableWorkspace,
   WorkspaceDragOverlay,
   type WorkspaceSidebarContext,
@@ -525,6 +526,9 @@ export default function LegacyLayout(props: ParentProps) {
     const sandbox = projects.find((p) => p.sandboxes?.some((item) => pathKey(item) === key))
     if (sandbox) return sandbox
 
+    const group = projects.find((p) => p.repositories?.some((item) => pathKey(item) === key))
+    if (group) return group
+
     const direct = projects.find((p) => pathKey(p.worktree) === key)
     if (direct) return direct
 
@@ -590,6 +594,13 @@ export default function LegacyLayout(props: ParentProps) {
   const visibleSessionDirs = createMemo(() => {
     const project = currentProject()
     if (!project) return [] as string[]
+    if ((project.repositories?.length ?? 0) >= 2) {
+      return [project.worktree, ...(project.repositories ?? [])].filter((directory) => {
+        const expanded = store.workspaceExpanded[directory] ?? directory === project.worktree
+        const active = pathKey(directory) === pathKey(currentDir())
+        return expanded || active
+      })
+    }
     if (!workspaceSetting()) return [project.worktree]
 
     const activeDir = currentDir()
@@ -608,9 +619,13 @@ export default function LegacyLayout(props: ParentProps) {
       if (!expanded) continue
       const key = pathKey(directory)
       const project = projects.find(
-        (item) => pathKey(item.worktree) === key || item.sandboxes?.some((sandbox) => pathKey(sandbox) === key),
+        (item) =>
+          pathKey(item.worktree) === key ||
+          item.sandboxes?.some((sandbox) => pathKey(sandbox) === key) ||
+          item.repositories?.some((repository) => pathKey(repository) === key),
       )
       if (!project) continue
+      if ((project.repositories?.length ?? 0) >= 2) continue
       if (project.vcs === "git" && layout.sidebar.workspaces(project.worktree)()) continue
       setStore("workspaceExpanded", directory, false)
     }
@@ -1123,7 +1138,12 @@ export default function LegacyLayout(props: ParentProps) {
     const key = pathKey(directory)
     const project = layout.projects
       .list()
-      .find((item) => pathKey(item.worktree) === key || item.sandboxes?.some((sandbox) => pathKey(sandbox) === key))
+      .find(
+        (item) =>
+          pathKey(item.worktree) === key ||
+          item.sandboxes?.some((sandbox) => pathKey(sandbox) === key) ||
+          item.repositories?.some((repository) => pathKey(repository) === key),
+      )
     if (project) return project.worktree
 
     const known = Object.entries(store.workspaceOrder).find(
@@ -1175,7 +1195,11 @@ export default function LegacyLayout(props: ParentProps) {
     server.projects.touch(root)
     const project = layout.projects.list().find((item) => item.worktree === root)
     let dirs = project
-      ? effectiveWorkspaceOrder(root, [root, ...(project.sandboxes ?? [])], store.workspaceOrder[root])
+      ? effectiveWorkspaceOrder(
+          root,
+          [root, ...(project.repositories ?? []), ...(project.sandboxes ?? [])],
+          store.workspaceOrder[root],
+        )
       : [root]
     const canOpen = (value: string | undefined) => {
       if (!value) return false
@@ -1190,7 +1214,11 @@ export default function LegacyLayout(props: ParentProps) {
         .then((projectID) => serverSDK().api.project.directories({ projectID, location: { directory: root } }))
         .then((items) => items.map((item) => item.directory).filter((item) => pathKey(item) !== pathKey(root)))
         .catch(() => [] as string[])
-      dirs = effectiveWorkspaceOrder(root, [root, ...listed], store.workspaceOrder[root])
+      dirs = effectiveWorkspaceOrder(
+        root,
+        [root, ...(project?.repositories ?? []), ...listed],
+        store.workspaceOrder[root],
+      )
       return canOpen(target)
     }
     const openSession = async (target: { directory: string; id: string }) => {
@@ -1760,7 +1788,7 @@ export default function LegacyLayout(props: ParentProps) {
   function workspaceIds(project: LocalProject | undefined) {
     if (!project) return []
     const local = project.worktree
-    const dirs = [local, ...(project.sandboxes ?? [])]
+    const dirs = [local, ...(project.repositories ?? []), ...(project.sandboxes ?? [])]
     const active = currentProject()
     const directory = pathKey(active?.worktree ?? "") === pathKey(project.worktree) ? currentDir() : undefined
     const extra =
@@ -1956,6 +1984,7 @@ export default function LegacyLayout(props: ParentProps) {
     const canToggle = createMemo(() => {
       const item = project()
       if (!item) return false
+      if ((item.repositories?.length ?? 0) >= 2) return false
       return item.vcs === "git" || layout.sidebar.workspaces(item.worktree)()
     })
     const homedir = createMemo(() => serverSync().data.path.home)
@@ -2096,86 +2125,98 @@ export default function LegacyLayout(props: ParentProps) {
 
               <div class="flex-1 min-h-0 flex flex-col">
                 <Show
-                  when={workspacesEnabled()}
+                  when={(project.repositories?.length ?? 0) >= 2}
                   fallback={
-                    <>
-                      <div class="shrink-0 py-4">
-                        <Button
-                          size="large"
-                          class="w-full"
-                          onClick={() => {
-                            const dir = worktree()
-                            if (!dir) return
-                            navigateWithSidebarReset(`/${base64Encode(dir)}/session`)
-                          }}
-                        >
-                          <IconV2 name="edit" size="small" />
-                          {language.t("command.session.new")}
-                        </Button>
-                      </div>
-                      <div class="flex-1 min-h-0">
-                        <LocalWorkspace
-                          ctx={workspaceSidebarCtx}
-                          project={project}
-                          sortNow={sortNow}
-                          mobile={panelProps.mobile}
-                        />
-                      </div>
-                    </>
+                    <Show
+                      when={workspacesEnabled()}
+                      fallback={
+                        <>
+                          <div class="shrink-0 py-4">
+                            <Button
+                              size="large"
+                              class="w-full"
+                              onClick={() => {
+                                const dir = worktree()
+                                if (!dir) return
+                                navigateWithSidebarReset(`/${base64Encode(dir)}/session`)
+                              }}
+                            >
+                              <IconV2 name="edit" size="small" />
+                              {language.t("command.session.new")}
+                            </Button>
+                          </div>
+                          <div class="flex-1 min-h-0">
+                            <LocalWorkspace
+                              ctx={workspaceSidebarCtx}
+                              project={project}
+                              sortNow={sortNow}
+                              mobile={panelProps.mobile}
+                            />
+                          </div>
+                        </>
+                      }
+                    >
+                      <>
+                        <div class="shrink-0 py-4">
+                          <Button
+                            size="large"
+                            icon="plus-small"
+                            class="w-full"
+                            onClick={() => {
+                              void createWorkspace(project)
+                            }}
+                          >
+                            {language.t("workspace.new")}
+                          </Button>
+                        </div>
+                        <div class="relative flex-1 min-h-0">
+                          <DragDropProvider
+                            onDragStart={handleWorkspaceDragStart}
+                            onDragEnd={handleWorkspaceDragEnd}
+                            onDragOver={handleWorkspaceDragOver}
+                            collisionDetector={closestCenter}
+                          >
+                            <DragDropSensors />
+                            <ConstrainDragXAxis />
+                            <div
+                              ref={(el) => {
+                                if (!panelProps.mobile) scrollContainerRef = el
+                              }}
+                              class="size-full flex flex-col py-2 gap-4 overflow-y-auto no-scrollbar [overflow-anchor:none]"
+                            >
+                              <SortableProvider ids={workspaces()}>
+                                <For each={workspaces()}>
+                                  {(directory) => (
+                                    <SortableWorkspace
+                                      ctx={workspaceSidebarCtx}
+                                      directory={directory}
+                                      project={project}
+                                      sortNow={sortNow}
+                                      mobile={panelProps.mobile}
+                                    />
+                                  )}
+                                </For>
+                              </SortableProvider>
+                            </div>
+                            <DragOverlay>
+                              <WorkspaceDragOverlay
+                                sidebarProject={sidebarProject}
+                                activeWorkspace={() => store.activeWorkspace}
+                                workspaceLabel={workspaceLabel}
+                              />
+                            </DragOverlay>
+                          </DragDropProvider>
+                        </div>
+                      </>
+                    </Show>
                   }
                 >
-                  <>
-                    <div class="shrink-0 py-4">
-                      <Button
-                        size="large"
-                        icon="plus-small"
-                        class="w-full"
-                        onClick={() => {
-                          void createWorkspace(project)
-                        }}
-                      >
-                        {language.t("workspace.new")}
-                      </Button>
-                    </div>
-                    <div class="relative flex-1 min-h-0">
-                      <DragDropProvider
-                        onDragStart={handleWorkspaceDragStart}
-                        onDragEnd={handleWorkspaceDragEnd}
-                        onDragOver={handleWorkspaceDragOver}
-                        collisionDetector={closestCenter}
-                      >
-                        <DragDropSensors />
-                        <ConstrainDragXAxis />
-                        <div
-                          ref={(el) => {
-                            if (!panelProps.mobile) scrollContainerRef = el
-                          }}
-                          class="size-full flex flex-col py-2 gap-4 overflow-y-auto no-scrollbar [overflow-anchor:none]"
-                        >
-                          <SortableProvider ids={workspaces()}>
-                            <For each={workspaces()}>
-                              {(directory) => (
-                                <SortableWorkspace
-                                  ctx={workspaceSidebarCtx}
-                                  directory={directory}
-                                  project={project}
-                                  sortNow={sortNow}
-                                  mobile={panelProps.mobile}
-                                />
-                              )}
-                            </For>
-                          </SortableProvider>
-                        </div>
-                        <DragOverlay>
-                          <WorkspaceDragOverlay
-                            sidebarProject={sidebarProject}
-                            activeWorkspace={() => store.activeWorkspace}
-                            workspaceLabel={workspaceLabel}
-                          />
-                        </DragOverlay>
-                      </DragDropProvider>
-                    </div>
-                  </>
+                  <ProjectGroupWorkspace
+                    ctx={workspaceSidebarCtx}
+                    project={project}
+                    sortNow={sortNow}
+                    mobile={panelProps.mobile}
+                  />
                 </Show>
               </div>
             </>

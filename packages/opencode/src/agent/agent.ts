@@ -162,6 +162,7 @@ const layer = Layer.effect(
               Permission.fromConfig({
                 question: "allow",
                 plan_exit: "allow",
+                bash: "deny",
                 task: {
                   general: "deny",
                 },

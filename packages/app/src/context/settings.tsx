@@ -49,6 +49,9 @@ export interface Settings {
   permissions: {
     autoApprove: boolean
   }
+  plugins: {
+    planning: boolean
+  }
   notifications: NotificationSettings
   sounds: SoundSettings
 }
@@ -199,6 +202,9 @@ const defaultSettings: Settings = {
   keybinds: {},
   permissions: {
     autoApprove: false,
+  },
+  plugins: {
+    planning: true,
   },
   notifications: {
     agent: true,
@@ -481,6 +487,12 @@ export const { use: useSettings, provider: SettingsProvider } = createSimpleCont
         autoApprove: withFallback(() => store.permissions?.autoApprove, defaultSettings.permissions.autoApprove),
         setAutoApprove(value: boolean) {
           setStore("permissions", "autoApprove", value)
+        },
+      },
+      plugins: {
+        planning: withFallback(() => store.plugins?.planning, defaultSettings.plugins.planning),
+        setPlanning(value: boolean) {
+          setStore("plugins", "planning", value)
         },
       },
       notifications: {

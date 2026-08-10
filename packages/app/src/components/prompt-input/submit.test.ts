@@ -4,6 +4,7 @@ import type { Prompt, PromptStore } from "@/context/prompt"
 import type { ModelSelection } from "@/context/local"
 
 let createPromptSubmit: typeof import("./submit").createPromptSubmit
+let sendFollowupDraft: typeof import("./submit").sendFollowupDraft
 
 const createdClients: string[] = []
 const createdSessions: string[] = []
@@ -39,6 +40,8 @@ let search: { draftId?: string } = {}
 let selected = "/repo/worktree-a"
 let variant: string | undefined
 let permissionServer = "server-a"
+let planning = true
+let settingsReady = true
 let createSessionGate: Promise<void> | undefined
 
 let promptValue: Prompt = [{ type: "text", content: "ls", start: 0, end: 2 }]
@@ -167,6 +170,10 @@ beforeAll(async () => {
     return { usePermission: () => ({ currentServerState: () => state(permissionServer) }) }
   })
 
+  mock.module("@/context/settings", () => ({
+    useSettings: () => ({ ready: () => settingsReady, plugins: { planning: () => planning } }),
+  }))
+
   mock.module("@/context/server", () => ({
     useServer: () => ({ key: "server-key" }),
   }))
@@ -276,6 +283,7 @@ beforeAll(async () => {
 
   const mod = await import("./submit")
   createPromptSubmit = mod.createPromptSubmit
+  sendFollowupDraft = mod.sendFollowupDraft
 })
 
 beforeEach(() => {
@@ -299,6 +307,8 @@ beforeEach(() => {
   selected = "/repo/worktree-a"
   variant = undefined
   permissionServer = "server-a"
+  planning = true
+  settingsReady = true
   createSessionGate = undefined
   serverSessionSyncs = 0
   for (const key of Object.keys(storedSessions)) delete storedSessions[key]
@@ -494,9 +504,45 @@ describe("prompt submit worktree selection", () => {
     ])
   })
 
+  test("disables automatic planning when configured off or settings are not hydrated", async () => {
+    params = { id: "session-1" }
+    planning = false
+
+    const submit = createPromptSubmit({
+      prompt,
+      info: () => ({ id: "session-1" }),
+      imageAttachments: () => [],
+      commentCount: () => 0,
+      autoAccept: () => false,
+      mode: () => "normal",
+      working: () => false,
+      editor: () => undefined,
+      queueScroll: () => undefined,
+      promptLength: (value) => value.reduce((sum, part) => sum + ("content" in part ? part.content.length : 0), 0),
+      addToHistory: () => undefined,
+      resetHistoryNavigation: () => undefined,
+      setMode: () => undefined,
+      setPopover: () => undefined,
+      onSubmit: () => undefined,
+    })
+
+    await submit.handleSubmit({ preventDefault: () => undefined } as unknown as Event)
+    await Bun.sleep(0)
+
+    expect(promptInputs[0]).toMatchObject({ tools: { plan_enter: false } })
+
+    planning = true
+    settingsReady = false
+    await submit.handleSubmit({ preventDefault: () => undefined } as unknown as Event)
+    await Bun.sleep(0)
+
+    expect(promptInputs[1]).toMatchObject({ tools: { plan_enter: false } })
+  })
+
   test("submits slash commands through the current session API", async () => {
     params = { id: "session-1" }
     variant = "high"
+    planning = false
     commands.push({ name: "review" })
     promptValue = [{ type: "text", content: "/review staged changes", start: 0, end: 22 }]
 
@@ -525,12 +571,51 @@ describe("prompt submit worktree selection", () => {
         id: expect.stringMatching(/^msg_/),
         command: "review",
         arguments: "staged changes",
+        tools: { plan_enter: false },
         agent: "agent",
         model: { id: "model", providerID: "provider", variant: "high" },
         files: [],
       },
     ])
     expect(serverSessionSyncs).toBe(0)
+  })
+
+  test("preserves planning overrides for queued slash commands", async () => {
+    commands.push({ name: "review" })
+
+    await sendFollowupDraft({
+      draft: {
+        sessionID: "session-1",
+        sessionDirectory: "/repo/main",
+        prompt: [{ type: "text", content: "/review staged changes", start: 0, end: 22 }],
+        context: [],
+        agent: "agent",
+        model: { providerID: "provider", modelID: "model" },
+        variant: "high",
+        tools: { plan_enter: false },
+      },
+      sync: { data: { command: commands } },
+      serverSync: { session: { set: () => undefined } },
+      api: {
+        command: async (input: unknown) => {
+          sentCommands.push(input)
+          return {} as never
+        },
+      },
+    } as unknown as Parameters<typeof sendFollowupDraft>[0])
+
+    expect(sentCommands).toEqual([
+      {
+        sessionID: "session-1",
+        id: expect.stringMatching(/^msg_/),
+        command: "review",
+        arguments: "staged changes",
+        tools: { plan_enter: false },
+        agent: "agent",
+        model: { id: "model", providerID: "provider", variant: "high" },
+        files: [],
+      },
+    ])
   })
 
   test("uses an injected model selection", async () => {

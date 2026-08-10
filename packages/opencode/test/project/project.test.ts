@@ -76,13 +76,17 @@ function projectV2FailureLayer() {
   return Layer.succeed(
     ProjectV2.Service,
     ProjectV2.Service.of({
+      list: () => Effect.succeed([]),
       directories: () => Effect.succeed([]),
+      repositories: () => Effect.succeed([]),
+      update: () => Effect.die("unused"),
       resolve: (input) =>
         Effect.succeed({
           id: ProjectV2.ID.global,
           directory: input,
           vcs: { type: "git" as const, store: input },
         }),
+      open: (input) => Effect.succeed({ id: ProjectV2.ID.global, directory: input }),
       commit: () => Effect.void,
     }),
   )

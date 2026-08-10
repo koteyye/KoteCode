@@ -141,6 +141,7 @@ import type {
   ProjectListErrors,
   ProjectListResponses,
   ProjectUpdateErrors,
+  ProjectUpdateInput,
   ProjectUpdateResponses,
   PromptInput,
   ProviderAuthErrors,
@@ -311,6 +312,16 @@ import type {
   V2ProjectCopyRefreshResponses,
   V2ProjectCopyRemoveErrors,
   V2ProjectCopyRemoveResponses,
+  V2ProjectCurrentErrors,
+  V2ProjectCurrentResponses,
+  V2ProjectDirectoriesErrors,
+  V2ProjectDirectoriesResponses,
+  V2ProjectListErrors,
+  V2ProjectListResponses,
+  V2ProjectRepositoriesErrors,
+  V2ProjectRepositoriesResponses,
+  V2ProjectUpdateErrors,
+  V2ProjectUpdateResponses,
   V2ProviderGetErrors,
   V2ProviderGetResponses,
   V2ProviderListErrors,
@@ -4162,6 +4173,9 @@ export class Session2 extends HeyApiClient {
       model?: string
       arguments?: string
       command?: string
+      tools?: {
+        [key: string]: boolean
+      }
       variant?: string
       parts?: Array<{
         id?: string
@@ -4187,6 +4201,7 @@ export class Session2 extends HeyApiClient {
             { in: "body", key: "model" },
             { in: "body", key: "arguments" },
             { in: "body", key: "command" },
+            { in: "body", key: "tools" },
             { in: "body", key: "variant" },
             { in: "body", key: "parts" },
           ],
@@ -6987,6 +7002,140 @@ export class ProjectCopy2 extends HeyApiClient {
   }
 }
 
+export class Project2 extends HeyApiClient {
+  /**
+   * List projects
+   *
+   * List known projects.
+   */
+  public list<ThrowOnError extends boolean = false>(options?: Options<never, ThrowOnError>) {
+    return (options?.client ?? this.client).get<V2ProjectListResponses, V2ProjectListErrors, ThrowOnError>({
+      url: "/api/project",
+      ...options,
+    })
+  }
+
+  /**
+   * Update project
+   *
+   * Update project metadata.
+   */
+  public update<ThrowOnError extends boolean = false>(
+    parameters: {
+      projectID: string
+      projectUpdateInput: ProjectUpdateInput
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "projectID" },
+            { key: "projectUpdateInput", map: "body" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).patch<V2ProjectUpdateResponses, V2ProjectUpdateErrors, ThrowOnError>({
+      url: "/api/project/{projectID}",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Get current project
+   *
+   * Resolve the project for the requested location.
+   */
+  public current<ThrowOnError extends boolean = false>(
+    parameters?: {
+      location?: {
+        directory?: string
+        workspace?: string
+      }
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams([parameters], [{ args: [{ in: "query", key: "location" }] }])
+    return (options?.client ?? this.client).get<V2ProjectCurrentResponses, V2ProjectCurrentErrors, ThrowOnError>({
+      url: "/api/project/current",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * List project directories
+   *
+   * List known local absolute directories for a project.
+   */
+  public directories<ThrowOnError extends boolean = false>(
+    parameters: {
+      projectID: string
+      location?: {
+        directory?: string
+        workspace?: string
+      }
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "projectID" },
+            { in: "query", key: "location" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<
+      V2ProjectDirectoriesResponses,
+      V2ProjectDirectoriesErrors,
+      ThrowOnError
+    >({
+      url: "/api/project/{projectID}/directories",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Discover child repositories
+   *
+   * List Git repositories located directly inside a non-repository location.
+   */
+  public repositories<ThrowOnError extends boolean = false>(
+    parameters?: {
+      location?: {
+        directory?: string
+        workspace?: string
+      }
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams([parameters], [{ args: [{ in: "query", key: "location" }] }])
+    return (options?.client ?? this.client).get<
+      V2ProjectRepositoriesResponses,
+      V2ProjectRepositoriesErrors,
+      ThrowOnError
+    >({
+      url: "/api/project/repositories",
+      ...options,
+      ...params,
+    })
+  }
+}
+
 export class V2 extends HeyApiClient {
   private _health?: Health
   get health(): Health {
@@ -7071,6 +7220,11 @@ export class V2 extends HeyApiClient {
   private _projectCopy?: ProjectCopy2
   get projectCopy(): ProjectCopy2 {
     return (this._projectCopy ??= new ProjectCopy2({ client: this.client }))
+  }
+
+  private _project?: Project2
+  get project(): Project2 {
+    return (this._project ??= new Project2({ client: this.client }))
   }
 }
 
