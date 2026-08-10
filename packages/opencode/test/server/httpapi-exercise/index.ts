@@ -663,6 +663,57 @@ const scenarios: Scenario[] = [
     check(body.healthy === true, "v2 server should report healthy")
   }),
   http.protected.get("/api/location", "v2.location.get").json(200, object),
+  http.protected
+    .get("/api/project", "v2.project.list")
+    .inProject()
+    .json(200, (body, ctx) => {
+      array(body)
+      check(
+        body.some((item) => isRecord(item) && item.worktree === ctx.directory),
+        "v2 project list should include the scenario project",
+      )
+    }),
+  http.protected
+    .get("/api/project/current", "v2.project.current")
+    .inProject()
+    .json(200, (body, ctx) => {
+      object(body)
+      check(body.directory === ctx.directory, "v2 current project should resolve from scenario directory")
+    }),
+  http.protected.get("/api/project/repositories", "v2.project.repositories").inProject({ git: false }).json(200, array),
+  http.protected
+    .get("/api/project/{projectID}/directories", "v2.project.directories")
+    .inProject()
+    .seeded((ctx) => ctx.project())
+    .at((ctx) => ({
+      path: route("/api/project/{projectID}/directories", { projectID: ctx.state.id }),
+      headers: ctx.headers(),
+    }))
+    .json(200, (body, ctx) => {
+      array(body)
+      check(
+        body.some((item) => isRecord(item) && item.directory === ctx.directory),
+        "v2 project directories should include the scenario directory",
+      )
+    }),
+  http.protected
+    .patch("/api/project/{projectID}", "v2.project.update")
+    .inProject()
+    .mutating()
+    .seeded((ctx) => ctx.project())
+    .at((ctx) => ({
+      path: route("/api/project/{projectID}", { projectID: ctx.state.id }),
+      headers: ctx.headers(),
+      body: { name: "HTTP API V2 Project", commands: { start: "bun --version" } },
+    }))
+    .json(200, (body) => {
+      object(body)
+      check(body.name === "HTTP API V2 Project", "v2 project update should return patched name")
+      check(
+        isRecord(body.commands) && body.commands.start === "bun --version",
+        "v2 project update should return patched command",
+      )
+    }),
   http.protected.get("/api/agent", "v2.agent.list").json(200, locationData(array)),
   http.protected.get("/api/model", "v2.model.list").json(200, locationData(array)),
   http.protected.get("/api/provider", "v2.provider.list").json(200, locationData(array)),
