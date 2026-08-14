@@ -653,7 +653,7 @@ export default function Page() {
     const project = sync().project
     return !!project && project.vcs !== "git"
   })
-  const changesOptions = createMemo<ChangeMode[]>(() => {
+  const changesOptions = createMemo<ChangeMode[]>((previous) => {
     const list: ChangeMode[] = []
     const project = sync().project
     const vcs = sync().data.vcs
@@ -662,8 +662,10 @@ export default function Page() {
       list.push("branch")
     }
     list.push("turn")
+    // Keep an open Kobalte collection mounted across equivalent VCS refreshes.
+    if (previous.length === list.length && previous.every((value, index) => value === list[index])) return previous
     return list
-  })
+  }, [])
   const mobileChanges = createMemo(() => !isDesktop() && store.mobileTab === "changes")
   const wantsReview = createMemo(() =>
     isDesktop()
