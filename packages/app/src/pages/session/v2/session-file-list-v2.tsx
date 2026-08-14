@@ -108,7 +108,7 @@ export function SessionFileListV2(props: {
           const directory = () => (value.includes("/") ? getDirectory(value) : undefined)
           const filename = () => getFilename(value)
           return (
-            <Show when={virtualItemByKey().get(key)}>
+            <Show when={virtualItemByKey().get(key)} keyed>
               {(item) => (
                 <div
                   style={{
@@ -116,8 +116,8 @@ export function SessionFileListV2(props: {
                     top: "0",
                     left: "0",
                     width: "100%",
-                    height: `${item().size}px`,
-                    transform: `translateY(${item().start}px)`,
+                    height: `${item.size}px`,
+                    transform: `translateY(${item.start}px)`,
                   }}
                 >
                   <button

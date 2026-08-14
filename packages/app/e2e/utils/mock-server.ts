@@ -3,6 +3,39 @@ import type { Page, Route } from "@playwright/test"
 const emptyList = new Set(["/skill", "/command", "/lsp", "/formatter", "/vcs/status", "/vcs/diff"])
 const emptyObject = new Set(["/global/config", "/config", "/provider/auth", "/mcp", "/experimental/resource"])
 
+type ProviderFixture = {
+  all?: Array<{
+    id: string
+    name: string
+    npm?: string
+    models?: Record<
+      string,
+      {
+        id: string
+        name: string
+        release_date?: string
+        attachment?: boolean
+        tool_call?: boolean
+        cost?: {
+          input?: number
+          output?: number
+          cache_read?: number
+          cache_write?: number
+        }
+        limit?: { context?: number; output?: number }
+        modalities?: { input?: string[]; output?: string[] }
+        status?: "alpha" | "beta" | "deprecated" | "active"
+        options?: Record<string, unknown>
+        headers?: Record<string, string>
+        provider?: { npm?: string }
+        variants?: Record<string, Record<string, unknown>>
+      }
+    >
+  }>
+  connected?: string[]
+  default?: Record<string, string | undefined>
+}
+
 export interface MockServerConfig {
   protocol?: "v1" | "v2"
   provider: unknown
@@ -30,6 +63,7 @@ export interface MockServerConfig {
 export async function mockOpenCodeServer(page: Page, config: MockServerConfig) {
   const cursors = new Map<string, string>()
   let nextCursor = 0
+  const catalog = v2Catalog(config.provider)
   const staticRoutes: Record<string, unknown> = {
     "/provider": config.provider,
     "/path": {
@@ -120,6 +154,9 @@ export async function mockOpenCodeServer(page: Page, config: MockServerConfig) {
           },
         ],
       })
+    if (path === "/api/provider") return json(route, { location: location(config), data: catalog.providers })
+    if (path === "/api/model") return json(route, { location: location(config), data: catalog.models })
+    if (path === "/api/model/default") return json(route, { location: location(config), data: catalog.defaultModel })
     if (path === "/api/command") return json(route, { location: location(config), data: [] })
     if (path === "/api/mcp") return json(route, { location: location(config), data: [] })
     if (path === "/api/mcp/resource")
@@ -301,6 +338,59 @@ function location(config: MockServerConfig) {
   return {
     directory: config.directory,
     project: { id: (config.project as { id?: string }).id, directory: config.directory },
+  }
+}
+
+function v2Catalog(input: unknown) {
+  const source = (input ?? {}) as ProviderFixture
+  const connected = new Set(source.connected ?? [])
+  const providers = (source.all ?? []).filter((provider) => connected.has(provider.id))
+  const models = providers.flatMap((provider) =>
+    Object.values(provider.models ?? {}).map((model) => {
+      const released = Date.parse(model.release_date ?? "")
+      return {
+        id: model.id,
+        modelID: model.id,
+        providerID: provider.id,
+        name: model.name,
+        package: model.provider?.npm ?? provider.npm ?? provider.id,
+        settings: model.options ?? {},
+        headers: model.headers ?? {},
+        capabilities: {
+          tools: model.tool_call ?? true,
+          input: model.modalities?.input ?? (model.attachment ? ["text", "image"] : ["text"]),
+          output: model.modalities?.output ?? ["text"],
+        },
+        variants: Object.entries(model.variants ?? {}).map(([id, settings]) => ({ id, settings })),
+        time: { released: Number.isNaN(released) ? 0 : released },
+        cost: model.cost
+          ? [
+              {
+                input: model.cost.input ?? 0,
+                output: model.cost.output ?? 0,
+                cache: { read: model.cost.cache_read ?? 0, write: model.cost.cache_write ?? 0 },
+              },
+            ]
+          : [],
+        status: model.status ?? "active",
+        enabled: true,
+        limit: { context: model.limit?.context ?? 200_000, output: model.limit?.output ?? 4_096 },
+      }
+    }),
+  )
+  return {
+    providers: providers.map((provider) => ({
+      id: provider.id,
+      name: provider.name,
+      package: provider.npm ?? provider.id,
+    })),
+    models,
+    defaultModel:
+      models.find((model) => {
+        const modelID =
+          source.default?.providerID === model.providerID ? source.default.modelID : source.default?.[model.providerID]
+        return model.id === modelID
+      }) ?? null,
   }
 }
 
