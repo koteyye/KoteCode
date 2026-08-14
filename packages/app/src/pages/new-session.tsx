@@ -71,7 +71,6 @@ export default function NewSessionPage() {
   const inputController = createPromptInputController({
     sessionKey: route.sessionKey,
     sessionID: () => route.params.id,
-    queryOptions: serverSync().queryOptions,
     model,
   })
   const projectControls = createPromptProjectControls()

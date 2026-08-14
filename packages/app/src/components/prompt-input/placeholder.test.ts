@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { promptPlaceholder } from "./placeholder"
+import { promptDesignPlaceholder, promptPlaceholder } from "./placeholder"
 
 describe("promptPlaceholder", () => {
   const t = (key: string, params?: Record<string, string>) => `${key}${params?.example ? `:${params.example}` : ""}`
@@ -44,5 +44,10 @@ describe("promptPlaceholder", () => {
       t,
     })
     expect(value).toBe("prompt.placeholder.simple")
+  })
+
+  test("uses the UI language pack for the redesigned normal placeholder", () => {
+    expect(promptDesignPlaceholder("normal", "fallback", t)).toBe("ui.prompt.placeholder.normal")
+    expect(promptDesignPlaceholder("shell", "translated shell", t)).toBe("translated shell")
   })
 })

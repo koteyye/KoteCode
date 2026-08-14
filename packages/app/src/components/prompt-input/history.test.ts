@@ -7,6 +7,7 @@ import {
   navigatePromptHistory,
   prependHistoryEntry,
   promptLength,
+  sanitizePromptHistoryState,
   type PromptHistoryComment,
 } from "./history"
 
@@ -39,6 +40,56 @@ describe("prompt-input history", () => {
 
     const dedupedComments = prependHistoryEntry(commentsOnly, DEFAULT_PROMPT, [comment("c1")])
     expect(dedupedComments).toBe(commentsOnly)
+  })
+
+  test("persisted history omits image data while retaining reusable text", () => {
+    const image: Prompt[number] = {
+      type: "image",
+      id: "image-1",
+      filename: "large.png",
+      mime: "image/png",
+      dataUrl: `data:image/png;base64,${"a".repeat(1024)}`,
+    }
+    const entries = prependHistoryEntry([], [...text("describe this"), image])
+
+    expect(entries).toHaveLength(1)
+    expect(normalizePromptHistoryEntry(entries[0]).prompt).toEqual(text("describe this"))
+    expect(JSON.stringify(entries)).not.toContain("data:image/png")
+    expect(prependHistoryEntry([], [image])).toEqual([])
+  })
+
+  test("migration strips existing images and enforces a UTF-8 byte cap", () => {
+    const newest = {
+      prompt: text("newest"),
+      comments: [],
+    }
+    const oldImage = {
+      prompt: [
+        ...text("older"),
+        {
+          type: "image" as const,
+          id: "image-1",
+          filename: "large.png",
+          mime: "image/png",
+          dataUrl: `data:image/png;base64,${"a".repeat(1024)}`,
+        },
+      ],
+      comments: [],
+    }
+    const maxBytes = new TextEncoder().encode(JSON.stringify({ entries: [newest] })).byteLength
+    const migrated = sanitizePromptHistoryState({ entries: [newest, oldImage] }, { maxBytes })
+
+    expect(migrated.entries).toEqual([newest])
+    expect(new TextEncoder().encode(JSON.stringify(migrated)).byteLength).toBeLessThanOrEqual(maxBytes)
+    expect(JSON.stringify(migrated)).not.toContain("data:image/png")
+
+    const unicode = {
+      prompt: text("кот".repeat(20)),
+      comments: [],
+    }
+    const unicodePayload = JSON.stringify({ entries: [unicode] })
+    expect(new TextEncoder().encode(unicodePayload).byteLength).toBeGreaterThan(unicodePayload.length)
+    expect(sanitizePromptHistoryState({ entries: [unicode] }, { maxBytes: unicodePayload.length }).entries).toEqual([])
   })
 
   test("navigatePromptHistory restores saved prompt when moving down from newest", () => {

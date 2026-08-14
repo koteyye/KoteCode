@@ -21,6 +21,7 @@ type PersistTarget = {
   key: string
   legacy?: string[]
   migrate?: (value: unknown) => unknown
+  serialize?: (value: unknown) => string
 }
 
 const LEGACY_STORAGE = "default.dat"
@@ -638,7 +639,11 @@ export function persisted<T>(
     return api
   })()
 
-  const [state, setState, init] = makePersisted(store, { name: config.key, storage })
+  const [state, setState, init] = makePersisted(store, {
+    name: config.key,
+    storage,
+    ...(config.serialize ? { serialize: config.serialize } : {}),
+  })
 
   const isAsync = init instanceof Promise
   const [ready] = createResource(

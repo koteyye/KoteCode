@@ -198,16 +198,18 @@ export function usePromptInputV2Controller(props: PromptInputV2ControllerProps):
     return text.trim().length === 0 && attachments().length === 0 && commentCount() === 0
   })
   const stopping = createMemo(() => working() && blank())
+  const translatePrompt = (key: string, params?: Record<string, string>) =>
+    language.t(key as Parameters<typeof language.t>[0], params as never)
   const placeholder = createMemo(() =>
     promptPlaceholder({
       mode: mode(),
       commentCount: commentCount(),
       example: mode() === "shell" ? "git status" : "",
       suggest: false,
-      t: (key, params) => language.t(key as Parameters<typeof language.t>[0], params as never),
+      t: translatePrompt,
     }),
   )
-  const designPlaceholder = () => promptDesignPlaceholder(mode(), placeholder())
+  const designPlaceholder = () => promptDesignPlaceholder(mode(), placeholder(), translatePrompt)
 
   const historyComments = () => {
     const byID = new Map(comments.all().map((item) => [`${item.file}\n${item.id}`, item] as const))

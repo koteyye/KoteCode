@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { createRoot } from "solid-js"
-import { createPromptState, DEFAULT_PROMPT } from "./prompt-state"
+import { createPromptState, DEFAULT_PROMPT, sanitizePersistedPromptState, type PromptStore } from "./prompt-state"
 
 describe("prompt state initialization", () => {
   test("initializes prompt text, cursor, and model together", () => {
@@ -25,5 +25,44 @@ describe("prompt state initialization", () => {
       expect(prompt.model.current()).toBeUndefined()
       dispose()
     })
+  })
+})
+
+describe("prompt state persistence", () => {
+  test("removes image data from the persisted snapshot without mutating runtime state", () => {
+    const text = { type: "text" as const, content: "hello", start: 0, end: 5 }
+    const image = {
+      type: "image" as const,
+      id: "image-1",
+      filename: "image.png",
+      mime: "image/png",
+      dataUrl: "data:image/png;base64,large-payload",
+    }
+    const state: PromptStore = {
+      prompt: [text, image],
+      cursor: 5,
+      model: { providerID: "openai", modelID: "gpt-5" },
+      context: { items: [] },
+    }
+
+    expect(sanitizePersistedPromptState(state)).toEqual({ ...state, prompt: [text] })
+    expect(state.prompt).toEqual([text, image])
+  })
+
+  test("persists the default text part when a prompt only contains images", () => {
+    const state: PromptStore = {
+      prompt: [
+        {
+          type: "image",
+          id: "image-1",
+          filename: "image.png",
+          mime: "image/png",
+          dataUrl: "data:image/png;base64,payload",
+        },
+      ],
+      cursor: 0,
+      context: { items: [] },
+    }
+    expect(sanitizePersistedPromptState(state)).toEqual({ ...state, prompt: DEFAULT_PROMPT })
   })
 })

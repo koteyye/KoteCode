@@ -217,6 +217,7 @@ export function registerIpcHandlers(deps: Deps) {
   })
 
   ipcMain.handle("get-window-count", () => BrowserWindow.getAllWindows().length)
+  ipcMain.handle("get-app-version", () => app.getVersion())
 
   ipcMain.handle("get-window-id", (event: IpcMainInvokeEvent) => {
     const win = BrowserWindow.fromWebContents(event.sender)

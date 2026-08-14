@@ -4,6 +4,10 @@ import type { SelectedLineRange } from "@/context/file"
 const DEFAULT_PROMPT: Prompt = [{ type: "text", content: "", start: 0, end: 0 }]
 
 export const MAX_HISTORY = 100
+export const MAX_HISTORY_BYTES = 256 * 1024
+
+const encoder = new TextEncoder()
+const EMPTY_HISTORY_STATE_BYTES = encoder.encode('{"entries":[]}').byteLength
 
 export type PromptHistoryComment = {
   id: string
@@ -21,6 +25,11 @@ export type PromptHistoryEntry = {
 }
 
 export type PromptHistoryStoredEntry = Prompt | PromptHistoryEntry
+
+type HistoryBounds = {
+  max?: number
+  maxBytes?: number
+}
 
 export function canNavigateHistoryAtCursor(direction: "up" | "down", text: string, cursor: number, inHistory = false) {
   const position = Math.max(0, Math.min(cursor, text.length))
@@ -41,6 +50,12 @@ export function clonePromptParts(prompt: Prompt): Prompt {
       selection: part.selection ? { ...part.selection } : undefined,
     }
   })
+}
+
+function clonePersistedPromptParts(prompt: Prompt) {
+  // Restoring image attachments requires retaining their complete data URLs.
+  // Keeping those blobs in global history makes every unrelated store write expensive.
+  return clonePromptParts(prompt.filter((part) => part.type !== "image"))
 }
 
 function cloneSelection(selection: SelectedLineRange): SelectedLineRange {
@@ -72,6 +87,82 @@ export function normalizePromptHistoryEntry(entry: PromptHistoryStoredEntry): Pr
   }
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+}
+
+function isPromptPart(value: unknown): value is Prompt[number] {
+  if (!isRecord(value)) return false
+  if (value.type === "image") return true
+  if (typeof value.content !== "string" || typeof value.start !== "number" || typeof value.end !== "number")
+    return false
+  if (value.type === "text") return true
+  if (value.type === "agent") return typeof value.name === "string"
+  if (value.type === "file") return typeof value.path === "string"
+  return false
+}
+
+function isHistoryComment(value: unknown): value is PromptHistoryComment {
+  if (!isRecord(value) || !isRecord(value.selection)) return false
+  return (
+    typeof value.id === "string" &&
+    typeof value.path === "string" &&
+    typeof value.comment === "string" &&
+    typeof value.time === "number" &&
+    typeof value.selection.start === "number" &&
+    typeof value.selection.end === "number"
+  )
+}
+
+function sanitizePromptHistoryEntry(value: unknown) {
+  const prompt = Array.isArray(value)
+    ? value
+    : isRecord(value) && Array.isArray(value.prompt)
+      ? value.prompt
+      : undefined
+  if (!prompt) return
+
+  const comments =
+    !Array.isArray(value) && isRecord(value) && Array.isArray(value.comments)
+      ? value.comments.filter(isHistoryComment)
+      : []
+  const entry = {
+    prompt: clonePersistedPromptParts(prompt.filter(isPromptPart)),
+    comments: clonePromptHistoryComments(comments),
+  } satisfies PromptHistoryEntry
+  const hasContent = entry.prompt.some((part) => "content" in part && !!part.content.trim())
+  const hasComments = entry.comments.some((comment) => !!comment.comment.trim())
+  if (!hasContent && !hasComments) return
+  return entry
+}
+
+export function sanitizePromptHistoryEntries(entries: unknown, bounds: HistoryBounds = {}) {
+  if (!Array.isArray(entries)) return [] as PromptHistoryStoredEntry[]
+
+  const output: PromptHistoryStoredEntry[] = []
+  const max = bounds.max ?? MAX_HISTORY
+  const maxBytes = bounds.maxBytes ?? MAX_HISTORY_BYTES
+  let bytes = EMPTY_HISTORY_STATE_BYTES
+
+  for (const value of entries) {
+    if (output.length >= max) break
+    const entry = sanitizePromptHistoryEntry(value)
+    if (!entry) continue
+    const size = encoder.encode(JSON.stringify(entry)).byteLength + (output.length === 0 ? 0 : 1)
+    if (bytes + size > maxBytes) continue
+    output.push(entry)
+    bytes += size
+  }
+
+  return output
+}
+
+export function sanitizePromptHistoryState(value: unknown, bounds: HistoryBounds = {}) {
+  return {
+    entries: sanitizePromptHistoryEntries(isRecord(value) ? value.entries : undefined, bounds),
+  }
+}
+
 export function promptLength(prompt: Prompt) {
   return prompt.reduce((len, part) => len + ("content" in part ? part.content.length : 0), 0)
 }
@@ -81,22 +172,13 @@ export function prependHistoryEntry(
   prompt: Prompt,
   comments: PromptHistoryComment[] = [],
   max = MAX_HISTORY,
+  maxBytes = MAX_HISTORY_BYTES,
 ) {
-  const text = prompt
-    .map((part) => ("content" in part ? part.content : ""))
-    .join("")
-    .trim()
-  const hasImages = prompt.some((part) => part.type === "image")
-  const hasComments = comments.some((comment) => !!comment.comment.trim())
-  if (!text && !hasImages && !hasComments) return entries
-
-  const entry = {
-    prompt: clonePromptParts(prompt),
-    comments: clonePromptHistoryComments(comments),
-  } satisfies PromptHistoryEntry
+  const entry = sanitizePromptHistoryEntry({ prompt, comments })
+  if (!entry) return entries
   const last = entries[0]
   if (last && isPromptEqual(last, entry)) return entries
-  return [entry, ...entries].slice(0, max)
+  return sanitizePromptHistoryEntries([entry, ...entries], { max, maxBytes })
 }
 
 function isCommentEqual(commentA: PromptHistoryComment, commentB: PromptHistoryComment) {

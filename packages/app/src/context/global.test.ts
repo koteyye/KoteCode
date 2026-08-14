@@ -1,7 +1,7 @@
 import { expect, test, vi } from "bun:test"
 import { createRoot } from "solid-js"
 import { createStore } from "solid-js/store"
-import { makeRepositoryDiscovery } from "./global"
+import { canDiscoverRepositories, makeRepositoryDiscovery } from "./global"
 import { createServerProjects } from "./server"
 import { ServerScope } from "@/utils/server-scope"
 
@@ -9,6 +9,22 @@ const flush = async () => {
   await Promise.resolve()
   await Promise.resolve()
 }
+
+test("repository discovery stays enabled for the built-in sidecar when protocol detection reports V1", () => {
+  const builtin = { type: "sidecar", variant: "base", http: { url: "http://127.0.0.1:4096" } } as const
+  const wsl = {
+    type: "sidecar",
+    variant: "wsl",
+    distro: "Debian",
+    http: { url: "http://127.0.0.1:4097" },
+  } as const
+  const remote = { type: "http", http: { url: "https://server.example.test" } } as const
+
+  expect(canDiscoverRepositories(builtin, "v1")).toBe(true)
+  expect(canDiscoverRepositories(wsl, "v1")).toBe(false)
+  expect(canDiscoverRepositories(remote, "v1")).toBe(false)
+  expect(canDiscoverRepositories(remote, "v2")).toBe(true)
+})
 
 test("repository discovery retries after a failed request", async () => {
   vi.useFakeTimers()

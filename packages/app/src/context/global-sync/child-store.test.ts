@@ -256,6 +256,7 @@ describe("createChildStoreManager", () => {
       expect(queries[4]?.().enabled).toBe(false)
       expect(queries[5]?.().enabled).toBe(false)
       expect(store.path.directory).toBe("/project")
+      expect(store.agent_ready).toBe(false)
       expect(store.provider_ready).toBe(false)
       expect(store.lsp_ready).toBe(false)
       expect(bootstraps).toEqual([])

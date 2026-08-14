@@ -77,6 +77,7 @@ const api: ElectronAPI = {
 
   getWindowCount: () => ipcRenderer.invoke("get-window-count"),
   getWindowID: () => ipcRenderer.invoke("get-window-id"),
+  getAppVersion: () => ipcRenderer.invoke("get-app-version"),
   onMenuCommand: (cb) => {
     const handler = (_: unknown, id: string) => cb(id)
     ipcRenderer.on("menu-command", handler)

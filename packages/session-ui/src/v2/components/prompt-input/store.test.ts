@@ -113,4 +113,28 @@ describe("prompt input v2 store", () => {
     expect(prompt.state.prompt).toEqual([{ type: "text", content: "", start: 0, end: 0 }])
     expect(prompt.state.cursor).toBe(0)
   })
+
+  test("coalesces prompt and cursor updates into one persisted store write", () => {
+    const [state, setState] = createStore<PromptInputV2PersistedState>({
+      prompt: [{ type: "text", content: "", start: 0, end: 0 }],
+      cursor: 0,
+      context: { items: [] },
+    })
+    let writes = 0
+    const tracked = ((...args: unknown[]) => {
+      writes++
+      return (setState as (...input: unknown[]) => void)(...args)
+    }) as typeof setState
+    const prompt = createPromptInputV2Store([state, tracked])
+
+    prompt.setPrompt([{ type: "text", content: "a", start: 0, end: 1 }], 1)
+    expect(writes).toBe(1)
+    expect(prompt.state.cursor).toBe(1)
+
+    prompt.setCursor(1)
+    expect(writes).toBe(1)
+
+    prompt.setCursor(0)
+    expect(writes).toBe(2)
+  })
 })

@@ -67,6 +67,7 @@ const deepLinkEvent = "opencode:deep-link"
 
 type DesktopWindowState = {
   id?: string
+  version?: string
 }
 
 const emitDeepLinks = (urls: string[]) => {
@@ -168,7 +169,7 @@ const createPlatform = (windowState: DesktopWindowState): Platform => {
   return {
     platform: "desktop",
     os,
-    version: pkg.version,
+    version: windowState.version ?? pkg.version,
     windowID: windowState.id,
 
     async openDirectoryPickerDialog(opts) {
@@ -452,8 +453,10 @@ render(() => {
   const [windowState] = createResource(async () => {
     const api = window.api as typeof window.api & {
       getWindowID?: () => Promise<string>
+      getAppVersion?: () => Promise<string>
     }
-    return { id: await api.getWindowID?.() }
+    const [id, version] = await Promise.all([api.getWindowID?.(), api.getAppVersion?.().catch(() => undefined)])
+    return { id, version: version?.trim() || pkg.version }
   })
 
   return (

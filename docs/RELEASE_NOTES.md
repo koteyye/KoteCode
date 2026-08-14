@@ -1,18 +1,21 @@
-# KoteCode v0.2.0
+# KoteCode v0.2.1
 
-This release expands the V2 project and session experience across the KoteCode stack.
+This patch release improves Desktop UI stability, project discovery, and session loading performance.
 
 ## Highlights
 
-- Added V2 project APIs and generated SDK support for listing and updating projects, resolving the current
-  project, listing its directories, and discovering child Git repositories.
-- Grouped repositories now appear under their project root on the home screen. Opening a child repository
-  keeps its exact repository and worktree in the new-session composer instead of falling back to the first
-  project.
-- Added a project indicator to the session composer and improved project-aware synchronization between the
-  App, Desktop, Server, Client, and SDK layers.
-- Expanded V2 session behavior, plan/build transitions, planning-plugin settings, and permission handling,
-  with regression coverage across the affected packages.
+- Restored grouped repository discovery for the bundled Desktop server while preserving compatibility with
+  legacy and remote servers.
+- Fixed project close and reopen actions that could leave stale rows or an unresponsive context menu on the
+  home screen.
+- Reduced the delay when opening sessions by reusing cached session metadata, starting message loading before
+  navigation, avoiding background synchronization for inactive tabs, and removing duplicate catalog requests.
+- Reduced main-thread and storage work by incrementally retaining the home session index, consolidating
+  timeline projections, and excluding image data URLs from persisted prompt history and draft snapshots.
+- Localized the new-session prompt placeholder and corrected the Desktop settings version so it reports the
+  installed application version.
+- Added regression coverage for grouped project lifecycle, cold session opening, prompt persistence, catalog
+  refreshes, timeline projection, and localized prompt text.
 
 ## Downloads
 
