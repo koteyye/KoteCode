@@ -189,5 +189,10 @@ function toLegacySummary(session: SessionV2Info): Session {
     model: session.model,
     version: "",
     time: session.time,
+    revert: session.revert && {
+      messageID: session.revert.messageID,
+      partID: session.revert.partID,
+      snapshot: session.revert.snapshot,
+    },
   }
 }

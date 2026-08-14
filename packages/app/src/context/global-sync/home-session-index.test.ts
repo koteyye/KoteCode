@@ -177,6 +177,27 @@ describe("Home V2 session index", () => {
     ])
   })
 
+  test("maps V2 revert state to Home session summaries", () => {
+    const result = parseHomeSessionIndex([
+      {
+        ...session({ id: "reverted" }),
+        revert: {
+          messageID: "message-1",
+          partID: "part-1",
+          snapshot: "snapshot-1",
+          diff: "patch",
+          files: [],
+        },
+      } as SessionV2Info,
+    ])
+
+    expect(result[0]?.revert).toEqual({
+      messageID: "message-1",
+      partID: "part-1",
+      snapshot: "snapshot-1",
+    })
+  })
+
   test("preserves the per-directory Home retention limit", () => {
     const now = 10 * 60 * 60 * 1000
     const sessions = Array.from({ length: 80 }, (_, index) => ({
