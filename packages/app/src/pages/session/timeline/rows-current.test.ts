@@ -167,4 +167,43 @@ describe("current session timeline rows", () => {
       "thinking:msg_2",
     ])
   })
+
+  test("keeps legacy comment strips out of the inline comment projection", () => {
+    const user = {
+      id: "msg_comment",
+      sessionID: "ses_1",
+      role: "user" as const,
+      time: { created: 1 },
+      agent: "build",
+      model: { modelID: "model", providerID: "provider" },
+    }
+    const comment = {
+      id: "part_comment",
+      sessionID: "ses_1",
+      messageID: user.id,
+      type: "text" as const,
+      text: "comment",
+      synthetic: true,
+      metadata: { opencodeComment: { path: "src/app.ts", comment: "Review this" } },
+    }
+    const rows = (inlineComments: boolean) =>
+      Timeline.constructMessageRows(
+        user,
+        (messageID) => (messageID === user.id ? [comment] : []),
+        [],
+        0,
+        false,
+        "idle",
+        true,
+        inlineComments,
+      )
+
+    const legacy = rows(false)
+    expect(legacy.map(TimelineRow.key)).toEqual(["comment-strip:msg_comment", "user-message:msg_comment"])
+    expect(legacy.find((row) => row._tag === "UserMessage")?.anchor).toBe(false)
+
+    const inline = rows(true)
+    expect(inline.map(TimelineRow.key)).toEqual(["user-message:msg_comment"])
+    expect(inline.find((row) => row._tag === "UserMessage")?.anchor).toBe(true)
+  })
 })

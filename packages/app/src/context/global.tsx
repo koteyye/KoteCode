@@ -137,8 +137,8 @@ function createServerCtx(
   createRepositoryDiscovery({
     health,
     projects,
-    enabled: () => sdk.protocolKind() === "v2",
-    repositories: (directory) => sdk.api.project.repositories({ directory }),
+    enabled: () => canDiscoverRepositories(conn, sdk.protocolKind()),
+    repositories: (directory) => sdk.currentApi.project.repositories({ directory }),
   })
   const recentlyClosedList = createMemo(() =>
     visibleRecentlyClosed({ recentlyClosed: projects.recentlyClosed(), projects: sync.data.project }).map(enrich),
@@ -158,6 +158,10 @@ function createServerCtx(
       recentlyClosed: recentlyClosedList,
     },
   }
+}
+
+export function canDiscoverRepositories(conn: ServerConnection.Any, protocol?: "v1" | "v2") {
+  return ServerConnection.builtin(conn) || protocol === "v2"
 }
 
 type RepositoryDiscoveryInput = {

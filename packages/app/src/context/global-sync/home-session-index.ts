@@ -4,6 +4,7 @@ import { trimSessions } from "./session-trim"
 import { pathKey } from "@/utils/path-key"
 
 export const HOME_V2_SESSION_PAGE_LIMIT = 5_000
+export const HOME_SESSION_INDEX_LIMIT = 64
 
 export type HomeSessionEvent = {
   type: "session.created" | "session.updated" | "session.deleted"
@@ -31,7 +32,8 @@ export async function loadHomeSessionIndex(
   eventSequence = 0,
   signal?: AbortSignal,
 ) {
-  const data: SessionV2Info[] = []
+  const buckets = new Map<string, Session[]>()
+  const now = Date.now()
   let cursor: string | undefined
 
   for (;;) {
@@ -44,9 +46,9 @@ export async function loadHomeSessionIndex(
       { signal },
     )
     const page = response.data!
-    data.push(...page.data)
+    mergeHomeSessionIndexPage(buckets, page.data, HOME_SESSION_INDEX_LIMIT, now)
     if (page.data.length < HOME_V2_SESSION_PAGE_LIMIT || !page.cursor.next)
-      return { sessions: parseHomeSessionIndex(data), eventSequence }
+      return { sessions: [...buckets.values()].flat(), eventSequence }
     cursor = page.cursor.next
   }
 }
@@ -125,9 +127,11 @@ export function createHomeSessionIndexCache(queryClient: QueryClient, server: st
   }
 }
 
-// TODO(v2): This deliberately dumb full-table scan is necessary because the
-// current V2 API orders by creation time and cannot filter roots, archives, or
-// multiple directories. A bounded page could omit an old session updated today.
+// TODO(v2): A full cursor scan remains necessary because the current V2 API
+// orders by creation time and cannot filter roots, archives, or multiple
+// directories. A bounded page could omit an old session updated today. Each
+// page is compacted immediately so Home retains only its bounded working set
+// for each directory instead of every session in that directory.
 // Once released, use client.v2.project.list() and client.v2.session.list({
 // parentID: null, order: "desc" }), then remove this adapter and its V1 fields.
 export function parseHomeSessionIndex(sessions: SessionV2Info[]): Session[] {
@@ -135,6 +139,21 @@ export function parseHomeSessionIndex(sessions: SessionV2Info[]): Session[] {
     if (item.parentID || typeof item.time.archived === "number") return []
     return [toLegacySummary(item)]
   })
+}
+
+export function mergeHomeSessionIndexPage(
+  buckets: Map<string, Session[]>,
+  page: SessionV2Info[],
+  limit: number,
+  now: number,
+) {
+  Map.groupBy(parseHomeSessionIndex(page), (session) => pathKey(session.directory)).forEach((sessions, directory) => {
+    buckets.set(
+      directory,
+      trimSessions([...(buckets.get(directory) ?? []), ...sessions], { limit, permission: {}, now }),
+    )
+  })
+  return buckets
 }
 
 export function retainHomeSessions(sessions: Session[], limit: number, now: number) {
@@ -170,5 +189,10 @@ function toLegacySummary(session: SessionV2Info): Session {
     model: session.model,
     version: "",
     time: session.time,
+    revert: session.revert && {
+      messageID: session.revert.messageID,
+      partID: session.revert.partID,
+      snapshot: session.revert.snapshot,
+    },
   }
 }

@@ -53,9 +53,10 @@ function SessionTabSlot(props: {
   let prefetched = false
 
   createEffect(() => {
+    const active = props.active()
     const ctx = props.serverCtx()
     const value = session()
-    if (!ctx || !value || prefetched) return
+    if (!active || !ctx || !value || prefetched) return
     prefetched = true
     createRoot((dispose) => {
       try {

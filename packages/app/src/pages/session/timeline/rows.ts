@@ -112,7 +112,7 @@ export namespace Timeline {
 
     const previousUserMessage = index > 0
     const userParts = getMessageParts(userMessage.id)
-    const comments = userParts.flatMap((p) => MessageComment.fromPart(p) ?? [])
+    const comments = inlineComments ? [] : userParts.flatMap((p) => MessageComment.fromPart(p) ?? [])
     const compaction = userParts.some((p) => p.type === "compaction")
     const interruptedMessageIndex = assistantMessages.findIndex((m) => m.error?.name === "MessageAbortedError")
     const interrupted = interruptedMessageIndex !== -1

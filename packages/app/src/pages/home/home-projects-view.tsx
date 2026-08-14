@@ -348,12 +348,7 @@ function HomeProjectList(props: HomeProjectListProps) {
       <div class="flex min-w-0 flex-col gap-1" ref={listRef}>
         <For each={props.items.map((project) => project.worktree)}>
           {(worktree, index) => (
-            <HomeProjectSlot
-              {...props}
-              projectByWorktree={projectByWorktree}
-              worktree={worktree}
-              index={index}
-            />
+            <HomeProjectSlot {...props} projectByWorktree={projectByWorktree} worktree={worktree} index={index} />
           )}
         </For>
       </div>
@@ -368,25 +363,24 @@ function HomeProjectSlot(
     index: () => number
   },
 ) {
-  const project = createMemo(() => props.projectByWorktree().get(props.worktree))
+  const project = createMemo<LocalProject | undefined>(
+    (previous) => props.projectByWorktree().get(props.worktree) ?? previous,
+  )
 
   return (
-    <Show when={project()}>
-      {(item) => (
-        <HomeProjectRow
-          {...props}
-          project={item()}
-          server={props.server}
-          index={props.index}
-          serverSelected={props.selection().server === ServerConnection.key(props.server)}
-          selected={
-            props.selection().server === ServerConnection.key(props.server) &&
-            props.selection().directory === props.worktree
-          }
-          unseen={props.unseenCount(props.server, item())}
-        />
-      )}
-    </Show>
+    <HomeProjectRow
+      {...props}
+      project={project()!}
+      worktree={props.worktree}
+      server={props.server}
+      index={props.index}
+      serverSelected={props.selection().server === ServerConnection.key(props.server)}
+      selected={
+        props.selection().server === ServerConnection.key(props.server) &&
+        props.selection().directory === props.worktree
+      }
+      unseen={props.unseenCount(props.server, project()!)}
+    />
   )
 }
 
@@ -454,6 +448,7 @@ function HomeProjectRow(
   props: HomeProjectsViewProps &
     HomeProjectsContextMenuProps & {
       project: LocalProject
+      worktree: string
       server: ServerConnection.Any
       index: () => number
       serverSelected: boolean
@@ -465,14 +460,14 @@ function HomeProjectRow(
   const serverUnreachable = () => props.serverHealth(props.server)?.healthy === false
   const sortable = useSortable({
     get id() {
-      return props.project.worktree
+      return props.worktree
     },
     get index() {
       return props.index()
     },
   })
   let pointerDownSelected: boolean | undefined
-  const contextMenuID = () => projectContextMenuID(props.server, props.project.worktree)
+  const contextMenuID = () => projectContextMenuID(props.server, props.worktree)
   onCleanup(() => {
     const id = contextMenuID()
     if (props.contextMenuOpen(id)) props.onSetContextMenuOpen(id, false)
@@ -506,7 +501,7 @@ function HomeProjectRow(
             if (event.button !== 0 || event.pointerType === "touch") return
             if (!props.serverSelected) return
             pointerDownSelected = props.selected
-            if (!props.selected) props.onSelectProject(props.server, props.project.worktree)
+            if (!props.selected) props.onSelectProject(props.server, props.worktree)
           }}
           onClick={(event) => {
             // The drag sensor calls preventDefault on post-drag clicks; never
@@ -514,12 +509,12 @@ function HomeProjectRow(
             if (event.defaultPrevented) return
             // Keyboard activation and touch taps keep the original toggle.
             if (event.detail === 0 || pointerDownSelected === undefined) {
-              props.onSelectProject(props.server, props.project.worktree)
+              props.onSelectProject(props.server, props.worktree)
               return
             }
             // Mouse: pointerdown already selected unselected rows; a plain click
             // on an already-selected row toggles it off.
-            if (pointerDownSelected) props.onSelectProject(props.server, props.project.worktree)
+            if (pointerDownSelected) props.onSelectProject(props.server, props.worktree)
             pointerDownSelected = undefined
           }}
         >
@@ -573,7 +568,7 @@ function HomeProjectRow(
             />
             <MenuV2.Portal>
               <MenuV2.Content>
-                <MenuV2.Item onSelect={() => props.onOpenProjectNewSession(props.server, props.project.worktree)}>
+                <MenuV2.Item onSelect={() => props.onOpenProjectNewSession(props.server, props.worktree)}>
                   {props.language.t("command.session.new")}
                 </MenuV2.Item>
                 <MenuV2.Item onSelect={() => props.onEditProject(props.server, props.project)}>
@@ -594,7 +589,12 @@ function HomeProjectRow(
                   {props.language.t("sidebar.project.clearNotifications")}
                 </MenuV2.Item>
                 <MenuV2.Separator />
-                <MenuV2.Item onSelect={() => props.onCloseProject(props.server, props.project.worktree)}>
+                <MenuV2.Item
+                  onSelect={() => {
+                    props.onSetContextMenuOpen(contextMenuID(), false)
+                    props.onCloseProject(props.server, props.worktree)
+                  }}
+                >
                   {props.language.t("common.close")}
                 </MenuV2.Item>
               </MenuV2.Content>
@@ -606,7 +606,7 @@ function HomeProjectRow(
             size="small"
             icon={<IconV2 name="edit" />}
             aria-label={props.language.t("command.session.new")}
-            onClick={() => props.onOpenProjectNewSession(props.server, props.project.worktree)}
+            onClick={() => props.onOpenProjectNewSession(props.server, props.worktree)}
           />
         </div>
       </div>
@@ -616,7 +616,7 @@ function HomeProjectRow(
             <HomeGroupRepositoryRow
               server={props.server}
               directory={directory}
-              projectDirectory={props.project.worktree}
+              projectDirectory={props.worktree}
               disabled={serverUnreachable()}
               onOpen={props.onOpenProjectNewSession}
               language={props.language}

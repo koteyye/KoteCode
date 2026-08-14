@@ -1,7 +1,22 @@
-import { describe, expect, test } from "bun:test"
+import { describe, expect, mock, test } from "bun:test"
+import type { SessionMessageInfo } from "@opencode-ai/client/promise"
 import type { PartGroup } from "@opencode-ai/session-ui/message-part"
+import { createRoot } from "solid-js"
+import { normalizeSessionMessages } from "@/utils/session-message"
 import { reuseTimelineRows } from "./row-reconciliation"
 import { TimelineRow } from "./timeline-row"
+
+mock.module("@opencode-ai/session-ui/message-part", () => ({
+  renderable: () => true,
+  groupParts: (refs: Array<{ messageID: string; part: { id: string } }>) =>
+    refs.map((ref) => ({
+      type: "part" as const,
+      key: `part:${ref.messageID}:${ref.part.id}`,
+      ref: { messageID: ref.messageID, partID: ref.part.id },
+    })),
+}))
+
+const { createTimelineProjection } = await import("./projection")
 
 const context = (key: string, partIDs: string[], userMessageID = "user-1") =>
   new TimelineRow.AssistantPart({
@@ -92,5 +107,89 @@ describe("reuseTimelineRows", () => {
     expect(keys(result)).toEqual([...expected])
     expect(new Set(keys(result)).size).toBe(result.length)
     reused.forEach(([resultIndex, previousIndex]) => expect(result[resultIndex]).toBe(previous[previousIndex]))
+  })
+})
+
+describe("createTimelineProjection", () => {
+  test("indexes keys and turn boundaries in the reconciled row order", () => {
+    const source = [
+      { id: "user-1", type: "user", text: "first", time: { created: 1 } },
+      {
+        id: "assistant-1",
+        type: "assistant",
+        agent: "build",
+        model: { id: "model", providerID: "provider" },
+        content: [
+          { type: "text", text: "one" },
+          { type: "text", text: "two" },
+        ],
+        time: { created: 2, completed: 3 },
+      },
+      { id: "user-2", type: "user", text: "second", time: { created: 4 } },
+      {
+        id: "assistant-2",
+        type: "assistant",
+        agent: "build",
+        model: { id: "model", providerID: "provider" },
+        content: [{ type: "text", text: "three" }],
+        time: { created: 5, completed: 6 },
+      },
+    ] satisfies SessionMessageInfo[]
+    const normalized = normalizeSessionMessages("session-1", source)
+
+    createRoot((dispose) => {
+      const projection = createTimelineProjection({
+        messages: () => normalized.messages,
+        userMessages: () => normalized.messages.filter((message) => message.role === "user"),
+        sessionMessages: () => source,
+        parts: (messageID) => normalized.parts.get(messageID) ?? [],
+        status: () => ({ type: "idle" }),
+        showReasoningSummaries: () => false,
+        inlineComments: () => true,
+      })
+
+      const rows = projection.rows()
+      normalized.messages.forEach((message) => expect(projection.messageByID().get(message.id)).toBe(message))
+      expect(
+        projection
+          .assistantMessagesByParent()
+          .get("user-1")
+          ?.map((message) => message.id),
+      ).toEqual(["assistant-1"])
+      expect(
+        projection
+          .assistantMessagesByParent()
+          .get("user-2")
+          ?.map((message) => message.id),
+      ).toEqual(["assistant-2"])
+      expect(rows.map(TimelineRow.key)).toEqual([
+        "user-message:user-1",
+        "assistant-part:user-1:part:assistant-1:assistant-1:text:0",
+        "assistant-part:user-1:part:assistant-1:assistant-1:text:1",
+        "turn-gap:user-2",
+        "user-message:user-2",
+        "assistant-part:user-2:part:assistant-2:assistant-2:text:0",
+      ])
+      expect(projection.messageRowIndex()).toEqual(
+        new Map([
+          ["user-1", 0],
+          ["user-2", 3],
+        ]),
+      )
+      expect(projection.messageLastRowIndex()).toEqual(
+        new Map([
+          ["user-1", 2],
+          ["user-2", 5],
+        ]),
+      )
+      expect(projection.lastAssistantGroupKey()).toEqual(
+        new Map([
+          ["user-1", "part:assistant-1:assistant-1:text:1"],
+          ["user-2", "part:assistant-2:assistant-2:text:0"],
+        ]),
+      )
+      rows.forEach((row) => expect(projection.rowByKey().get(TimelineRow.key(row))).toBe(row))
+      dispose()
+    })
   })
 })

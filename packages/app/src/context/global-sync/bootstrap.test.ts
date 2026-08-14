@@ -38,6 +38,7 @@ const api = {
 function directoryState() {
   return createStore<State>({
     status: "loading",
+    agent_ready: false,
     agent: [],
     command: [],
     reference: [],
@@ -75,6 +76,7 @@ function directoryState() {
 describe("bootstrapDirectory", () => {
   test("marks a loading directory partial during bootstrap and complete after success", async () => {
     const mcpReads: string[] = []
+    let sessionReads = 0
     const [store, setStore] = directoryState()
 
     await bootstrapDirectory({
@@ -112,7 +114,9 @@ describe("bootstrapDirectory", () => {
       store,
       setStore,
       vcsCache: { setStore() {} } as unknown as VcsCache,
-      loadSessions() {},
+      loadSessions() {
+        sessionReads++
+      },
       translate: (key) => key,
       queryClient: new QueryClient(),
     })
@@ -122,7 +126,9 @@ describe("bootstrapDirectory", () => {
     await new Promise((resolve) => setTimeout(resolve, 80))
 
     expect(store.status).toBe("complete")
+    expect(store.agent_ready).toBe(true)
     expect(mcpReads).toEqual([])
+    expect(sessionReads).toBe(1)
   })
 
   test("uses legacy instance endpoints for v1 sidecars", async () => {
@@ -252,6 +258,119 @@ describe("bootstrapDirectory", () => {
     expect(store.project).toBe("legacy-project")
     expect(store.vcs).toEqual({ branch: "legacy", default_branch: "main" })
     expect(store.status).toBe("complete")
+  })
+
+  test("marks agents ready when the initial agent catalog fails", async () => {
+    const [store, setStore] = directoryState()
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const sdk = {
+      app: { agents: async () => Promise.reject(new Error("agent unavailable")) },
+      config: { get: async () => ({ data: {} }) },
+      path: {
+        get: async () => ({
+          data: { state: "", config: "", worktree: "/project", directory: "/project", home: "/home" },
+        }),
+      },
+      permission: { list: async () => ({ data: [] }) },
+      provider: { list: async () => ({ data: { all: [], connected: [], default: {} } }) },
+      question: { list: async () => ({ data: [] }) },
+      session: { status: async () => ({ data: {} }) },
+      v2: { reference: { list: async () => ({ data: { data: [] } }) } },
+      vcs: { get: async () => ({ data: { branch: "main", default_branch: "main" } }) },
+    } as unknown as OpencodeClient
+
+    await bootstrapDirectory({
+      directory: "/project",
+      scope: ServerScope.local,
+      mcp: false,
+      global: {
+        config: {},
+        path: { state: "", config: "", worktree: "", directory: "", home: "" },
+        project: [{ id: "project", worktree: "/project" }] as Project[],
+        provider,
+      },
+      sdk,
+      api,
+      protocol: Promise.resolve("v1"),
+      store,
+      setStore,
+      vcsCache: { setStore() {} } as unknown as VcsCache,
+      loadSessions() {},
+      translate: (key) => key,
+      queryClient,
+    })
+
+    await new Promise((resolve) => setTimeout(resolve, 80))
+
+    expect(store.agent_ready).toBe(true)
+    expect(store.status).toBe("partial")
+  })
+
+  test("refreshes cached catalogs when retrying a partial bootstrap", async () => {
+    const [store, setStore] = directoryState()
+    const queryClient = new QueryClient()
+    let revision = 1
+    let agentReads = 0
+    let providerReads = 0
+    const sdk = {
+      app: {
+        agents: async () => {
+          agentReads++
+          return { data: [{ name: `agent-${revision}`, mode: "primary" }] }
+        },
+      },
+      config: { get: async () => ({ data: {} }) },
+      permission: { list: async () => ({ data: [] }) },
+      provider: {
+        list: async () => {
+          providerReads++
+          return { data: { all: [], connected: [], default: {} } }
+        },
+      },
+      question: { list: async () => ({ data: [] }) },
+      session: { status: async () => ({ data: {} }) },
+      v2: { reference: { list: async () => ({ data: { data: [] } }) } },
+      vcs: { get: async () => ({ data: { branch: "main", default_branch: "main" } }) },
+    } as unknown as OpencodeClient
+    const run = () =>
+      bootstrapDirectory({
+        directory: "/project",
+        scope: ServerScope.local,
+        mcp: false,
+        global: {
+          config: {},
+          path: { state: "", config: "", worktree: "/project", directory: "/project", home: "/home" },
+          project: [{ id: "project", worktree: "/project" }] as Project[],
+          provider,
+        },
+        sdk,
+        api,
+        protocol: Promise.resolve("v1"),
+        store,
+        setStore,
+        vcsCache: { setStore() {} } as unknown as VcsCache,
+        loadSessions() {},
+        translate: (key) => key,
+        queryClient,
+      })
+
+    await run()
+    await new Promise((resolve) => setTimeout(resolve, 80))
+
+    expect(store.status).toBe("complete")
+    expect(store.agent.map((agent) => agent.name)).toEqual(["agent-1"])
+    expect(agentReads).toBe(1)
+    expect(providerReads).toBe(1)
+
+    revision = 2
+    setStore("status", "partial")
+    await run()
+    await new Promise((resolve) => setTimeout(resolve, 80))
+
+    expect(store.status).toBe("complete")
+    expect(store.agent.map((agent) => agent.name)).toEqual(["agent-2"])
+    expect(agentReads).toBe(2)
+    expect(providerReads).toBe(2)
   })
 })
 

@@ -369,6 +369,7 @@ export async function bootstrapDirectory(input: {
   session?: ServerSession
   protocol?: Promise<ServerProtocol>
 }) {
+  const initial = input.store.status === "loading"
   const loading = input.store.status !== "complete"
   const seededProject = projectID(input.directory, input.global.project)
   const seededPath = input.global.path.directory === input.directory ? input.global.path : undefined
@@ -386,9 +387,16 @@ export async function bootstrapDirectory(input: {
     const slow = [
       () => Promise.resolve(input.loadSessions(input.directory)),
       () =>
-        input.queryClient
-          .ensureQueryData(loadAgentsQuery(input.scope, input.directory, input.api.agent, input.sdk, input.protocol))
-          .then((data) => input.setStore("agent", data)),
+        (initial
+          ? input.queryClient.ensureQueryData(
+              loadAgentsQuery(input.scope, input.directory, input.api.agent, input.sdk, input.protocol),
+            )
+          : input.queryClient.fetchQuery(
+              loadAgentsQuery(input.scope, input.directory, input.api.agent, input.sdk, input.protocol),
+            )
+        )
+          .then((data) => input.setStore("agent", data))
+          .finally(() => input.setStore("agent_ready", true)),
       () =>
         retry(() => input.sdk.config.get().then((x) => input.setStore("config", reconcile(x.data!, { merge: false })))),
       () =>
@@ -530,7 +538,6 @@ export async function bootstrapDirectory(input: {
             )
           }),
         ),
-      () => Promise.resolve(input.loadSessions(input.directory)),
       input.mcp &&
         (() =>
           input.queryClient.fetchQuery(
@@ -542,16 +549,21 @@ export async function bootstrapDirectory(input: {
             loadMcpResourcesQuery(input.scope, input.directory, input.api.mcp, input.sdk, input.protocol),
           )),
       () =>
-        input.queryClient
-          .fetchQuery(loadProvidersQuery(input.scope, input.directory, input.api, input.sdk, input.protocol))
-          .catch((err) => {
-            const project = getFilename(input.directory)
-            showToast({
-              variant: "error",
-              title: input.translate("toast.project.reloadFailed.title", { project }),
-              description: formatServerError(err, input.translate),
-            })
-          }),
+        (initial
+          ? input.queryClient.ensureQueryData(
+              loadProvidersQuery(input.scope, input.directory, input.api, input.sdk, input.protocol),
+            )
+          : input.queryClient.fetchQuery(
+              loadProvidersQuery(input.scope, input.directory, input.api, input.sdk, input.protocol),
+            )
+        ).catch((err) => {
+          const project = getFilename(input.directory)
+          showToast({
+            variant: "error",
+            title: input.translate("toast.project.reloadFailed.title", { project }),
+            description: formatServerError(err, input.translate),
+          })
+        }),
     ].filter(Boolean) as (() => Promise<any>)[]
 
     await waitForPaint()

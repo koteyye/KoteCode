@@ -1,6 +1,6 @@
 import { checksum } from "@opencode-ai/core/util/encode"
 import type { FilePartSource } from "@opencode-ai/sdk/v2/client"
-import { batch, createMemo, type Accessor } from "solid-js"
+import { createMemo, type Accessor } from "solid-js"
 import { createStore, type SetStoreFunction } from "solid-js/store"
 import type { FileSelection } from "@/context/file"
 import { Persist, persisted } from "@/utils/persist"
@@ -132,6 +132,21 @@ function clonePrompt(prompt: Prompt): Prompt {
   return prompt.map(clonePart)
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+}
+
+export function sanitizePersistedPromptState(value: unknown) {
+  if (!isRecord(value) || !Array.isArray(value.prompt)) return value
+  const prompt = value.prompt.filter((part) => !isRecord(part) || part.type !== "image")
+  if (prompt.length === value.prompt.length) return value
+  return { ...value, prompt: prompt.length > 0 ? prompt : clonePrompt(DEFAULT_PROMPT) }
+}
+
+function serializePersistedPromptState(value: unknown) {
+  return JSON.stringify(sanitizePersistedPromptState(value)) ?? "{}"
+}
+
 function contextItemKey(item: ContextItem) {
   if (item.type !== "file") return item.type
   const start = item.selection?.startLine
@@ -153,24 +168,28 @@ function createPromptActions(setStore: SetStoreFunction<PromptStore>) {
   return {
     set(prompt: Prompt, cursorPosition?: number) {
       const next = clonePrompt(prompt)
-      batch(() => {
-        setStore("prompt", next)
-        if (cursorPosition !== undefined) setStore("cursor", cursorPosition)
-      })
+      setStore({ prompt: next, ...(cursorPosition === undefined ? {} : { cursor: cursorPosition }) })
     },
     reset() {
-      batch(() => {
-        setStore("prompt", clonePrompt(DEFAULT_PROMPT))
-        setStore("cursor", 0)
-      })
+      setStore({ prompt: clonePrompt(DEFAULT_PROMPT), cursor: 0 })
     },
   }
 }
 
+type PromptPersistTarget = ReturnType<typeof Persist.serverScoped>
+
+function withPromptPersistence(target: PromptPersistTarget) {
+  return {
+    ...target,
+    migrate: sanitizePersistedPromptState,
+    serialize: serializePersistedPromptState,
+  }
+}
+
 function promptTarget(serverScope: ServerScope, scope: PromptScope) {
-  if ("draftID" in scope) return Persist.draft(scope.draftID, "prompt")
+  if ("draftID" in scope) return withPromptPersistence(Persist.draft(scope.draftID, "prompt"))
   const legacy = `${scope.dir}/prompt${scope.id ? "/" + scope.id : ""}.v2`
-  return Persist.serverScoped(serverScope, scope.dir, scope.id, "prompt", [legacy])
+  return withPromptPersistence(Persist.serverScoped(serverScope, scope.dir, scope.id, "prompt", [legacy]))
 }
 
 function promptStore(initial?: InitialPrompt): PromptStore {
@@ -245,7 +264,7 @@ export function createPromptSession(serverScope: ServerScope, scope: PromptScope
 }
 
 export function createDraftPromptSession(draftID: string, initial?: InitialPrompt) {
-  return createPersistedPrompt(Persist.draft(draftID, "prompt"), initial)
+  return createPersistedPrompt(withPromptPersistence(Persist.draft(draftID, "prompt")), initial)
 }
 
 export type PromptSession = ReturnType<typeof createPromptSession>
